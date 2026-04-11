@@ -3,8 +3,8 @@
 Harness Phase Executor.
 Phase를 순차적으로 실행하고, 상태를 관리하고, 결과를 기록한다.
 
-Usage: python3 scripts/execute.py <task-dir>
-Example: python3 scripts/execute.py 0-mvp
+Usage: python3 scripts/execute.py <task-name>
+Example: python3 scripts/execute.py mvp
 """
 
 import itertools
@@ -22,7 +22,7 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 ROOT = Path(__file__).resolve().parent.parent
-TASKS_DIR = ROOT / "tasks"
+PHASES_DIR = ROOT / "phases"
 SPINNER_CHARS = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 COMMIT_TEMPLATE = "feat({task}): phase {num} — {name}"
 
@@ -45,6 +45,51 @@ def load_json(path: Path) -> dict:
 def save_json(path: Path, data: dict):
     with open(path, "w") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+# ---------------------------------------------------------------------------
+# Phase discovery
+# ---------------------------------------------------------------------------
+
+def discover_phases(task_dir: Path) -> list[dict]:
+    """phases/{task}/phase{N}.md 파일들을 찾아서 순서대로 반환.
+    각 phase의 상태는 phases/{task}/phase{N}.status.json에 저장."""
+    phases = []
+    for f in sorted(task_dir.glob("phase*.md")):
+        name = f.stem  # "phase0", "phase1", ...
+        num_str = name.replace("phase", "")
+        if not num_str.isdigit():
+            continue
+        num = int(num_str)
+
+        status_file = task_dir / f"phase{num}.status.json"
+        if status_file.exists():
+            status_data = load_json(status_file)
+        else:
+            status_data = {"phase": num, "status": "pending"}
+            save_json(status_file, status_data)
+
+        phases.append({
+            "phase": num,
+            "name": extract_phase_name(f),
+            "status_file": status_file,
+            "prompt_file": f,
+            **status_data,
+        })
+
+    return sorted(phases, key=lambda p: p["phase"])
+
+
+def extract_phase_name(phase_file: Path) -> str:
+    """phase 파일의 첫 줄에서 이름 추출. 예: '# Phase 0: 프로젝트 세팅' → '프로젝트-세팅'"""
+    try:
+        first_line = phase_file.read_text().split("\n")[0]
+        if ":" in first_line:
+            name = first_line.split(":", 1)[1].strip()
+            return name.lower().replace(" ", "-")
+        return phase_file.stem
+    except Exception:
+        return phase_file.stem
 
 
 # ---------------------------------------------------------------------------
@@ -121,7 +166,7 @@ class Spinner:
 # Phase execution
 # ---------------------------------------------------------------------------
 
-def build_preamble(project: str, task_dir: str, task_name: str) -> str:
+def build_preamble(project: str, task_name: str) -> str:
     return f"""{project} 프로젝트의 아래 phase를 수행하라.
 
 ## 코드 작성 전
@@ -132,10 +177,10 @@ def build_preamble(project: str, task_dir: str, task_name: str) -> str:
 ## 작업 완료 후
 
 - phase에 명시된 AC(Acceptance Criteria) 커맨드를 실행하라.
-- /tasks/{task_dir}/index.json의 해당 phase status를 업데이트하라:
-  - AC 통과 → "completed"
-  - 3회 수정 시도 후에도 실패 → "error" + "error_message" 기록
-  - 사람의 개입이 필요한 경우 (API 키, 인증 등) → "blocked" + "blocked_reason" 기록 후 즉시 중단
+- /phases/{task_name}/phase{{N}}.status.json을 업데이트하라:
+  - AC 통과 → {{"phase": N, "status": "completed"}}
+  - 3회 수정 시도 후에도 실패 → {{"phase": N, "status": "error", "error_message": "..."}}
+  - 사람의 개입이 필요한 경우 → {{"phase": N, "status": "blocked", "blocked_reason": "..."}} 기록 후 즉시 중단
 - 변경사항을 커밋하라: feat({task_name}): phase N — phase-name
 
 ## 제약
@@ -148,17 +193,13 @@ def build_preamble(project: str, task_dir: str, task_name: str) -> str:
 """
 
 
-def run_phase(task_dir: Path, phase: dict, preamble: str) -> dict:
+def run_phase(phase: dict, preamble: str) -> dict:
     phase_num = phase["phase"]
     phase_name = phase["name"]
-    phase_file = task_dir / f"phase{phase_num}.md"
+    prompt_file = phase["prompt_file"]
 
-    if not phase_file.exists():
-        print(f"  ERROR: {phase_file} not found")
-        sys.exit(1)
-
-    prompt = preamble + phase_file.read_text()
-    output_file = task_dir / f"phase{phase_num}-output.json"
+    prompt = preamble + prompt_file.read_text()
+    output_file = prompt_file.parent / f"phase{phase_num}.output.json"
 
     result = subprocess.run(
         ["claude", "-p", "--dangerously-skip-permissions", "--output-format", "json", prompt],
@@ -188,36 +229,35 @@ def run_phase(task_dir: Path, phase: dict, preamble: str) -> dict:
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python3 scripts/execute.py <task-dir>")
-        print("Example: python3 scripts/execute.py 0-mvp")
+        print("Usage: python3 scripts/execute.py <task-name>")
+        print("Example: python3 scripts/execute.py mvp")
         sys.exit(1)
 
-    task_dir = TASKS_DIR / sys.argv[1]
+    task_name = sys.argv[1]
+    task_dir = PHASES_DIR / task_name
     if not task_dir.is_dir():
         print(f"ERROR: {task_dir} not found")
         sys.exit(1)
 
-    index_file = task_dir / "index.json"
-    if not index_file.exists():
-        print(f"ERROR: {index_file} not found")
+    phases = discover_phases(task_dir)
+    if not phases:
+        print(f"ERROR: No phase files found in {task_dir}")
         sys.exit(1)
 
-    index = load_json(index_file)
-    project = index.get("project", "project")
-    task_name = index.get("task", task_dir.name)
-    total = len(index["phases"])
+    total = len(phases)
+    pending = [p for p in phases if p["status"] == "pending"]
 
     print(f"\n{'='*50}")
     print(f"  Harness Executor")
-    print(f"  Task: {task_name} | Phases: {total}")
+    print(f"  Task: {task_name} | Phases: {total} | Pending: {len(pending)}")
     print(f"{'='*50}")
 
     # Check for error/blocked
-    for p in index["phases"]:
+    for p in phases:
         if p["status"] == "error":
             print(f"\n  ✗ Phase {p['phase']} ({p['name']}) failed.")
             print(f"  Error: {p.get('error_message', 'unknown')}")
-            print(f"  Fix and reset status to 'pending' to retry.")
+            print(f"  Fix and reset status to 'pending' in {p['status_file']} to retry.")
             sys.exit(1)
         if p["status"] == "blocked":
             print(f"\n  ⏸ Phase {p['phase']} ({p['name']}) blocked.")
@@ -228,86 +268,66 @@ def main():
     git_ensure_branch(task_name)
 
     # Preamble
-    preamble = build_preamble(project, task_dir.name, task_name)
+    project = "FeedbackPulse"
+    preamble = build_preamble(project, task_name)
 
     # Phase loop
     while True:
-        index = load_json(index_file)
-        pending = next((p for p in index["phases"] if p["status"] == "pending"), None)
+        phases = discover_phases(task_dir)
+        current = next((p for p in phases if p["status"] == "pending"), None)
 
-        if pending is None:
+        if current is None:
             print("\n  All phases completed!")
             break
 
-        phase_num = pending["phase"]
-        phase_name = pending["name"]
-        done = sum(1 for p in index["phases"] if p["status"] == "completed")
+        phase_num = current["phase"]
+        phase_name = current["name"]
+        done = sum(1 for p in phases if p["status"] == "completed")
 
         # Record start time
-        for p in index["phases"]:
-            if p["phase"] == phase_num and "started_at" not in p:
-                p["started_at"] = now_iso()
-                save_json(index_file, index)
-                break
+        status_data = load_json(current["status_file"])
+        if "started_at" not in status_data:
+            status_data["started_at"] = now_iso()
+            save_json(current["status_file"], status_data)
 
         # Run
         with Spinner(f"Phase {phase_num}/{total - 1} ({done} done): {phase_name}") as sp:
-            run_phase(task_dir, pending, preamble)
+            run_phase(current, preamble)
             elapsed = int(sp.elapsed)
 
-        # Check result
-        index = load_json(index_file)
-        status = "pending"
-        for p in index["phases"]:
-            if p["phase"] == phase_num:
-                status = p.get("status", "pending")
-                break
-
+        # Re-read status
+        status_data = load_json(current["status_file"])
+        status = status_data.get("status", "pending")
         ts = now_iso()
 
         if status == "completed":
-            for p in index["phases"]:
-                if p["phase"] == phase_num:
-                    p["completed_at"] = ts
-            save_json(index_file, index)
+            status_data["completed_at"] = ts
+            save_json(current["status_file"], status_data)
             git_commit(task_name, phase_num, phase_name)
             print(f"  ✓ Phase {phase_num}: {phase_name} [{elapsed}s]")
 
         elif status == "error":
-            for p in index["phases"]:
-                if p["phase"] == phase_num:
-                    p["failed_at"] = ts
-            save_json(index_file, index)
+            status_data["failed_at"] = ts
+            save_json(current["status_file"], status_data)
             git_commit(task_name, phase_num, phase_name)
-            err = next((p.get("error_message", "") for p in index["phases"] if p["phase"] == phase_num), "")
             print(f"  ✗ Phase {phase_num}: {phase_name} failed [{elapsed}s]")
-            print(f"    Error: {err}")
+            print(f"    Error: {status_data.get('error_message', 'unknown')}")
             sys.exit(1)
 
         elif status == "blocked":
-            for p in index["phases"]:
-                if p["phase"] == phase_num:
-                    p["blocked_at"] = ts
-            save_json(index_file, index)
-            reason = next((p.get("blocked_reason", "") for p in index["phases"] if p["phase"] == phase_num), "")
+            status_data["blocked_at"] = ts
+            save_json(current["status_file"], status_data)
             print(f"  ⏸ Phase {phase_num}: {phase_name} blocked [{elapsed}s]")
-            print(f"    Reason: {reason}")
+            print(f"    Reason: {status_data.get('blocked_reason', 'unknown')}")
             sys.exit(2)
 
         else:  # still pending
-            for p in index["phases"]:
-                if p["phase"] == phase_num:
-                    p["status"] = "error"
-                    p["error_message"] = "Phase did not update status"
-                    p["failed_at"] = ts
-            save_json(index_file, index)
+            status_data["status"] = "error"
+            status_data["error_message"] = "Phase did not update status"
+            status_data["failed_at"] = ts
+            save_json(current["status_file"], status_data)
             print(f"  ✗ Phase {phase_num}: status not updated [{elapsed}s]")
             sys.exit(1)
-
-    # All done
-    index = load_json(index_file)
-    index["completed_at"] = now_iso()
-    save_json(index_file, index)
 
     print(f"\n{'='*50}")
     print(f"  Task '{task_name}' completed!")
