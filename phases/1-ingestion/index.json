@@ -1,0 +1,62 @@
+{
+  "project": "Robot Telemetry Pipeline",
+  "phase": "1-ingestion",
+  "domain": "mixed",
+  "steps": [
+    {
+      "step": 0,
+      "name": "data-pipeline-iam",
+      "status": "pending",
+      "depends_on": [],
+      "description": "Kinesis 및 S3 접근을 위한 전용 IRSA Role 정의",
+      "started_at": "2026-04-26T02:13:42+0900"
+    },
+    {
+      "step": 1,
+      "name": "kinesis-streams",
+      "status": "pending",
+      "depends_on": [
+        0
+      ],
+      "description": "10개 샤드 규모의 메인 텔레메트리 스트림 구축"
+    },
+    {
+      "step": 2,
+      "name": "glue-catalog",
+      "status": "pending",
+      "depends_on": [
+        1
+      ],
+      "description": "Parquet 변환을 위한 Glue 데이터 카탈로그 스키마 정의"
+    },
+    {
+      "step": 3,
+      "name": "kinesis-firehose",
+      "status": "pending",
+      "depends_on": [
+        2
+      ],
+      "description": "S3 동적 파티셔닝 및 포맷 변환(JSON->Parquet) 구성"
+    },
+    {
+      "step": 4,
+      "name": "generator-app",
+      "status": "completed",
+      "depends_on": [],
+      "description": "asyncio 기반 가상 로봇 텔레메트리 생성기 구현",
+      "started_at": "2026-04-26T02:13:42+0900",
+      "summary": "data/seed_data_sample.csv(AI4I 포맷 200행) + src/generator/app.py(asyncio 10,000로봇, put_records 배치, failure 프로필 스파이크 로직)"
+    },
+    {
+      "step": 5,
+      "name": "generator-k8s",
+      "status": "pending",
+      "depends_on": [
+        3,
+        4
+      ],
+      "description": "Generator EKS 배포 및 데이터 송신 시작"
+    }
+  ],
+  "created_at": "2026-04-26T02:13:14+0900"
+}
