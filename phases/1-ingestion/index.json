@@ -47,7 +47,7 @@
       "description": "S3 동적 파티셔닝 및 포맷 변환(JSON->Parquet) 구성",
       "started_at": "2026-04-26T02:19:27+0900",
       "summary": "kinesis.tf: robot-telemetry-firehose(KDS→S3 Bronze, Parquet/Snappy, Dynamic Partitioning, Glue 스키마 참조)",
-      "completed_at": "2026-04-26T05:30:00+0900"
+      "completed_at": "2026-04-26T02:20:45+0900"
     },
     {
       "step": 4,
@@ -62,12 +62,15 @@
     {
       "step": 5,
       "name": "generator-k8s",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [
         3,
         4
       ],
-      "description": "Generator EKS 배포 및 데이터 송신 시작"
+      "description": "Generator EKS 배포 및 데이터 송신 시작",
+      "started_at": "2026-04-26T02:20:45+0900",
+      "summary": "Dockerfile + configmap.yaml(seed CSV) + deployment.yaml: ns=robot-telemetry, ConfigMap 마운트, IRSA SA, ROBOT_COUNT=10000, 2Gi",
+      "completed_at": "2026-04-26T02:25:00+0900"
     }
   ],
   "created_at": "2026-04-26T02:13:14+0900"
