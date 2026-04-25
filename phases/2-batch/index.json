@@ -6,10 +6,11 @@
     {
       "step": 0,
       "name": "athena-ddl",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [],
       "description": "Bronze/Silver/Gold 테이블 및 파티션 프로젝션 SQL 작성",
-      "started_at": "2026-04-26T02:32:11+0900"
+      "started_at": "2026-04-26T02:32:11+0900",
+      "summary": "sql/ DDL 3개(bronze Partition Projection, silver, gold). athena.tf: robot-telemetry-workgroup, project-athena-results/"
     },
     {
       "step": 1,
@@ -18,7 +19,7 @@
       "depends_on": [],
       "description": "EKS 내 Airflow 환경 및 AWS 커넥션 설정",
       "started_at": "2026-04-26T02:32:11+0900",
-      "completed_at": "2026-04-26T02:32:11+0900",
+      "completed_at": "2026-04-26T02:33:20+0900",
       "summary": "docker-compose.yaml 생성: Airflow LocalExecutor, PostgreSQL, dags/ 마운트, AWS Provider 포함"
     },
     {
