@@ -10,16 +10,20 @@
       "depends_on": [],
       "description": "Kinesis 및 S3 접근을 위한 전용 IRSA Role 정의",
       "started_at": "2026-04-26T02:13:42+0900",
-      "summary": "iam.tf: Generator IRSA(ns=robot-telemetry, main+alert stream), Firehose Role(S3+Glue)"
+      "summary": "iam.tf: Generator IRSA(ns=robot-telemetry, main+alert stream), Firehose Role(S3+Glue)",
+      "completed_at": "2026-04-26T02:16:56+0900"
     },
     {
       "step": 1,
       "name": "kinesis-streams",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [
         0
       ],
-      "description": "10개 샤드 규모의 메인 텔레메트리 스트림 구축"
+      "description": "10개 샤드 규모의 메인 텔레메트리 스트림 구축",
+      "started_at": "2026-04-26T02:16:56+0900",
+      "summary": "kinesis.tf: robot-telemetry-stream(10 Shards), robot-anomaly-alert-stream(1 Shard), iam.tf ARN 연결",
+      "completed_at": "2026-04-26T02:30:00+0900"
     },
     {
       "step": 2,
