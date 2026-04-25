@@ -23,16 +23,19 @@
       "description": "10개 샤드 규모의 메인 텔레메트리 스트림 구축",
       "started_at": "2026-04-26T02:16:56+0900",
       "summary": "kinesis.tf: robot-telemetry-stream(10 Shards), robot-anomaly-alert-stream(1 Shard), iam.tf ARN 연결",
-      "completed_at": "2026-04-26T02:30:00+0900"
+      "completed_at": "2026-04-26T02:18:28+0900"
     },
     {
       "step": 2,
       "name": "glue-catalog",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [
         1
       ],
-      "description": "Parquet 변환을 위한 Glue 데이터 카탈로그 스키마 정의"
+      "description": "Parquet 변환을 위한 Glue 데이터 카탈로그 스키마 정의",
+      "started_at": "2026-04-26T02:18:28+0900",
+      "summary": "glue.tf: robot_telemetry_db DB, bronze_robot_telemetry 테이블(7컬럼+4파티션키) 생성",
+      "completed_at": "2026-04-26T10:30:00+0900"
     },
     {
       "step": 3,
