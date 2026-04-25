@@ -10,7 +10,8 @@
       "depends_on": [],
       "description": "Bronze/Silver/Gold 테이블 및 파티션 프로젝션 SQL 작성",
       "started_at": "2026-04-26T02:32:11+0900",
-      "summary": "sql/ DDL 3개(bronze Partition Projection, silver, gold). athena.tf: robot-telemetry-workgroup, project-athena-results/"
+      "summary": "sql/ DDL 3개(bronze Partition Projection, silver, gold). athena.tf: robot-telemetry-workgroup, project-athena-results/",
+      "completed_at": "2026-04-26T02:33:50+0900"
     },
     {
       "step": 1,
@@ -25,12 +26,15 @@
     {
       "step": 2,
       "name": "dag-bronze-silver",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [
         0,
         1
       ],
-      "description": "데이터 정제 및 중복 제거 ETL DAG 구현"
+      "description": "데이터 정제 및 중복 제거 ETL DAG 구현",
+      "started_at": "2026-04-26T02:33:50+0900",
+      "completed_at": "2026-04-26T03:10:00+0900",
+      "summary": "robot_daily_etl.py 생성: bronze_to_silver(이상치/중복 제거, Workgroup=robot-telemetry-workgroup)"
     },
     {
       "step": 3,
