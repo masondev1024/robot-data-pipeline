@@ -58,5 +58,6 @@
       "summary": "tests/ml/test_train.py(7 tests: query validation, feature alignment, Athena/XGBoost mock) + test_train_entry.py(6 tests: parse_args, feature_cols, DataFrame processing, model output) — 78 total PASSED, 회귀 없음"
     }
   ],
-  "created_at": "2026-04-26T00:00:00+0900"
+  "created_at": "2026-04-26T00:00:00+0900",
+  "completed_at": "2026-04-27T01:34:39+0900"
 }
