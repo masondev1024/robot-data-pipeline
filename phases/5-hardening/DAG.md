@@ -10,5 +10,5 @@ graph TD
   class S0 pending;
   S1["1. predictive-maintenance"]
   class S1 pending;
-  S0 --> S1
+  Sobservability --> S1
 ```
