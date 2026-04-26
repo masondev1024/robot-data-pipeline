@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import re
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -9,6 +10,7 @@ import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -18,6 +20,8 @@ limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="Robot Telemetry AI Query API")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
 
 _gold_cache: str = ""
 _cache_updated_at: str = ""
@@ -129,22 +133,41 @@ async def healthz():
     return {"status": "ok", "cached_at": _cache_updated_at}
 
 
+@app.get("/api/status")
+async def status():
+    return {
+        "data_date": _data_date,
+        "cached_at": _cache_updated_at,
+        "cache_ready": _cache_ready,
+    }
+
+
 class ChatRequest(BaseModel):
     question: str
 
 
 @app.post("/api/chat")
-async def chat(req: ChatRequest):
+@limiter.limit("10/minute")
+async def chat(request: Request, req: ChatRequest):
     if not _gold_cache:
         raise HTTPException(status_code=503, detail="캐시가 아직 준비되지 않았습니다.")
 
-    model_id = os.environ.get("BEDROCK_MODEL_ID", "anthropic.claude-3-haiku-20240307-v1:0")
-    prompt = f"다음은 공장 로봇 상태 데이터야:\n{_gold_cache}\n\n질문: {req.question}"
+    model_id = os.environ.get(
+        "BEDROCK_MODEL_ID",
+        "anthropic.claude-3-5-sonnet-20241022-v2:0",
+    )
+
+    system_prompt = (
+        "로봇 ID 언급 시 반드시 [ROBOT-XXXXX] 형식(대괄호+5자리 숫자)으로 표기하라. "
+        "응답은 200자 이내, 점검 우선순위 위주로 답하라."
+    )
+    user_prompt = f"다음은 공장 로봇 상태 데이터야:\n{_gold_cache}\n\n질문: {req.question}"
 
     body = json.dumps({
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": 512,
-        "messages": [{"role": "user", "content": prompt}],
+        "system": system_prompt,
+        "messages": [{"role": "user", "content": user_prompt}],
     })
 
     loop = asyncio.get_event_loop()
@@ -168,7 +191,21 @@ async def chat(req: ChatRequest):
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Bedrock 호출 실패: {exc}")
 
-    return {"answer": response_text, "cached_at": _cache_updated_at, "data_date": _data_date}
+    links = []
+    robot_id_pattern = r"\[ROBOT-(\d{5})\]"
+    for match in re.finditer(robot_id_pattern, response_text):
+        robot_id = f"ROBOT-{match.group(1)}"
+        links.append({
+            "label": f"{robot_id} 차트",
+            "url": f"/?robot_id={robot_id}"
+        })
+
+    return {
+        "answer": response_text,
+        "cached_at": _cache_updated_at,
+        "data_date": _data_date,
+        "links": links
+    }
 
 
 sagemaker_runtime = boto3.client("sagemaker-runtime", region_name="eu-west-1")
@@ -208,7 +245,5 @@ async def predict_failure(request: Request, body: PredictRequest):
 
 
 @app.get("/", response_class=HTMLResponse)
-async def index():
-    template_path = os.path.join(os.path.dirname(__file__), "templates", "chat.html")
-    with open(template_path, encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
+async def portal(request: Request, robot_id: str = ""):
+    return templates.TemplateResponse("portal.html", {"request": request, "robot_id": robot_id})
