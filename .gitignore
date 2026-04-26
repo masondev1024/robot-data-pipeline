@@ -29,3 +29,12 @@ terraform/lambda_*.zip
 # Seed 데이터 — 전체 Kaggle 데이터셋은 커밋 금지 (sample만 허용)
 data/seed_data.csv
 data/*.zip
+
+# 로컬 학습 문서 — 원격 저장소에 올리지 않음
+ARCHITECTURE_OVERVIEW.md
+DATA_FLOW_DETAILED.md
+PHASE_DEEP_DIVE.md
+OPERATIONAL_GUIDE.md
+DE_SKILLS_LEARNING_JOURNAL.md
+plan.md
+프로젝트 구성될때 물리적 빈틈.md
