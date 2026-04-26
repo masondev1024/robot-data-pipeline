@@ -12,4 +12,13 @@ graph TD
   class S1 completed;
   S2["2. api-server"]
   class S2 completed;
+  S3["3. alert-handler-deeplink"]
+  class S3 pending;
+  S4["4. alb-ingresses"]
+  class S4 pending;
+  S5["5. portal-and-ux-bugs"]
+  class S5 pending;
+  S6["6. api-tests"]
+  class S6 pending;
+  S5 --> S6
 ```

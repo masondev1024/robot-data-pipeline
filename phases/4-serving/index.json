@@ -36,29 +36,36 @@
     {
       "step": 3,
       "name": "alert-handler-deeplink",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [],
-      "description": "Lambda alert_handler 보강 — portal_url SSM 런타임 조회 + 딥링크 메시지 포맷 + IAM ssm:GetParameter 권한"
+      "description": "Lambda alert_handler 보강 — portal_url SSM 런타임 조회 + 딥링크 메시지 포맷 + IAM ssm:GetParameter 권한",
+      "started_at": "2026-04-27T01:11:28+0900",
+      "completed_at": "2026-04-27T01:15:00+0900",
+      "summary": "alert_handler.py 보강 (SSM portal_url 런타임 조회 + 모듈 전역 캐시 + 딥링크 메시지 포맷) + iam.tf Lambda 권한 범위 축소 (/robot-telemetry/portal-url 단일 파라미터)"
     },
     {
       "step": 4,
       "name": "alb-ingresses",
       "status": "pending",
       "depends_on": [],
-      "description": "Grafana + API ALB Ingress 2종 (internet-facing) + grafana_admin_password sensitive 변수화 검증"
+      "description": "Grafana + API ALB Ingress 2종 (internet-facing) + grafana_admin_password sensitive 변수화 검증",
+      "started_at": "2026-04-27T01:11:28+0900"
     },
     {
       "step": 5,
       "name": "portal-and-ux-bugs",
       "status": "pending",
       "depends_on": [],
-      "description": "FastAPI 통합 관제 포털(portal.html) + Bedrock Sonnet 3.5 + slowapi rate limit + UX 버그 6건 idempotent 수정 (timezone/data_date/system 필드/DOMPurify/minReplicas/딥링크)"
+      "description": "FastAPI 통합 관제 포털(portal.html) + Bedrock Sonnet 3.5 + slowapi rate limit + UX 버그 6건 idempotent 수정 (timezone/data_date/system 필드/DOMPurify/minReplicas/딥링크)",
+      "started_at": "2026-04-27T01:11:28+0900"
     },
     {
       "step": 6,
       "name": "api-tests",
       "status": "pending",
-      "depends_on": [5],
+      "depends_on": [
+        5
+      ],
       "description": "tests/api/(chat 6 + status 4) + tests/lambda/(alert 5) — 모든 boto3 Mock, 실 AWS 호출 0건"
     }
   ],
