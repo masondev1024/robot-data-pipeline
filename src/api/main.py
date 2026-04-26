@@ -5,6 +5,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 import boto3
+import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -20,12 +21,13 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 _gold_cache: str = ""
 _cache_updated_at: str = ""
+_data_date: str = ""
 _cache_ready: bool = False
 
 
 def _run_athena_query(query: str, database: str, workgroup: str, output_location: str) -> list[dict]:
     """Synchronous Athena query execution. Returns list of row dicts."""
-    client = boto3.client("athena", region_name=os.environ.get("AWS_DEFAULT_REGION", "ap-northeast-2"))
+    client = boto3.client("athena", region_name=os.environ.get("AWS_DEFAULT_REGION", "eu-west-1"))
 
     response = client.start_query_execution(
         QueryString=query,
@@ -63,7 +65,7 @@ def _run_athena_query(query: str, database: str, workgroup: str, output_location
 
 async def refresh_cache():
     """Athena Gold 테이블 최신 파티션 조회 → _gold_cache 갱신."""
-    global _gold_cache, _cache_updated_at
+    global _gold_cache, _cache_updated_at, _data_date
 
     database = os.environ.get("ATHENA_DATABASE", "robot_telemetry_db")
     workgroup = os.environ.get("ATHENA_WORKGROUP", "robot-telemetry-workgroup")
@@ -95,6 +97,7 @@ LIMIT 100
         else:
             _gold_cache = "(데이터 없음)"
         _cache_updated_at = datetime.now(timezone.utc).isoformat()
+        _data_date = yesterday
     except Exception as exc:
         print(f"[refresh_cache] 실패: {exc}")
         if not _gold_cache:
@@ -114,7 +117,8 @@ async def startup():
             await asyncio.sleep(10)
     scheduler = AsyncIOScheduler()
     hour = int(os.environ.get("CACHE_REFRESH_HOUR", "1"))
-    scheduler.add_job(refresh_cache, "cron", hour=hour, minute=0)
+    kst = pytz.timezone("Asia/Seoul")
+    scheduler.add_job(refresh_cache, "cron", hour=hour, minute=0, timezone=kst)
     scheduler.start()
 
 
@@ -146,7 +150,7 @@ async def chat(req: ChatRequest):
     loop = asyncio.get_event_loop()
     bedrock = boto3.client(
         "bedrock-runtime",
-        region_name=os.environ.get("AWS_DEFAULT_REGION", "ap-northeast-2"),
+        region_name=os.environ.get("AWS_DEFAULT_REGION", "eu-west-1"),
     )
 
     try:
@@ -164,7 +168,7 @@ async def chat(req: ChatRequest):
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Bedrock 호출 실패: {exc}")
 
-    return {"answer": response_text, "cached_at": _cache_updated_at}
+    return {"answer": response_text, "cached_at": _cache_updated_at, "data_date": _data_date}
 
 
 sagemaker_runtime = boto3.client("sagemaker-runtime", region_name="eu-west-1")
