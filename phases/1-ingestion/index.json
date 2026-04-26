@@ -58,12 +58,14 @@
     {
       "step": 5,
       "name": "generator-k8s",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [
         4
       ],
       "description": "Generator Dockerfile + K8s ConfigMap + Deployment 작성",
-      "started_at": "2026-04-26T21:03:34+0900"
+      "started_at": "2026-04-26T21:03:34+0900",
+      "completed_at": "2026-04-26T21:10:00+0900",
+      "summary": "Dockerfile + configmap.yaml(seed CSV) + deployment.yaml: ns=robot-telemetry, ConfigMap 마운트, IRSA SA, ROBOT_COUNT=10000, 2Gi"
     },
     {
       "step": 6,
