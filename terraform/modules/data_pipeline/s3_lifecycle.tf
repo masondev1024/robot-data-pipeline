@@ -1,9 +1,5 @@
-data "aws_s3_bucket" "main" {
-  bucket = var.s3_bucket_name
-}
-
 resource "aws_s3_bucket_lifecycle_configuration" "data_lake" {
-  bucket = data.aws_s3_bucket.main.id
+  bucket = data.aws_s3_bucket.existing.id
 
   rule {
     id     = "bronze-glacier"
