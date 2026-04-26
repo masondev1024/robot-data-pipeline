@@ -6,10 +6,12 @@
     {
       "step": 0,
       "name": "lambda-alert",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [],
       "description": "Alert KDS → SNS → Slack 브리지 Lambda + Slack 딥링크 구현",
-      "started_at": "2026-04-27T00:51:04+0900"
+      "started_at": "2026-04-27T00:51:04+0900",
+      "completed_at": "2026-04-27T06:00:00+0900",
+      "summary": "terraform/modules/data_pipeline/sns.tf(robot-anomaly-alerts SNS topic + Slack webhook subscription) + lambda.tf(robot-anomaly-alert-lambda + Event Source Mapping + KDS trigger) + src/lambda/alert_handler.py(alert payload parsing + SNS publish) + variables.tf(slack_webhook_url sensitive var)"
     },
     {
       "step": 1,
@@ -26,7 +28,7 @@
       "depends_on": [],
       "description": "FastAPI 통합 관제 포털(portal.html) + ALB Ingress + Rate Limiting + Cold Start 처리",
       "started_at": "2026-04-27T00:51:04+0900",
-      "completed_at": "2026-04-27T03:30:00+0900",
+      "completed_at": "2026-04-27T00:53:17+0900",
       "summary": "src/api/main.py(FastAPI+in-memory캐시+apscheduler KST timezone+Bedrock), templates/chat.html(UI), Dockerfile(python:3.11), k8s/api/deployment.yaml+hpa.yaml(eu-west-1 region fix), iam.tf(API IRSA 완성)"
     }
   ],
