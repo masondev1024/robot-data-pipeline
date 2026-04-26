@@ -66,11 +66,14 @@
     {
       "step": 6,
       "name": "api-tests",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [
         5
       ],
-      "description": "tests/api/(chat 6 + status 4) + tests/lambda/(alert 5) — 모든 boto3 Mock, 실 AWS 호출 0건"
+      "description": "tests/api/(chat 6 + status 4) + tests/lambda/(alert 5) — 모든 boto3 Mock, 실 AWS 호출 0건",
+      "started_at": "2026-04-27T01:14:08+0900",
+      "completed_at": "2026-04-27T01:16:20+0900",
+      "summary": "tests/api/(test_chat.py 6 + test_status.py 4) + tests/lambda/test_alert_handler.py 5 = 15 PASSED, 모든 boto3 mock처리, 회귀테스트 65 PASSED"
     }
   ],
   "created_at": "2026-04-27T00:50:51+0900"
