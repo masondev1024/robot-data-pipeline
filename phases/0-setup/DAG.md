@@ -21,6 +21,6 @@ graph TD
   class S4 completed;
   S2 --> S4
   S5["5. github-actions-workflows"]
-  class S5 pending;
+  class S5 completed;
   S4 --> S5
 ```
