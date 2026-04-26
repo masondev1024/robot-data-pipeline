@@ -295,17 +295,17 @@
   ### Phase 3: Real-time Anomaly Detection & AI Insight (Flink + Bedrock)
   *목표: 스트리밍 데이터를 실시간으로 모니터링하고, 배치 집계 결과를 바탕으로 LLM 리포트 생성.*
 
-  - [ ] **Task 3.1: Real-time Processing (Apache Managed Flink + PyFlink) — 고도화된 이상 탐지**
-    - [ ] **[ADR-010]** Managed Flink **Application 모드 + PyFlink (Table API)** 채택. Studio Notebook(Zeppelin)·Java·SQL CLI 모두 미사용. 코드를 ZIP 패키징하여 S3에 업로드, Terraform `aws_s3_object`로 추적.
-    - [ ] KDS(`robot-telemetry-stream`)를 Source Table로 매핑. `kinesis` connector + `format=json` + `scan.stream.initpos=LATEST`. 리전은 `eu-west-1`로 통일.
-    - [ ] **[필수] Watermark 선언**: Source Table DDL에 `WATERMARK FOR event_time AS event_time - INTERVAL '10' SECOND` 추가. 지연 데이터(Late Data) 최대 10초 허용. Watermark 없이 Event Time 기반 Window를 사용하면 Flink가 Window를 닫지 못하고 상태가 무한히 쌓임.
-    - [ ] **[핵심][ADR-009] 실무형 이상 탐지 로직 구현 (PyFlink Table API + 임베디드 SQL):**
-      - [ ] **Condition 1 (Moving Z-Score):** OVER `PARTITION BY robot_id ORDER BY event_time RANGE INTERVAL '5' MINUTE PRECEDING`로 robot_id별 5분 이동 평균 μ, 이동 표준편차 σ 계산. `|motor_temp - μ| / GREATEST(σ, 0.5) > 3.0` (3-sigma rule). σ 분모 가드 필수.
-      - [ ] **Condition 2 (Multivariate Correlation):** `motor_temp >= 85.0 AND (motor_temp / GREATEST(current_load, 1)) > 1.8` — 부하 대비 과열. division-by-zero 가드 필수.
-      - [ ] 위 두 조건의 OR 결합 → 이상 레코드 추출 → **1분 Tumbling Window**로 robot_id별 집계(avg/max temp, alert_count) → Sink (알람 폭주 방지).
-    - [ ] **[Threshold 외부화]** `zscore.threshold = 3.0`, `load.ratio.threshold = 1.8`, `load.ratio.min.temp = 85.0` 모두 Flink `environment_properties`의 `property_map`(group_id `robot-app-config`)으로 주입. 코드 hardcoding 금지.
-    - [ ] 탐지된 이상 이벤트를 두 곳에 동시 Sink: ① S3 `alerts/` 경로 (filesystem connector + JSON, 이력 로깅), ② **`robot-anomaly-alert-stream`** (Alert 전용 KDS, kinesis connector + JSON, Native Sink) — SNS 직접 연결 금지 (Flink에 SNS Native Sink 없음).
-    - [ ] PyFlink Statement Set으로 두 Sink를 동일 트랜잭션에서 실행 (`STATEMENT SET BEGIN INSERT INTO sink1 ...; INSERT INTO sink2 ...; END;` 패턴 또는 `t_env.create_statement_set()`).
+  - [x] **Task 3.1: Real-time Processing (Apache Managed Flink + PyFlink) — 고도화된 이상 탐지**
+    - [x] **[ADR-010]** Managed Flink **Application 모드 + PyFlink (Table API)** 채택. Studio Notebook(Zeppelin)·Java·SQL CLI 모두 미사용. 코드를 ZIP 패키징하여 S3에 업로드, Terraform `aws_s3_object`로 추적. (`terraform/modules/data_pipeline/flink.tf` step 0 산출물)
+    - [x] KDS(`robot-telemetry-stream`)를 Source Table로 매핑. `kinesis` connector + `format=json` + `scan.stream.initpos=LATEST`. 리전은 `eu-west-1`로 통일.
+    - [x] **[필수] Watermark 선언**: Source Table DDL에 `WATERMARK FOR event_time AS event_time - INTERVAL '10' SECOND` 추가. 지연 데이터(Late Data) 최대 10초 허용. Watermark 없이 Event Time 기반 Window를 사용하면 Flink가 Window를 닫지 못하고 상태가 무한히 쌓임.
+    - [x] **[핵심][ADR-009] 실무형 이상 탐지 로직 구현 (PyFlink Table API + 임베디드 SQL):**
+      - [x] **Condition 1 (Moving Z-Score):** OVER `PARTITION BY robot_id ORDER BY event_time RANGE INTERVAL '5' MINUTE PRECEDING`로 robot_id별 5분 이동 평균 μ, 이동 표준편차 σ 계산. `|motor_temp - μ| / GREATEST(σ, 0.5) > 3.0` (3-sigma rule). σ 분모 가드 필수.
+      - [x] **Condition 2 (Multivariate Correlation):** `motor_temp >= 85.0 AND (motor_temp / GREATEST(current_load, 1)) > 1.8` — 부하 대비 과열. division-by-zero 가드 필수.
+      - [x] 위 두 조건의 OR 결합 → 이상 레코드 추출 → **1분 Tumbling Window**로 robot_id별 집계(avg/max temp, alert_count) → Sink (알람 폭주 방지).
+    - [x] **[Threshold 외부화]** `zscore.threshold = 3.0`, `load.ratio.threshold = 1.8`, `load.ratio.min.temp = 85.0` 모두 Flink `environment_properties`의 `property_map`(group_id `robot-app-config`)으로 주입. 코드 hardcoding 금지. (`flink/anomaly_detection.py`의 `load_application_properties` 표준 패턴)
+    - [x] 탐지된 이상 이벤트를 두 곳에 동시 Sink: ① S3 `alerts/` 경로 (filesystem connector + JSON, 이력 로깅), ② **`robot-anomaly-alert-stream`** (Alert 전용 KDS, kinesis connector + JSON, Native Sink) — SNS 직접 연결 금지 (Flink에 SNS Native Sink 없음).
+    - [x] PyFlink Statement Set으로 두 Sink를 동일 트랜잭션에서 실행 (`t_env.create_statement_set()` + 2× `add_insert_sql`).
   - [x] **Task 3.2: LLM 배치 리포트 (Amazon Bedrock)**
     - [x] `dags/robot_daily_etl.py`의 마지막 Task로 Python Operator 추가.
     - [x] Gold Table의 최신 파티션 데이터(일일 상태 요약)를 `boto3` Athena Client로 읽어옴.
@@ -314,9 +314,9 @@
     - [x] 생성된 리포트를 S3 `reports/YYYY-MM-DD.txt` 경로에 저장.
     - [x] SELECT 컬럼 정합성: gold DDL 컬럼(`battery_drain`, `active_hours`)으로 정정 — step 4 (dag-fix) 완료.
   - [ ] **Task 3.3: Real-time & AI Validation**
-    - [ ] **[Flink 단위 검증 — `tests/flink/`]** Z-Score 계산 함수(`compute_zscore`), 다변량 비율 함수(`compute_load_ratio`), 두 조건 OR 결합 로직을 **순수 함수**로 분리해 pytest 케이스 작성: 정상 데이터, σ=0 가드, current_load=0 가드, 두 조건 동시 발화, 임계값 boundary.
-    - [ ] **[Flink 통합 검증]** 실 환경에서 90도 이상의 테스트 데이터를 메인 KDS에 주입 → Alert KDS Consumer로 Sink 수신 확인. Z-Score 발화/비발화 케이스를 시나리오로 분리.
-    - [ ] **[Bedrock 검증 — `tests/etl/test_bedrock_report.py`]** Mock Athena response + Mock Bedrock response로 `_bedrock_report` 함수 호출 → S3 `put_object`가 `reports/{ds}.txt` 키로 호출되는지, 프롬프트에 data_summary가 포함되는지, `max_tokens=512` 인지 검증.
+    - [x] **[Flink 단위 검증 — `tests/flink/test_anomaly_detection.py`]** 18 케이스 PASSED (`compute_zscore` 5건, `compute_load_ratio` 4건, `is_anomaly` 8건, `TestThresholdTuning` 1건). σ=0 가드, current_load=0 가드, 두 조건 동시 발화, threshold tuning 모두 커버.
+    - [ ] **[Flink 통합 검증]** 실 환경에서 90도 이상의 테스트 데이터를 메인 KDS에 주입 → Alert KDS Consumer로 Sink 수신 확인. Z-Score 발화/비발화 케이스를 시나리오로 분리. (운영 배포 후 별도 진행)
+    - [x] **[Bedrock 검증 — `tests/etl/test_bedrock_report.py`]** 14 케이스 PASSED (Athena 호출 4건, Bedrock 호출 6건, S3 1건, DAG 토폴로지 4건 — 회귀 시 17건 합산 통과).
 
   ### Phase 4: Serving Layer (Slack Alert + Grafana + AI Chat)
   *목표: 파이프라인 결과를 운영자가 실시간으로 확인하고 AI에게 직접 질문할 수 있는 서비스 레이어를 구축한다.*
@@ -461,5 +461,13 @@
   - `[2026-04-26]`: Phase 2 Step 4(dag-fix) 실행 완료 — dags/robot_daily_etl.py의 bronze WHERE 절을 year/month/day 파티션 키 기반으로 변경, gold INSERT를 active_hours로 정정(operation_ratio/battery_drain_rate 제거), bedrock SELECT/data_summary도 동기화. AC 7/7 통과.
   - `[2026-04-26]`: Phase 2 Step 5(data-quality-gate) 신설 + 실행 — Task 2.0 충족. requirements.txt 신규 작성, evaluate_quality 순수 함수 + _quality_check PythonOperator + _publish_dq_failure SNS 알림 추가, DAG chain `quality_check → bronze_to_silver → ...` 로 재배선. tests/etl/test_data_quality.py 7건 통과. tests/conftest.py에 sys.path 추가 (dags/ 임포트 경로). **2-batch phase의 모든 step (0~5) completed**.
   - `[2026-04-26]`: Phase 3 step 재설계 — 기존 step0/1/2(`flink-terraform` / `flink-sql` / `bedrock-report`) 초안을 PRD/ADR과 비교 검토하여 부정합 다수 발견(① step2 bedrock-report는 Phase 2에서 이미 완성, AC `task_id` 깨짐 / ② step1 단순 임계값 vs plan.md 고도화 명세 불일치 / ③ step1 `aws.region=ap-northeast-2` vs 실 인프라 `eu-west-1` / ④ step0 `code_content`/CloudWatch logging/SQL→앱 deploy 경로 누락 / ⑤ Task 3.3 검증 step 부재). 사용자 결정에 따라 **고도화 + PyFlink + 4-step 재설계**로 전환: step0(flink-terraform 보강), step1(flink-app PyFlink Z-Score+다변량), step2(flink-validation 단위 테스트), step3(bedrock-report-tests). 동반 갱신: ADR-009(이상 탐지 고도화), ADR-010(PyFlink 채택), research.md §4(Z-Score/다변량/Watermark/threshold 외부화), plan.md Task 3.1·3.3 명세. stale `step{0,1,2}-output.json` 삭제. **현재 phase 3는 다시 pending 상태로 진입 대기**.
+
+  - `[2026-04-27]`: Harness 개선 — `chore(harness): declarative phase gates + --preflight-yes` 커밋. ① `phases/index.json`에 `gate_files: []` 선언적 옵션 신설(named gate 코드 수정 없이 phase 추가 가능), `_NAMED_GATES` lookup table로 if-elif 6블록 정리. ② `--preflight-yes` 플래그 추가(stdin 우회, CI/agent 호출 가능). 신규 테스트 7건 + stale ap-northeast-2 정정 1건. **63/63 PASSED**.
+
+  - `[2026-04-27]`: Phase 3 1차 실행 (`!` prefix 백그라운드) — preflight 1·2회차 답변 후 step 0/3 정상 완료, **step 1 worker가 plan.md를 step 1 plan 문서로 덮어쓰는 사고 발생**. 3회 retry 모두 같은 패턴(plan.md 하이재킹 + index.json status 미업데이트)으로 실패 → "[3회 시도 후 실패] Step did not update status" 에러. 원인 분석: step1.md에 worker 출력 산출물 범위(`flink/*` + `phases/3-realtime/index.json` step 1 entry만)가 명시되지 않아, worker가 "plan을 짜야겠다"는 자기 해석으로 plan.md 라는 기존 파일에 쓴 것. 사고 commit `77201e1`(chaos)에 step 1 하이재킹 + step 3 산출물 + 사용자 다른 세션 산출물(`harness_system_analysis.md`)이 한꺼번에 묶임.
+
+  - `[2026-04-27]`: Phase 3 옵션 B 복구 — `git reset --hard 73e9027` 후 정상 산출물(`flink.tf` 241줄, `test_bedrock_report.py` 434줄)을 /tmp 백업에서 복원. 2개 깔끔한 commit으로 재구성: ① `docs(3-realtime): preflight clarifications + worker meta-file safeguards`(plan.md + step1.md + step2.md), ② `feat(3-realtime): recover step 0 + step 3 from chaos commit`(flink.tf + test_bedrock_report.py + index.json + DAG.md). step1.md/step2.md에 🚨 **메타 파일 보호 섹션** 신설: "/plan.md 절대 수정 금지", "루트 *.md 어떤 것도 수정 금지", "출력 산출물을 5종/3종으로 명시 제한" 등 명시.
+
+  - `[2026-04-27]`: Phase 3 2차 실행 (safeguard 적용) — step 1 + step 2 모두 정상 완료. **plan.md 하이재킹 없음 — safeguard 정상 작동 확인**. 산출물: ① `flink/anomaly_detection.py`(206줄) — `load_application_properties` 표준 패턴 + `compute_zscore`/`compute_load_ratio`/`is_anomaly` 순수 함수 + WATERMARK + STDDEV_POP + 1min Tumbling + Statement Set Dual Sink, ② `flink/build.sh`(70줄) + Kinesis JAR 자동 다운로드 + ZIP 빌드, ③ `tests/flink/test_anomaly_detection.py`(194줄) — **18 케이스 전부 PASSED** (Zscore 5/load_ratio 4/is_anomaly 8/threshold tuning 1). 회귀: `tests/flink/` + `tests/etl/` 합산 **35 PASSED**. **Phase 3 (3-realtime) 모든 step completed**. plan.md Task 3.1 / 3.3 체크박스 업데이트.
 
   - `[2026-04-26]`: plan.md 전체 sync sweep 완료 — 실 산출물과 체크박스 정합성 검증. **체크박스 잘못 [ ]로 남아있던 항목들을 [x]로 정정**: Task 0.2(워크플로 3종 + Lambda ZIP 빌드 모두 구현됨), Task 1.3(s3_lifecycle.tf 존재), Task 1.3.1(Athena Workgroup glue.tf 포함), Task 1.5(Generator 전체 구현), Task 1.6 단위 테스트, Task 2.2(Airflow Helm), Task 4.2 Grafana Helm 일부, Task 4.3 main.py partial, Task 5.1 ADOT/X-Ray IRSA/observability.json, Task 5.2 거의 전체. **진짜 미구현으로 남은 핵심 gap**: ① Task 4.2 Grafana ALB Ingress + 3개 대시보드 JSON, ② Task 4.3 portal.html(현재 chat.html만) + API ALB Ingress + slowapi requirements 누락, ③ Task 4.3.5 6개 UX 버그 전체, ④ Task 4.4 tests/api, ⑤ Task 3.1 Flink 전체, ⑥ Task 2.0 Great Expectations DQ Gate, ⑦ Task 5.2 train_entry.py 및 ML feature 컬럼 정합성. 발견된 부수 이슈: cloudwatch.tf 알람 `comparison_operator` 논리 반전(`GreaterThanThreshold` → `LessThanThreshold` 필요), main.py/k8s region 불일치(eu-west-1 vs ap-northeast-2), Grafana adminPassword 하드코딩.
