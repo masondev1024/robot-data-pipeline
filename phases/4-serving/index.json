@@ -34,5 +34,6 @@
       "summary": "src/api/main.py(FastAPI+in-memory캐시+apscheduler KST timezone+Bedrock), templates/chat.html(UI), Dockerfile(python:3.11), k8s/api/deployment.yaml+hpa.yaml(eu-west-1 region fix), iam.tf(API IRSA 완성)"
     }
   ],
-  "created_at": "2026-04-27T00:50:51+0900"
+  "created_at": "2026-04-27T00:50:51+0900",
+  "completed_at": "2026-04-27T00:55:03+0900"
 }
