@@ -6,12 +6,12 @@
     {
       "step": 0,
       "name": "athena-ddl",
-      "status": "error",
+      "status": "completed",
       "depends_on": [],
       "description": "Bronze/Silver/Gold 테이블 DDL SQL 파일 작성 (Partition Projection 포함)",
       "started_at": "2026-04-26T21:09:38+0900",
-      "error_message": "[3회 시도 후 실패] Step did not update status",
-      "failed_at": "2026-04-26T21:10:38+0900"
+      "summary": "sql/bronze_ddl.sql · silver_ddl.sql · gold_ddl.sql 작성. 3개 테이블 모두 Partition Projection 활성화(bronze=year/month/day/hour, silver/gold=dt DATE).",
+      "completed_at": "2026-04-26T22:00:00+0900"
     },
     {
       "step": 1,
@@ -44,6 +44,29 @@
       "description": "일별/로봇별 지표 집계 + Bedrock 리포트 생성 DAG 완성",
       "summary": "dags/robot_daily_etl.py: Silver→Gold 집계(avg/max temp, battery_drain, active_hours), Bedrock Claude 정비 리포트 S3 저장, 주간 SageMaker 재학습",
       "completed_at": "2026-04-26T18:40:00+0900"
+    },
+    {
+      "step": 4,
+      "name": "dag-fix",
+      "status": "completed",
+      "depends_on": [
+        0,
+        3
+      ],
+      "description": "DAG ↔ DDL 정합성 정정: bronze WHERE 절 파티션 키(year/month/day) 사용, gold INSERT 컬럼을 DDL 스펙(active_hours)에 맞춰 정정, bedrock 리포트 SELECT도 동일 정정",
+      "summary": "dags/robot_daily_etl.py: bronze WHERE를 year/month/day 파티션 키로 변경, gold INSERT를 active_hours로 정정(operation_ratio/battery_drain_rate 제거), bedrock SELECT 및 data_summary 텍스트 동기화. AC 7/7 통과.",
+      "completed_at": "2026-04-26T22:30:00+0900"
+    },
+    {
+      "step": 5,
+      "name": "data-quality-gate",
+      "status": "completed",
+      "depends_on": [
+        4
+      ],
+      "description": "Task 2.0: Great Expectations 기반 데이터 품질 게이트 구현 (Bronze→Silver 진입 전 PythonOperator로 검사 + tests/etl 단위 테스트)",
+      "summary": "requirements.txt 신규 작성(great-expectations 포함), dags/robot_daily_etl.py에 evaluate_quality 순수 함수 + _quality_check Operator + SNS 알림(_publish_dq_failure) 추가, DAG dependency를 quality_check → bronze_to_silver로 변경. tests/etl/test_data_quality.py 7건 모두 통과.",
+      "completed_at": "2026-04-26T22:50:00+0900"
     }
   ],
   "created_at": "2026-04-26T21:09:19+0900"
