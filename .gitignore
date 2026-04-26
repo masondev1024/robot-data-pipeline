@@ -1,3 +1,6 @@
+__pycache__/
+*.pyc
+*.pyo
 node_modules/
 .next/
 out/
@@ -7,3 +10,22 @@ tsconfig.tsbuildinfo
 # phase execution outputs
 phases/**/phase*-output.json
 phases/**/step*-output.json
+
+# 환경변수 — 절대 커밋 금지
+.env
+.env.local
+.env.*.local
+.env.example
+# Terraform 상태 및 자격증명
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/*.tfvars
+terraform/.terraform.lock.hcl
+
+# Lambda 빌드 아티팩트
+terraform/lambda_*.zip
+
+# Seed 데이터 — 전체 Kaggle 데이터셋은 커밋 금지 (sample만 허용)
+data/seed_data.csv
+data/*.zip
