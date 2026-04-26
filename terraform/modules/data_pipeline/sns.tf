@@ -1,6 +1,15 @@
+# SNS Topic for Robot Anomaly Alerts
 resource "aws_sns_topic" "alerts" {
-  name = "${var.project_name}-anomaly-alerts"
+  name = "robot-anomaly-alerts"
+
+  tags = {
+    Name = "robot-anomaly-alerts"
+  }
 }
 
-# Note: Slack subscription is usually handled via Chatbot or a manual webhook integration.
-# Here we just create the topic.
+# SNS Topic Subscription: Slack Webhook
+resource "aws_sns_topic_subscription" "slack" {
+  topic_arn = aws_sns_topic.alerts.arn
+  protocol  = "https"
+  endpoint  = var.slack_webhook_url
+}

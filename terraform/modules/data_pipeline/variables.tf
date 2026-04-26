@@ -24,3 +24,9 @@ variable "s3_bucket_name" {
   type        = string
   default     = "de-ai-06-827913617635-ap-northeast-2-an"
 }
+
+variable "slack_webhook_url" {
+  description = "Slack Webhook URL for alert notifications (injected from .env)"
+  type        = string
+  sensitive   = true
+}
