@@ -24,7 +24,7 @@
   | VPC / 서브넷 3계층 구조 | `network.tf` | 동일 패턴으로 신규 생성 (리전: `eu-west-1`) |
   | EKS 클러스터 + 노드그룹 + IAM | `eks_and_iam.tf` | 동일 패턴, 리소스명 변경 후 신규 생성 |
   | Karpenter 노드 자동 확장 | `karpenter.tf` | 동일 패턴 적용 |
-  | ECR + GitHub Actions OIDC | `cicd_gitpos.tf` | repo명 등 변경 후 신규 생성 |
+  | ECR + GitHub Actions OIDC | `cicd_gitops.tf` | repo명 등 변경 후 신규 생성 |
   | EKS 애드온 (ALB, ArgoCD 등) | `addons.tf` | 동일 패턴 적용, Airflow Helm도 여기 추가 |
 
   ---
@@ -169,12 +169,12 @@
   ### Phase 0: 신규 Terraform 프로젝트 기반 구성
   *목표: 래플 프로젝트 코드 패턴을 기반으로 신규 네트워크, EKS, CI/CD 인프라를 처음부터 프로비저닝한다.*
 
-  - [ ] **Task 0.1: 신규 Terraform 프로젝트 셋업**
-    - [ ] `terraform/` 루트에 `providers.tf`, `variables.tf`, `network.tf`, `eks_and_iam.tf`, `karpenter.tf`, `addons.tf`, `cicd_gitops.tf` 작성 (래플 프로젝트 코드 패턴 참조).
-    - [ ] `variables.tf`에 `aws_region = "eu-west-1"` 로 설정. `.env` 파일에서 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`를 로드하는 방식으로 자격증명 구성 (하드코딩 금지).
-    - [ ] `modules/data_pipeline/` 디렉토리 생성 — 데이터 파이프라인 전용 리소스(Kinesis, Firehose, Glue, IAM)는 전부 이 모듈 하위에 작성.
-    - [ ] Bastion + RDS는 이번 프로젝트에서 불필요하므로 생성하지 않는다.
-    - [ ] **[비용·보안]** `network.tf`에 VPC Endpoint 2개 추가:
+  - [x] **Task 0.1: 신규 Terraform 프로젝트 셋업**
+    - [x] `terraform/` 루트에 `providers.tf`, `variables.tf`, `network.tf`, `eks_and_iam.tf`, `karpenter.tf`, `addons.tf`, `cicd_gitops.tf` 작성 (래플 프로젝트 코드 패턴 참조).
+    - [x] `variables.tf`에 `aws_region = "eu-west-1"` 로 설정. `.env` 파일에서 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`를 로드하는 방식으로 자격증명 구성 (하드코딩 금지).
+    - [x] `modules/data_pipeline/` 디렉토리 생성 — 데이터 파이프라인 전용 리소스(Kinesis, Firehose, Glue, IAM)는 전부 이 모듈 하위에 작성.
+    - [x] Bastion + RDS는 이번 프로젝트에서 불필요하므로 생성하지 않는다.
+    - [x] **[비용·보안]** `network.tf`에 VPC Endpoint 2개 추가:
       - `aws_vpc_endpoint` type=`Gateway` for **S3** — 무료. EKS Pod → S3 트래픽이 NAT Gateway를 우회해 AWS 내부 네트워크로 처리됨.
       - `aws_vpc_endpoint` type=`Interface` for **Kinesis Streams** (PrivateLink) — Generator의 초당 10,000건 전송 트래픽이 퍼블릭망을 타지 않음. NAT Gateway 데이터 처리 비용 차단.
 
@@ -194,50 +194,55 @@
   ### Phase 1: Ingestion & Data Lake Infrastructure (Terraform & Generator)
   *목표: AI4I 2020 CSV Seed 데이터를 기반으로 가상 로봇 10,000대를 시뮬레이션하여 Kinesis로 전송하고, S3에 Parquet 포맷으로 동적 파티셔닝 적재.*
 
-  - [ ] **Task 1.0: Glue Schema Registry (Terraform)**
-    - [ ] `modules/data_pipeline/glue.tf`에 `aws_glue_registry` (`robot-telemetry-registry`) 추가.
-    - [ ] `aws_glue_schema` 리소스로 로봇 텔레메트리 JSON 스키마 등록 (`robot_id`, `pos_x`, `pos_y`, `battery_level`, `current_load`, `motor_temp`, `timestamp`).
+  - [x] **Task 1.0: Glue Schema Registry (Terraform)**
+    - [x] `modules/data_pipeline/glue.tf`에 `aws_glue_registry` (`robot-telemetry-registry`) 추가.
+    - [x] `aws_glue_schema` 리소스로 로봇 텔레메트리 JSON 스키마 등록 (`robot_id`, `pos_x`, `pos_y`, `battery_level`, `current_load`, `motor_temp`, `timestamp`).
     - [ ] Generator가 Kinesis에 레코드를 쓰기 전 Glue Schema Registry SDK로 스키마 검증 — upstream 필드명 변경 시 파이프라인 보호.
-    - [ ] Firehose의 `data_format_conversion_configuration`도 이 Registry 스키마를 참조하도록 연결.
-  - [ ] **Task 1.0.5: Dead Letter Queue (DLQ) — Firehose 실패 처리 (Terraform)**
-    - [ ] `aws_kinesis_firehose_delivery_stream` 리소스에 `s3_backup_mode = "FailedDataOnly"` 설정, 실패 데이터를 `bronze-dlq/` prefix로 리다이렉트.
-    - [ ] CloudWatch Alarm 추가: DLQ prefix(`bronze-dlq/`) 오브젝트 수 > 0 일 때 SNS(`robot-anomaly-alerts`)로 알림 → Slack 채널에 "파이프라인 실패 감지" 경고.
-    - [ ] `modules/data_pipeline/cloudwatch.tf` 신규 작성.
-  - [ ] **Task 1.1: IAM & Security Configuration (Terraform)**
-    - [ ] `modules/data_pipeline/iam.tf` 작성.
-    - [ ] EKS Pod이 Kinesis에 `PutRecord` 할 수 있도록 **IRSA(IAM Role for Service Accounts)** 신규 생성. Phase 0에서 생성된 EKS 클러스터의 OIDC Issuer URL 참조.
-    - [ ] Firehose가 S3 버킷 `de-ai-06-827913617635-ap-northeast-2-an`에 쓸 수 있는 `firehose_delivery_role` 신규 작성. 버킷 ARN은 `data "aws_s3_bucket"` 으로 참조 (버킷 자체는 Terraform으로 관리하지 않음).
+    - [x] Firehose의 `data_format_conversion_configuration`도 이 Registry 스키마를 참조하도록 연결.
+  - [x] **Task 1.0.5: Dead Letter Queue (DLQ) — Firehose 실패 처리 (Terraform)**
+    - [x] `aws_kinesis_firehose_delivery_stream` 리소스에 `s3_backup_mode = "FailedDataOnly"` 설정, 실패 데이터를 `bronze-dlq/` prefix로 리다이렉트.
+    - [x] CloudWatch Alarm 추가: Firehose `DeliveryToS3.Success` < 95% 시 SNS(`robot-anomaly-alerts`)로 알림. (`modules/data_pipeline/cloudwatch.tf` 작성 완료)
+    - [x] `modules/data_pipeline/cloudwatch.tf` 신규 작성.
+  - [x] **Task 1.1: IAM & Security Configuration (Terraform)**
+    - [x] `modules/data_pipeline/iam.tf` 작성.
+    - [x] EKS Pod이 Kinesis에 `PutRecord` 할 수 있도록 **IRSA(IAM Role for Service Accounts)** 신규 생성. Phase 0에서 생성된 EKS 클러스터의 OIDC Issuer URL 참조.
+    - [x] Firehose가 S3 버킷 `de-ai-06-827913617635-ap-northeast-2-an`에 쓸 수 있는 `firehose_delivery_role` 신규 작성. 버킷 ARN은 `data "aws_s3_bucket"` 으로 참조 (버킷 자체는 Terraform으로 관리하지 않음).
     - [ ] **[보안 강화]** AWS Secrets Manager에 민감 정보 저장: `robot-telemetry/slack-webhook-url`, `robot-telemetry/grafana-admin-password`.
-    - [ ] EKS에 **External Secrets Operator** Helm 배포 (`addons.tf`). Secrets Manager 값을 K8s Secret으로 자동 동기화 — `.env` 파일 직접 참조 제거.
+    - [x] EKS에 **External Secrets Operator** Helm 배포 (`addons.tf`). Secrets Manager 값을 K8s Secret으로 자동 동기화 — `.env` 파일 직접 참조 제거.
     - [ ] Generator, API, Airflow Worker Pod 모두 IRSA 어노테이션 완전 적용 (최소 권한 원칙).
-    - [ ] **[SSM Parameter Store]** `modules/data_pipeline/ssm.tf` 작성:
-      - `aws_ssm_parameter` 플레이스홀더 2개 생성 (`/robot-telemetry/portal-url`, `/robot-telemetry/grafana-url`) — 초기값 `"PENDING"`, Type `String`. CI/CD post-deploy job이 실제 DNS로 덮어씀.
-      - Lambda IRSA, API IRSA에 `ssm:GetParameter` 권한 추가 (위 2개 경로만 허용).
-      - Lambda 코드(`src/lambda/alert_handler.py`)에서 `PORTAL_URL` env var 대신 SSM `get_parameter` 런타임 조회로 변경. 콜드스타트당 1회 조회 후 프로세스 내 캐시.
-      - API startup(`src/api/main.py`)에서 `GRAFANA_URL` env var 대신 SSM `get_parameter` 조회 후 전역변수 저장.
-  - [ ] **Task 1.2: Kinesis Data Streams (KDS) Provisioning (Terraform)**
-    - [ ] `modules/data_pipeline/kinesis.tf`에 메인 스트림 `aws_kinesis_stream` 리소스 생성 (Provisioned Mode, **Shard Count: 10**, Retention: **24시간**).
+    - [x] **[SSM Parameter Store]** `modules/data_pipeline/ssm.tf` 작성:
+      - [x] `aws_ssm_parameter` 플레이스홀더 2개 생성 (`/robot-telemetry/portal-url`, `/robot-telemetry/grafana-url`) — 초기값 `"PENDING"`, Type `String`. CI/CD post-deploy job이 실제 DNS로 덮어씀.
+      - [x] Lambda IRSA, API IRSA에 `ssm:GetParameter` 권한 추가 (위 2개 경로만 허용).
+      - [ ] Lambda 코드(`src/lambda/alert_handler.py`)에서 `PORTAL_URL` env var 대신 SSM `get_parameter` 런타임 조회로 변경. 콜드스타트당 1회 조회 후 프로세스 내 캐시.
+      - [ ] API startup(`src/api/main.py`)에서 `GRAFANA_URL` env var 대신 SSM `get_parameter` 조회 후 전역변수 저장.
+  - [x] **Task 1.2: Kinesis Data Streams (KDS) Provisioning (Terraform)**
+    - [x] `modules/data_pipeline/kinesis.tf`에 메인 스트림 `aws_kinesis_stream` 리소스 생성 (Provisioned Mode, **Shard Count: 10**, Retention: **24시간**).
       - 산출 근거: 가상 로봇 10,000대 × 1 rec/sec = **10,000 rec/sec**, 레코드당 ~1KB → **10 MB/sec**. KDS Shard 1개 한도(1,000 rec/sec, 1 MB/sec)에서 **10 Shards** 필요.
-    - [ ] Alert 전용 스트림 `robot-anomaly-alert-stream` 별도 생성 (**Shard Count: 2**, Retention: **24시간**).
+    - [x] Alert 전용 스트림 `robot-anomaly-alert-stream` 별도 생성 (**Shard Count: 2**, Retention: **24시간**).
       - 산출 근거: Flink 이상 탐지 이벤트 수는 메인 스트림 대비 소량(전체 로봇의 일부). Shard 2개면 충분하며 비용 최소화.
   - [ ] **Task 1.3: S3 Data Lake Prefix 정의 및 Lifecycle 설정**
-    - [ ] **S3 버킷 신규 생성 금지.** 사전 생성된 버킷 `de-ai-06-827913617635-ap-northeast-2-an` 사용.
-    - [ ] 논리적 Prefix `bronze/`, `silver/`, `gold/`는 S3 오브젝트 키 네이밍 규칙으로만 정의 (별도 Terraform 리소스 불필요).
-    - [ ] **[비용 최적화]** `aws_s3_bucket_lifecycle_configuration` 리소스 추가:
+    - [x] **S3 버킷 신규 생성 금지.** 사전 생성된 버킷 `de-ai-06-827913617635-ap-northeast-2-an` 사용.
+    - [x] 논리적 Prefix `bronze/`, `silver/`, `gold/`는 S3 오브젝트 키 네이밍 규칙으로만 정의 (별도 Terraform 리소스 불필요).
+    - [ ] **[비용 최적화 — 미구현]** `aws_s3_bucket_lifecycle_configuration` 리소스 추가 (`modules/data_pipeline/s3_lifecycle.tf` 신규):
       - `bronze/` prefix: 90일 후 Glacier Instant Retrieval로 전환.
       - `silver/` prefix: 365일 후 Glacier Instant Retrieval로 전환.
       - `gold/` prefix: 영구 보관 (Lifecycle 규칙 없음).
       - `bronze-dlq/` prefix: 30일 후 만료 삭제 (비정상 데이터 자동 정리).
-  - [ ] **Task 1.3.5: Glue Data Catalog Schema 사전 선언 (Terraform)**
-    - [ ] `modules/data_pipeline/glue.tf` 작성 — **Task 1.4(KDF) 이전에 반드시 완료해야 한다.**
-    - [ ] `aws_glue_catalog_database` (`robot_telemetry_db`) 생성.
-    - [ ] `aws_glue_catalog_table` (`bronze_robot_telemetry`) 생성: KDF가 Parquet 변환 시 참조할 컬럼 스키마 선언 (`robot_id`, `pos_x`, `pos_y`, `battery_level`, `current_load`, `motor_temp`, `timestamp`).
-    - [ ] KDF는 이 Glue Table을 `data_format_conversion_configuration`의 `schema_configuration`으로 참조한다. Glue Table이 없으면 KDF 프로비저닝이 실패한다.
-  - [ ] **Task 1.4: Kinesis Data Firehose (KDF) Configuration (Terraform)**
-    - [ ] `modules/data_pipeline/kinesis.tf`에 `aws_kinesis_firehose_delivery_stream` 추가.
-    - [ ] Source: Task 1.2에서 생성한 KDS. Destination: `de-ai-06-827913617635-ap-northeast-2-an` 버킷 (`data "aws_s3_bucket"` 참조).
-    - [ ] **[핵심]** Data Format Conversion 활성화: AWS Glue Data Catalog 테이블 포맷을 참조하여 원본 JSON을 **Parquet**으로 변환 (Snappy 압축).
-    - [ ] **[핵심]** Dynamic Partitioning 설정: S3 Prefix를 `bronze/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/` 형태로 구성.
+  - [ ] **Task 1.3.1: Athena Workgroup 생성 (Terraform — 미구현)**
+    - [ ] `modules/data_pipeline/glue.tf` 또는 별도 `athena.tf`에 `aws_athena_workgroup` 추가.
+      - Workgroup명: `robot-telemetry-workgroup`
+      - `enforce_workgroup_configuration = true`, `publish_cloudwatch_metrics_enabled = true`.
+      - 쿼리 결과 S3 위치: `s3://de-ai-06-827913617635-ap-northeast-2-an/project-athena-results/`.
+  - [x] **Task 1.3.5: Glue Data Catalog Schema 사전 선언 (Terraform)**
+    - [x] `modules/data_pipeline/glue.tf` 작성.
+    - [x] `aws_glue_catalog_database` (`robot_telemetry_db`) 생성.
+    - [x] `aws_glue_catalog_table` (`bronze_robot_telemetry`) 생성: KDF가 Parquet 변환 시 참조할 컬럼 스키마 선언 (`robot_id`, `pos_x`, `pos_y`, `battery_level`, `current_load`, `motor_temp`, `timestamp`).
+    - [x] KDF는 이 Glue Table을 `data_format_conversion_configuration`의 `schema_configuration`으로 참조한다.
+  - [x] **Task 1.4: Kinesis Data Firehose (KDF) Configuration (Terraform)**
+    - [x] `modules/data_pipeline/kinesis.tf`에 `aws_kinesis_firehose_delivery_stream` 추가.
+    - [x] Source: Task 1.2에서 생성한 KDS. Destination: `de-ai-06-827913617635-ap-northeast-2-an` 버킷 (`data "aws_s3_bucket"` 참조).
+    - [x] **[핵심]** Data Format Conversion 활성화: AWS Glue Data Catalog 테이블 포맷을 참조하여 원본 JSON을 **Parquet**으로 변환 (Snappy 압축).
+    - [x] **[핵심]** Dynamic Partitioning 설정: S3 Prefix를 `bronze/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/` 형태로 구성.
   - [ ] **Task 1.5: Generator Implementation (Python — AI4I 2020 CSV Seed 기반)**
     - [ ] `data/generate_sample.py` 작성: AI4I 2020 포맷 200행 합성 CSV(`data/seed_data_sample.csv`) 생성 스크립트.
       - 운영 환경에서는 `data/seed_data.csv` (Kaggle AI4I 2020 전체 데이터, 직접 다운로드 필요) 사용.
@@ -289,12 +294,14 @@
   ### Phase 3: Real-time Anomaly Detection & AI Insight (Flink + Bedrock)
   *목표: 스트리밍 데이터를 실시간으로 모니터링하고, 배치 집계 결과를 바탕으로 LLM 리포트 생성.*
 
-  - [ ] **Task 3.1: Real-time Processing (Apache Flink)**
+  - [ ] **Task 3.1: Real-time Processing (Apache Flink) — 고도화된 이상 탐지**
     - [ ] AWS Managed Flink Studio(Zeppelin) 또는 SQL Client를 위한 구성.
     - [ ] KDS를 Source Table로 매핑.
     - [ ] **[필수] Watermark 선언**: Source Table DDL에 `WATERMARK FOR event_time AS event_time - INTERVAL '10' SECOND` 추가. 지연 데이터(Late Data) 최대 10초 허용. Watermark 없이 Event Time 기반 Window를 사용하면 Flink가 Window를 닫지 못하고 상태가 무한히 쌓임.
-    - [ ] 1분 Tumbling Window 기반 이상 탐지 SQL 작성 (Event Time 기준):
-      - [ ] 조건: `motor_temp` > 90도 초과 로봇 식별.
+    - [ ] **[핵심] 실무형 이상 탐지 로직 구현 (Flink SQL):**
+      - [ ] **Condition 1 (Moving Z-Score):** 최근 5분간 로봇별 `motor_temp` 평균/표준편차 대비 3시그마를 초과하는 급격한 온도 변화 탐지.
+      - [ ] **Condition 2 (Multivariate Correlation):** `current_load` 대비 `motor_temp` 비율이 비정상적으로 높은 경우(부하 대비 과열) 탐지.
+      - [ ] 위 두 조건 중 하나라도 만족 시 이상 징후로 판단하여 알람 생성 (알람 피로도 급감 및 AI 추론 신뢰도 확보).
     - [ ] 탐지된 이상 이벤트를 두 곳에 동시 Sink: ① S3 `alerts/` 경로 (이력 로깅), ② **`robot-anomaly-alert-stream`** (Alert 전용 KDS, Native Sink 사용) — SNS 직접 연결 금지 (Flink에 SNS Native Sink 없음).
   - [ ] **Task 3.2: LLM 배치 리포트 (Amazon Bedrock)**
     - [ ] `dags/robot_daily_etl.py`의 마지막 Task로 Python Operator 추가.
@@ -310,11 +317,12 @@
   *목표: 파이프라인 결과를 운영자가 실시간으로 확인하고 AI에게 직접 질문할 수 있는 서비스 레이어를 구축한다.*
 
   - [ ] **Task 4.1: Real-time Slack Alert (Terraform — Alert KDS → Lambda → SNS → Slack)**
-    - [ ] `modules/data_pipeline/sns.tf` 작성: `aws_sns_topic` (`robot-anomaly-alerts`) 생성. `aws_sns_topic_subscription`으로 Slack Webhook URL 구독.
-    - [ ] `modules/data_pipeline/lambda.tf` 작성:
-      - [ ] `aws_lambda_function` (`robot-anomaly-alert-lambda`) 생성: Python 런타임. KDS 레코드 파싱 → SNS Publish 로직.
-      - [ ] `aws_lambda_event_source_mapping`: `robot-anomaly-alert-stream` KDS를 트리거로 연결.
-      - [ ] Lambda IAM Role: `kinesis:GetRecords` + `sns:Publish` 권한 부여.
+    - [x] `modules/data_pipeline/sns.tf` 작성: `aws_sns_topic` (`robot-anomaly-alerts`) 생성. (Note: Slack Webhook 구독은 Chatbot 또는 수동 설정 필요)
+    - [x] `modules/data_pipeline/lambda.tf` 작성:
+      - [x] `aws_lambda_function` (`robot-anomaly-alert-lambda`) 생성: Python 3.11 런타임. (ZIP 플레이스홀더 `src/lambda/alert_handler.zip` — 코드 구현 별도)
+      - [x] `aws_lambda_event_source_mapping`: `robot-anomaly-alert-stream` KDS를 트리거로 연결.
+      - [x] Lambda IAM Role: `kinesis:GetRecords` + `sns:Publish` 권한 부여.
+    - [ ] **[미구현]** Lambda ZIP 빌드 프로세스: GitHub Actions `k8s-deploy.yml`에 `pip install -t dist/ && zip -r alert_handler.zip dist/` 빌드 스텝 추가 필요.
     - [ ] 알림 메시지 포맷 (딥링크 포함):
       ```
       [⚠️ 이상 감지] robot_id: {id} | motor_temp: {temp}°C | 감지 시각: {timestamp}
@@ -405,8 +413,8 @@
     - [ ] **[검증]** `/api/chat` 호출 후 X-Ray 콘솔에서 Service Map이 Generator → Kinesis → API 경로로 표시되는지 확인.
   - [ ] **Task 5.2: ML 기반 예측정비 (Amazon SageMaker)**
     - [ ] `modules/data_pipeline/sagemaker.tf` 작성:
-      - [ ] SageMaker IAM Role: Athena 조회 + S3 읽기/쓰기 + ECR 권한.
-      - [ ] S3 prefix `ml-models/` 정의 (학습 결과 아티팩트 저장).
+      - [x] SageMaker IAM Role: Athena 조회 + S3 읽기/쓰기 권한. (현재 `iam.tf`에 포함됨 — 별도 파일로 분리 필요)
+      - [x] S3 prefix `ml-models/` 정의 (학습 결과 아티팩트 저장).
     - [ ] `src/ml/train.py` 작성:
       - [ ] Gold Table(`gold_robot_daily_stats`)에서 지난 30일 데이터 Athena 조회.
       - [ ] Feature: `avg_motor_temp`, `max_motor_temp`, `battery_drain_rate`, `operation_ratio`.
@@ -430,4 +438,6 @@
   ## 📝 AI Action Log
   *작업이 완료될 때마다 날짜, 완료된 Task, 변경된 파일, 이슈 사항을 기록하십시오.*
 
-  - `[YYYY-MM-DD]`: Initial Plan Draft Created. Waiting for Human Approval.
+  - `[2026-04-26]`: Phase 0 Task 0.1 완료 — `eu-west-1` 리전 및 `robot-telemetry` 네이밍 규칙으로 신규 terraform 파일 작성 (network.tf, eks_and_iam.tf, karpenter.tf, addons.tf, cicd_gitops.tf). VPC Endpoint(S3 Gateway + Kinesis Interface) 추가. Phase 0 `check_env` pre-gate 실패로 현재 `error` 상태. Task 0.2 (GitHub Actions) 미구현.
+  - `[2026-04-26]`: Phase 1 Terraform 모듈 선행 구현 완료 — `modules/data_pipeline/` 하위 kinesis.tf(KDS 10샤드 + Firehose Parquet), glue.tf(Registry+Bronze Table), iam.tf(Generator/API/Lambda IRSA), cloudwatch.tf(알람), lambda.tf(stub), sns.tf, ssm.tf 작성. 체크박스 sync 완료.
+  - `[2026-04-26]`: plan.md 품질 검토 완료 — phases/index.json Phase 5 status 오류(`completed`→`pending`) 정정, 오타(`cicd_gitpos.tf`→`cicd_gitops.tf`) 수정, Task 1.3.1(Athena Workgroup) 누락 추가, S3 Lifecycle 미구현 명시.

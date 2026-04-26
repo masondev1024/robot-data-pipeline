@@ -56,6 +56,78 @@ module "data_pipeline" {
 }
 ```
 
+### `.github/workflows/post-deploy.yml` — ALB DNS Late-Binding 해소
+
+**[ALB DNS 레이스 컨디션 방지]** k8s-deploy.yml 이후 실행되는 후속 워크플로우.
+Ingress 생성 후 ALB DNS가 전파되기까지 2~5분이 걸리므로, DNS가 확정될 때까지
+폴링하여 SSM에 저장한다. Lambda와 API Pod은 런타임에 SSM을 읽으므로 DNS 전파 완료
+전에 서비스가 기동되더라도 첫 요청 시점에는 유효한 값을 읽는다.
+
+```yaml
+name: post-deploy
+on:
+  workflow_run:
+    workflows: ["k8s-deploy"]
+    types: [completed]
+
+jobs:
+  store-dns:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-west-1
+
+      - name: Configure kubectl
+        run: aws eks update-kubeconfig --name robot-telemetry-cluster --region eu-west-1
+
+      - name: Wait for API ALB DNS
+        id: api-dns
+        run: |
+          for i in $(seq 1 20); do
+            DNS=$(kubectl get ingress robot-telemetry-api-ingress \
+              -n robot-telemetry \
+              -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            if [ -n "$DNS" ] && [ "$DNS" != "null" ]; then
+              echo "dns=$DNS" >> $GITHUB_OUTPUT
+              echo "API ALB DNS 확정: $DNS"
+              break
+            fi
+            echo "[$i/20] 대기 중... (15초)"
+            sleep 15
+          done
+          if [ -z "$DNS" ]; then exit 1; fi
+
+      - name: Wait for Grafana ALB DNS
+        id: grafana-dns
+        run: |
+          for i in $(seq 1 20); do
+            DNS=$(kubectl get ingress grafana-ingress \
+              -n monitoring \
+              -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            if [ -n "$DNS" ] && [ "$DNS" != "null" ]; then
+              echo "dns=$DNS" >> $GITHUB_OUTPUT
+              break
+            fi
+            echo "[$i/20] 대기 중... (15초)"
+            sleep 15
+          done
+          if [ -z "$DNS" ]; then exit 1; fi
+
+      - name: Store DNS to SSM
+        run: |
+          aws ssm put-parameter \
+            --name "/robot-telemetry/portal-url" \
+            --value "http://${{ steps.api-dns.outputs.dns }}" \
+            --type String --overwrite
+          aws ssm put-parameter \
+            --name "/robot-telemetry/grafana-url" \
+            --value "http://${{ steps.grafana-dns.outputs.dns }}" \
+            --type String --overwrite
+```
+
 ## Acceptance Criteria
 
 ```bash

@@ -185,6 +185,54 @@ resource "aws_iam_role_policy" "api_permissions" {
   policy = data.aws_iam_policy_document.api_permissions.json
 }
 
+# ── Lambda Alert Handler Role ──────────────────────────────────
+
+resource "aws_iam_role" "lambda_alert_role" {
+  name = "${var.project_name}-lambda-alert-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "lambda.amazonaws.com"
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "lambda_alert_policy" {
+  name = "lambda-alert-policy"
+  role = aws_iam_role.lambda_alert_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["kinesis:GetRecords", "kinesis:GetShardIterator", "kinesis:DescribeStream", "kinesis:ListShards"]
+        Resource = [aws_kinesis_stream.alert.arn]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["sns:Publish"]
+        Resource = [aws_sns_topic.alerts.arn]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["ssm:GetParameter"]
+        Resource = ["arn:aws:ssm:${var.aws_region}:*:parameter/robot-telemetry/*"]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
+        Resource = ["arn:aws:logs:*:*:*"]
+      }
+    ]
+  })
+}
+
 # ── X-Ray Tracing Policy (Generator + API IRSA) ─────────────────
 
 resource "aws_iam_role_policy" "xray_generator" {

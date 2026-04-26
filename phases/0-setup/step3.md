@@ -27,7 +27,19 @@
   - webserver / scheduler: 각 1 replica
   - dags: Git-sync 또는 ConfigMap 방식 선택 가능
 
-모든 Helm Release는 `depends_on`으로 EKS 클러스터/노드그룹 생성 완료를 보장하라.
+모든 Helm Release에 아래 두 가지를 반드시 적용하라:
+
+1. **`depends_on`**: EKS 클러스터·노드그룹 생성 완료 보장
+2. **[Karpenter 레이스 컨디션 방지] `timeout` + `wait` 설정**:
+   ```hcl
+   # 모든 aws_helm_release 리소스에 공통 적용
+   wait             = true   # Pod Ready 상태까지 대기
+   timeout          = 600    # 10분 — Karpenter가 신규 노드를 띄우는 시간 포함
+   wait_for_jobs    = true   # Job 완료까지 대기 (Airflow DB 마이그레이션 등)
+   ```
+   이유: `depends_on`은 Terraform 리소스 생성만 보장하며 EC2 노드 Ready는 보장하지 않는다.
+   초기 2노드로 Airflow+Grafana+ArgoCD를 동시 스케줄하면 Karpenter 노드 프로비저닝(~2~3분)
+   동안 Pod이 Pending 상태에 머물고, 기본 timeout(300초) 안에 완료되지 않아 Helm 설치가 실패한다.
 
 ## Acceptance Criteria
 
