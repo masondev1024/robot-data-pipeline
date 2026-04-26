@@ -32,10 +32,9 @@
     },
     {
       "dir": "5-hardening",
-      "status": "completed",
+      "status": "pending",
       "pre_gate_check": "verify_serving_layer",
-      "description": "Observability (X-Ray/OTEL) 및 ML 예측정비 (SageMaker) 구현",
-      "completed_at": "2026-04-26T17:05:53+0900"
+      "description": "Observability (X-Ray/OTEL) 및 ML 예측정비 (SageMaker) 구현"
     }
   ]
 }

@@ -1,0 +1,71 @@
+# Kinesis Data Streams
+resource "aws_kinesis_stream" "main" {
+  name             = "${var.project_name}-stream"
+  shard_count      = 10
+  retention_period = 24
+
+  tags = {
+    Name = "${var.project_name}-stream"
+  }
+}
+
+resource "aws_kinesis_stream" "alert" {
+  name             = "${var.project_name}-anomaly-alert-stream"
+  shard_count      = 2
+  retention_period = 24
+
+  tags = {
+    Name = "${var.project_name}-anomaly-alert-stream"
+  }
+}
+
+# Kinesis Data Firehose
+resource "aws_kinesis_firehose_delivery_stream" "main" {
+  name        = "${var.project_name}-firehose"
+  destination = "extended_s3"
+
+  extended_s3_configuration {
+    role_arn   = aws_iam_role.firehose_delivery_role.arn
+    bucket_arn = data.aws_s3_bucket.existing.arn
+
+    prefix              = "bronze/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
+    error_output_prefix = "bronze-dlq/!{firehose:error-output-type}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
+
+    buffering_size     = 128
+    buffering_interval = 300
+    compression_format = "UNCOMPRESSED" # Parquet format conversion handles its own compression (Snappy)
+
+    dynamic_partitioning_configuration {
+      enabled = true
+    }
+
+    data_format_conversion_configuration {
+      input_format_configuration {
+        deserializer {
+          open_x_json_ser_de {}
+        }
+      }
+
+      output_format_configuration {
+        serializer {
+          parquet_ser_de {
+            compression = "SNAPPY"
+          }
+        }
+      }
+
+      schema_configuration {
+        database_name = aws_glue_catalog_database.main.name
+        table_name    = aws_glue_catalog_table.bronze.name
+        role_arn      = aws_iam_role.firehose_delivery_role.arn
+      }
+    }
+
+    s3_backup_mode = "FailedDataOnly"
+  }
+
+  kinesis_source_configuration {
+    kinesis_stream_arn = aws_kinesis_stream.main.arn
+    role_arn           = aws_iam_role.firehose_delivery_role.arn
+  }
+}
