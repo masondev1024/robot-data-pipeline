@@ -6,15 +6,19 @@
     {
       "step": 0,
       "name": "observability",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [],
-      "description": "AWS X-Ray + ADOT 기반 전구간 분산 추적 구축"
+      "description": "AWS X-Ray + ADOT 기반 전구간 분산 추적 구축",
+      "started_at": "2026-04-26T16:58:28+0900",
+      "summary": "ADOT Operator Helm(addons.tf) + X-Ray IAM(Generator+API IRSA) + OTEL inject-python 어노테이션(api/generator deployment) + observability.json 대시보드(Latency/ErrorRate/Kinesis/ServiceMap 4패널) 작성"
     },
     {
       "step": 1,
       "name": "predictive-maintenance",
       "status": "pending",
-      "depends_on": ["observability"],
+      "depends_on": [
+        "observability"
+      ],
       "description": "SageMaker XGBoost 고장 예측 모델 학습 및 API 엔드포인트 배포"
     }
   ],

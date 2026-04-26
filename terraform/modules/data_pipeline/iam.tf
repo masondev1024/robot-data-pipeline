@@ -175,3 +175,43 @@ resource "aws_iam_role_policy" "api_permissions" {
   role   = aws_iam_role.api_irsa.id
   policy = data.aws_iam_policy_document.api_permissions.json
 }
+
+# ── X-Ray Tracing Policy (Generator + API IRSA) ─────────────────
+
+resource "aws_iam_role_policy" "xray_generator" {
+  name = "robot-telemetry-xray-policy"
+  role = aws_iam_role.generator_irsa.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "xray:PutTraceSegments",
+        "xray:PutTelemetryRecords",
+        "xray:GetSamplingRules",
+        "xray:GetSamplingTargets"
+      ]
+      Resource = "*"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "xray_api" {
+  name = "robot-telemetry-xray-policy"
+  role = aws_iam_role.api_irsa.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "xray:PutTraceSegments",
+        "xray:PutTelemetryRecords",
+        "xray:GetSamplingRules",
+        "xray:GetSamplingTargets"
+      ]
+      Resource = "*"
+    }]
+  })
+}

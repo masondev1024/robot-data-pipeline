@@ -1,0 +1,45 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: generator-sa
+  namespace: robot-telemetry
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::827913617635:role/robot-telemetry-generator-irsa  # replace with actual ARN
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: robot-telemetry-generator
+  namespace: robot-telemetry
+  labels:
+    app: robot-telemetry-generator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: robot-telemetry-generator
+  template:
+    metadata:
+      labels:
+        app: robot-telemetry-generator
+      annotations:
+        instrumentation.opentelemetry.io/inject-python: "true"
+    spec:
+      serviceAccountName: generator-sa
+      containers:
+        - name: generator
+          image: 827913617635.dkr.ecr.ap-northeast-2.amazonaws.com/robot-telemetry-generator:latest
+          env:
+            - name: KINESIS_STREAM_NAME
+              value: "robot-telemetry-stream"
+            - name: AWS_DEFAULT_REGION
+              value: "ap-northeast-2"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "512Mi"
