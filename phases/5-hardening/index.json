@@ -16,11 +16,14 @@
     {
       "step": 1,
       "name": "predictive-maintenance",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [
-        "observability"
+        0
       ],
-      "description": "SageMaker XGBoost 고장 예측 모델 학습 및 API 엔드포인트 배포"
+      "description": "SageMaker XGBoost 고장 예측 모델 학습 및 API 엔드포인트 배포",
+      "started_at": "2026-04-26T17:01:50+0900",
+      "completed_at": "2026-04-26T17:30:00+0900",
+      "summary": "sagemaker.tf(IAM Role+S3 ml-models권한) + train.py(Athena 30일 조회+XGBoost 학습+ml.t2.medium 배포) + /api/predict 엔드포인트(slowapi 20/min 제한) + 주간 재학습 DAG Task(check_monday→retrain_ml_model) + API IRSA sagemaker:InvokeEndpoint 권한 추가"
     }
   ],
   "created_at": "2026-04-26T00:00:00+0900"

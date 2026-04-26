@@ -168,6 +168,15 @@ data "aws_iam_policy_document" "api_permissions" {
     ]
     resources = ["*"]
   }
+
+  statement {
+    sid    = "SageMakerInvokeEndpoint"
+    effect = "Allow"
+    actions = [
+      "sagemaker:InvokeEndpoint",
+    ]
+    resources = ["*"]
+  }
 }
 
 resource "aws_iam_role_policy" "api_permissions" {
