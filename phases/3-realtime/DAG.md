@@ -7,13 +7,13 @@ graph TD
   classDef error fill:#f44336,stroke:#fff,color:#fff;
   classDef blocked fill:#FF9800,stroke:#fff,color:#fff;
   S0["0. flink-terraform"]
-  class S0 pending;
+  class S0 completed;
   S1["1. flink-app (PyFlink)"]
   class S1 pending;
   S2["2. flink-validation"]
   class S2 pending;
   S3["3. bedrock-report-tests"]
-  class S3 pending;
+  class S3 completed;
   S0 --> S1
   S1 --> S2
 ```

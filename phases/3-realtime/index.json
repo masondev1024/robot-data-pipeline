@@ -6,9 +6,12 @@
     {
       "step": 0,
       "name": "flink-terraform",
-      "status": "pending",
+      "status": "completed",
+      "summary": "flink.tf: Application 모드 + PyFlink + S3 코드 ZIP + CloudWatch + 외부화 threshold (zscore=3.0, load_ratio=1.8)",
       "depends_on": [],
-      "description": "Managed Flink Application 인프라 (IAM + S3 코드 ZIP + CloudWatch Logging + 외부화 threshold property_map) 구성"
+      "description": "Managed Flink Application 인프라 (IAM + S3 코드 ZIP + CloudWatch Logging + 외부화 threshold property_map) 구성",
+      "started_at": "2026-04-27T00:06:05+0900",
+      "completed_at": "2026-04-27T00:10:36+0900"
     },
     {
       "step": 1,
@@ -27,9 +30,12 @@
     {
       "step": 3,
       "name": "bedrock-report-tests",
-      "status": "pending",
+      "status": "completed",
+      "summary": "tests/etl/test_bedrock_report.py: Athena+Bedrock+S3 호출 검증 10케이스 + DAG 토폴로지 4케이스 모두 PASSED",
       "depends_on": [],
-      "description": "Phase 2에서 구현된 _bedrock_report 함수 + DAG 토폴로지 검증 (Mock Athena/Bedrock/S3)"
+      "description": "Phase 2에서 구현된 _bedrock_report 함수 + DAG 토폴로지 검증 (Mock Athena/Bedrock/S3)",
+      "started_at": "2026-04-27T00:06:05+0900",
+      "completed_at": "2026-04-27T00:11:15+0900"
     }
   ]
 }
