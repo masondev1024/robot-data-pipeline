@@ -23,9 +23,10 @@
     },
     {
       "dir": "3-realtime",
-      "status": "pending",
+      "status": "completed",
       "pre_gate_check": "verify_batch_output",
-      "description": "실시간 이상 탐지 및 AI 리포트 (Flink, Bedrock) 구현"
+      "description": "실시간 이상 탐지 및 AI 리포트 (Flink, Bedrock) 구현",
+      "completed_at": "2026-04-27T00:34:26+0900"
     },
     {
       "dir": "4-serving",
