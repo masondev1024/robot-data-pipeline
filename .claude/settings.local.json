@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(python3 -m pytest scripts/test_execute.py -v)",
+      "Bash(pip install *)",
+      "Bash(xargs -I{} sh -c 'echo \"=== {} ===\" && cat \"{}\"')",
+      "Bash(python3 -m pytest /Users/mason/Desktop/Projects/harness_framework/scripts/test_execute.py -q)",
+      "Bash(python3 *)",
+      "Bash(kill %1)"
+    ]
+  }
+}

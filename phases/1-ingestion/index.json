@@ -70,7 +70,7 @@
       "description": "Generator EKS 배포 및 데이터 송신 시작",
       "started_at": "2026-04-26T02:20:45+0900",
       "summary": "Dockerfile + configmap.yaml(seed CSV) + deployment.yaml: ns=robot-telemetry, ConfigMap 마운트, IRSA SA, ROBOT_COUNT=10000, 2Gi",
-      "completed_at": "2026-04-26T02:25:00+0900"
+      "completed_at": "2026-04-26T02:23:58+0900"
     }
   ],
   "created_at": "2026-04-26T02:13:14+0900"

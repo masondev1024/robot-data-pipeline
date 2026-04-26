@@ -45,7 +45,7 @@
       ],
       "description": "일별/로봇별 지표 집계 및 분석 테이블 적재 구현",
       "started_at": "2026-04-26T02:36:21+0900",
-      "completed_at": "2026-04-26T03:10:00+0900",
+      "completed_at": "2026-04-26T02:39:00+0900",
       "summary": "robot_daily_etl.py 완성: silver_to_gold(일별 집계 4지표) + generate_bedrock_report(Bedrock Claude → S3 reports/) 체인"
     }
   ],

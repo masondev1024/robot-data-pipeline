@@ -1,0 +1,49 @@
+{
+  "project": "Robot Telemetry Pipeline",
+  "phase": "0-setup",
+  "domain": "terraform",
+  "steps": [
+    {
+      "step": 0,
+      "name": "terraform-root",
+      "status": "completed",
+      "depends_on": [],
+      "description": "AWS Provider 및 공통 변수 정의",
+      "summary": "Shadow terraform/variables.tf 생성 및 VPC CIDR(10.0.32.0/16) 확정"
+    },
+    {
+      "step": 1,
+      "name": "network",
+      "status": "completed",
+      "depends_on": [0],
+      "description": "3계층 VPC 및 인터페이스 엔드포인트 구성",
+      "summary": "Shadow network.tf 생성 및 S3/Kinesis PrivateLink 구성 완료"
+    },
+    {
+      "step": 2,
+      "name": "eks-iam",
+      "status": "completed",
+      "depends_on": [1],
+      "description": "EKS 클러스터 및 노드 그룹, IRSA 기초 IAM 구성",
+      "summary": "Shadow eks_and_iam.tf 생성 및 OIDC Provider 구성 완료"
+    },
+    {
+      "step": 3,
+      "name": "karpenter-addons",
+      "status": "completed",
+      "depends_on": [2],
+      "description": "Karpenter 및 Helm 애드온(ALB, Airflow 등) 프로비저닝",
+      "summary": "Shadow karpenter.tf + addons.tf 생성 및 Airflow Helm 구성 완료"
+    },
+    {
+      "step": 4,
+      "name": "cicd-module-scaffold",
+      "status": "completed",
+      "depends_on": [2],
+      "description": "GitHub Actions OIDC 및 데이터 파이프라인 모듈 골격 생성",
+      "summary": "Shadow cicd_gitops.tf 생성 및 GitHub OIDC Role 설정 완료"
+    }
+  ],
+  "created_at": "2026-04-26T00:28:03+0900",
+  "completed_at": "2026-04-26T00:40:00+0900"
+}
