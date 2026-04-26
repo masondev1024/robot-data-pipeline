@@ -508,17 +508,80 @@ class TestSimulationAndGates:
         phase_name = "0-mvp"
         (tmp_project / "phases" / phase_name).mkdir(parents=True)
         (tmp_project / "phases" / phase_name / "index.json").write_text(json.dumps({"project": "P", "steps": []}))
-        
+
         with patch.object(ex, "ROOT", tmp_project):
             executor = ex.StepExecutor(phase_name)
             executor._top_index_file.write_text(json.dumps({
                 "phases": [{"dir": phase_name, "pre_gate_check": "check_env"}]
             }))
             assert executor._run_phase_gate() is False
-            
+
             # .env.example 생성 후 성공
             (tmp_project / ".env.example").write_text("TEST=1")
             assert executor._run_phase_gate() is True
+
+    def test_run_phase_gate_declarative_files(self, tmp_project):
+        """phases/index.json의 gate_files 선언적 옵션 — named gate 코드 수정 없이 동작."""
+        phase_name = "9-custom"
+        (tmp_project / "phases" / phase_name).mkdir(parents=True)
+        (tmp_project / "phases" / phase_name / "index.json").write_text(
+            json.dumps({"project": "P", "steps": []}))
+
+        with patch.object(ex, "ROOT", tmp_project):
+            executor = ex.StepExecutor(phase_name)
+            executor._top_index_file.write_text(json.dumps({
+                "phases": [{
+                    "dir": phase_name,
+                    "gate_files": ["custom/file_a.txt", "custom/dir/file_b.yaml"],
+                }]
+            }))
+            # 둘 다 없음 → 실패
+            assert executor._run_phase_gate() is False
+
+            # 하나만 있음 → 여전히 실패
+            (tmp_project / "custom").mkdir()
+            (tmp_project / "custom" / "file_a.txt").write_text("a")
+            assert executor._run_phase_gate() is False
+
+            # 둘 다 있음 → 성공
+            (tmp_project / "custom" / "dir").mkdir()
+            (tmp_project / "custom" / "dir" / "file_b.yaml").write_text("b: 1")
+            assert executor._run_phase_gate() is True
+
+    def test_run_phase_gate_unknown_named_passes(self, tmp_project):
+        """알 수 없는 named gate는 통과 처리(하위 호환)."""
+        phase_name = "0-mvp"
+        (tmp_project / "phases" / phase_name).mkdir(parents=True)
+        (tmp_project / "phases" / phase_name / "index.json").write_text(
+            json.dumps({"project": "P", "steps": []}))
+
+        with patch.object(ex, "ROOT", tmp_project):
+            executor = ex.StepExecutor(phase_name)
+            executor._top_index_file.write_text(json.dumps({
+                "phases": [{"dir": phase_name, "pre_gate_check": "totally_unknown"}]
+            }))
+            assert executor._run_phase_gate() is True
+
+    def test_run_phase_gate_declarative_overrides_named(self, tmp_project):
+        """gate_files 선언이 있으면 named lookup 무시(선언적 우선)."""
+        phase_name = "0-mvp"
+        (tmp_project / "phases" / phase_name).mkdir(parents=True)
+        (tmp_project / "phases" / phase_name / "index.json").write_text(
+            json.dumps({"project": "P", "steps": []}))
+
+        with patch.object(ex, "ROOT", tmp_project):
+            executor = ex.StepExecutor(phase_name)
+            executor._top_index_file.write_text(json.dumps({
+                "phases": [{
+                    "dir": phase_name,
+                    # named gate는 .env.example 검사 — 일부러 만들어두지만
+                    "pre_gate_check": "check_env",
+                    # gate_files가 있으므로 named 무시
+                    "gate_files": ["should/not/exist.txt"],
+                }]
+            }))
+            (tmp_project / ".env.example").write_text("X=1")
+            assert executor._run_phase_gate() is False  # gate_files 우선 → 실패
 
     def test_verify_logical_connection_simulation(self, tmp_project):
         # Phase 디렉토리 및 인덱스 준비
@@ -535,7 +598,7 @@ class TestSimulationAndGates:
             tf_dir.mkdir(parents=True)
             vars_tf = tf_dir / "variables.tf"
             vars_tf.write_text('variable "vpc_cidr" { default = "10.0.32.0/16" }\n'
-                             'variable "aws_region" { default = "ap-northeast-2" }\n'
+                             'variable "aws_region" { default = "eu-west-1" }\n'
                              'variable "cluster_name" { default = "robot-telemetry-cluster" }')
             
             assert executor._verify_logical_connection("check_infra_base") is True
@@ -583,6 +646,63 @@ class TestMainCli:
                     # main() 내부에서 생성된 인스턴스의 속성 확인이 필요하므로 
                     # StepExecutor.__init__을 mock하거나 run 호출 시점의 self를 확인
         
+    def test_preflight_yes_skips_stdin(self, tmp_project):
+        """--preflight-yes: 질문은 출력하되 input() 호출 없이 자동 통과."""
+        phase_name = "0-mvp"
+        d = tmp_project / "phases" / phase_name
+        d.mkdir(parents=True)
+        (d / "index.json").write_text(json.dumps({"project": "P", "steps": []}))
+        (d / "step0.md").write_text("# Step 0\nDummy")
+
+        with patch.object(ex, "ROOT", tmp_project):
+            executor = ex.StepExecutor(phase_name, preflight=True, preflight_yes=True)
+
+            # claude 서브세션 모킹 — 가짜 질문 3개 반환
+            fake = MagicMock(returncode=0, stdout="1) q1?\n2) q2?\n3) q3?")
+            with patch("subprocess.run", return_value=fake):
+                # input 이 호출되면 테스트 실패 (StopIteration)
+                with patch("builtins.input", side_effect=AssertionError("input should not be called")):
+                    assert executor._run_preflight("guardrails") is True
+
+    def test_preflight_interactive_q_aborts(self, tmp_project):
+        """기존 인터랙티브 모드: 'q' 입력 시 False 반환(중단)."""
+        phase_name = "0-mvp"
+        d = tmp_project / "phases" / phase_name
+        d.mkdir(parents=True)
+        (d / "index.json").write_text(json.dumps({"project": "P", "steps": []}))
+        (d / "step0.md").write_text("# Step 0\nDummy")
+
+        with patch.object(ex, "ROOT", tmp_project):
+            executor = ex.StepExecutor(phase_name, preflight=True, preflight_yes=False)
+            fake = MagicMock(returncode=0, stdout="1) q1?")
+            with patch("subprocess.run", return_value=fake):
+                with patch("builtins.input", return_value="q"):
+                    assert executor._run_preflight("guardrails") is False
+
+    def test_preflight_yes_implies_preflight_in_main(self, tmp_project):
+        """main(): --preflight-yes 단독 사용 시에도 preflight 가 켜진다."""
+        phase_name = "0-mvp"
+        (tmp_project / "phases" / phase_name).mkdir(parents=True)
+        (tmp_project / "phases" / phase_name / "index.json").write_text(
+            json.dumps({"project": "P", "steps": []}))
+        (tmp_project / "phases" / "index.json").write_text(json.dumps({"phases": []}))
+
+        captured = {}
+        orig_init = ex.StepExecutor.__init__
+
+        def capture_init(self, *args, **kwargs):
+            captured.update(kwargs)
+            orig_init(self, *args, **kwargs)
+
+        with patch("sys.argv", ["execute.py", phase_name, "--preflight-yes"]):
+            with patch.object(ex, "ROOT", tmp_project):
+                with patch.object(ex.StepExecutor, "__init__", capture_init):
+                    with patch.object(ex.StepExecutor, "run"):
+                        ex.main()
+
+        assert captured.get("preflight") is True
+        assert captured.get("preflight_yes") is True
+
     def test_no_args_exits(self):
         with patch("sys.argv", ["execute.py"]):
             with pytest.raises(SystemExit) as exc_info:
