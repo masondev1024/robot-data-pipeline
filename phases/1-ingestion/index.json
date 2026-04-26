@@ -67,10 +67,12 @@
     {
       "step": 6,
       "name": "s3-lifecycle-athena",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [],
       "description": "S3 Lifecycle 규칙(bronze/silver/dlq) + Athena Workgroup Terraform 추가",
-      "started_at": "2026-04-26T21:01:11+0900"
+      "summary": "s3_lifecycle.tf: bronze@90d/silver@365d/dlq@30d. glue.tf+: Athena Workgroup robot-telemetry-workgroup",
+      "started_at": "2026-04-26T21:01:11+0900",
+      "completed_at": "2026-04-26T21:35:00+0900"
     },
     {
       "step": 7,
