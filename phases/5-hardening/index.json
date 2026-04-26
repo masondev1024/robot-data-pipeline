@@ -32,7 +32,7 @@
       "depends_on": [],
       "description": "Generator OTEL inject-python annotation + AWS X-Ray Group Terraform 리소스 + sampling rule (cost control)",
       "started_at": "2026-04-27T01:27:19+0900",
-      "completed_at": "2026-04-27T01:30:00+0900",
+      "completed_at": "2026-04-27T01:28:29+0900",
       "summary": "k8s/generator OTEL inject-python annotation + xray.tf (Group robot-telemetry-traces + sampling 5%)"
     },
     {
