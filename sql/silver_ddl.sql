@@ -11,5 +11,13 @@ PARTITIONED BY (dt DATE)
 STORED AS PARQUET
 LOCATION 's3://de-ai-06-827913617635-ap-northeast-2-an/silver/'
 TBLPROPERTIES (
-    'parquet.compress' = 'SNAPPY'
+    'parquet.compression'         = 'SNAPPY',
+    'projection.enabled'          = 'true',
+    'projection.dt.type'          = 'date',
+    'projection.dt.range'         = '2024-01-01,NOW',
+    'projection.dt.format'        = 'yyyy-MM-dd',
+    'projection.dt.interval'      = '1',
+    'projection.dt.interval.unit' = 'DAYS',
+    'storage.location.template'   =
+        's3://de-ai-06-827913617635-ap-northeast-2-an/silver/dt=${dt}/'
 );
