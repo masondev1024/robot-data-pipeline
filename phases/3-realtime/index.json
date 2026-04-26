@@ -35,7 +35,7 @@
       ],
       "description": "이상 탐지 순수 함수 단위 테스트 (Z-Score / load_ratio / is_anomaly + threshold tuning)",
       "started_at": "2026-04-27T00:32:57+0900",
-      "completed_at": "2026-04-27T00:38:00+0900"
+      "completed_at": "2026-04-27T00:34:26+0900"
     },
     {
       "step": 3,
