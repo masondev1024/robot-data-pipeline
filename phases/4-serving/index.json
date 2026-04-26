@@ -10,7 +10,7 @@
       "depends_on": [],
       "description": "Alert KDS → SNS → Slack 브리지 Lambda + Slack 딥링크 구현",
       "started_at": "2026-04-27T00:51:04+0900",
-      "completed_at": "2026-04-27T06:00:00+0900",
+      "completed_at": "2026-04-27T00:53:36+0900",
       "summary": "terraform/modules/data_pipeline/sns.tf(robot-anomaly-alerts SNS topic + Slack webhook subscription) + lambda.tf(robot-anomaly-alert-lambda + Event Source Mapping + KDS trigger) + src/lambda/alert_handler.py(alert payload parsing + SNS publish) + variables.tf(slack_webhook_url sensitive var)"
     },
     {
