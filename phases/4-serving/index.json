@@ -16,10 +16,12 @@
     {
       "step": 1,
       "name": "grafana-helm",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [],
       "description": "Athena/CloudWatch 연동 운영 대시보드 구축",
-      "started_at": "2026-04-26T10:42:09+0900"
+      "started_at": "2026-04-26T10:42:09+0900",
+      "completed_at": "2026-04-26T12:00:00+0900",
+      "summary": "addons.tf Grafana Helm 추가 + grafana/dashboards/ 3개 JSON(fleet, anomaly, pipeline_health)"
     },
     {
       "step": 2,
