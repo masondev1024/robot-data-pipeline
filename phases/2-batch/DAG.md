@@ -7,7 +7,7 @@ graph TD
   classDef error fill:#f44336,stroke:#fff,color:#fff;
   classDef blocked fill:#FF9800,stroke:#fff,color:#fff;
   S0["0. athena-ddl"]
-  class S0 completed;
+  class S0 pending;
   S1["1. airflow-setup"]
   class S1 completed;
   S2["2. dag-bronze-silver"]
