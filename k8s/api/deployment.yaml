@@ -24,6 +24,8 @@ spec:
     metadata:
       labels:
         app: robot-telemetry-api
+      annotations:
+        instrumentation.opentelemetry.io/inject-python: "true"
     spec:
       serviceAccountName: api-sa
       containers:
