@@ -20,11 +20,11 @@ graph TD
   S4["4. generator-app"]
   class S4 completed;
   S5["5. generator-k8s"]
-  class S5 pending;
+  class S5 completed;
   S4 --> S5
   S6["6. s3-lifecycle-athena"]
   class S6 completed;
   S7["7. generator-tests"]
-  class S7 pending;
+  class S7 completed;
   S4 --> S7
 ```
