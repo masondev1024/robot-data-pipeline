@@ -8,7 +8,7 @@
       "name": "lambda-alert",
       "status": "completed",
       "depends_on": [],
-      "description": "Alert KDS → SNS → Slack 브리지 Lambda + Slack 딥링크 구현",
+      "description": "Alert KDS → SNS → Slack 브리지 Lambda + 기본 메시지 포맷",
       "started_at": "2026-04-27T00:51:04+0900",
       "completed_at": "2026-04-27T00:53:36+0900",
       "summary": "terraform/modules/data_pipeline/sns.tf(robot-anomaly-alerts SNS topic + Slack webhook subscription) + lambda.tf(robot-anomaly-alert-lambda + Event Source Mapping + KDS trigger) + src/lambda/alert_handler.py(alert payload parsing + SNS publish) + variables.tf(slack_webhook_url sensitive var)"
@@ -18,7 +18,7 @@
       "name": "grafana-helm",
       "status": "completed",
       "depends_on": [],
-      "description": "Grafana Helm(allow_embedding) + ALB Ingress + 대시보드 3종 구축",
+      "description": "Grafana Helm + 대시보드 3종",
       "started_at": "2026-04-27T00:51:04+0900",
       "completed_at": "2026-04-27T00:55:03+0900",
       "summary": "terraform/variables.tf(grafana_admin_password sensitive var) + addons.tf(Grafana Helm Release: var.grafana_admin_password, service.type=ClusterIP, persistence.enabled=true, allow_embedding, anonymous) + grafana/dashboards/(robot_fleet.json: motor_temp+battery_drain Top 10 Athena, anomaly_timeline.json: 24h anomaly trend, pipeline_health.json: Kinesis+Firehose+EKS CloudWatch)"
@@ -28,12 +28,39 @@
       "name": "api-server",
       "status": "completed",
       "depends_on": [],
-      "description": "FastAPI 통합 관제 포털(portal.html) + ALB Ingress + Rate Limiting + Cold Start 처리",
+      "description": "FastAPI AI Query 서버 기본 구현 + chat.html UI + IRSA",
       "started_at": "2026-04-27T00:51:04+0900",
       "completed_at": "2026-04-27T00:53:17+0900",
       "summary": "src/api/main.py(FastAPI+in-memory캐시+apscheduler KST timezone+Bedrock), templates/chat.html(UI), Dockerfile(python:3.11), k8s/api/deployment.yaml+hpa.yaml(eu-west-1 region fix), iam.tf(API IRSA 완성)"
+    },
+    {
+      "step": 3,
+      "name": "alert-handler-deeplink",
+      "status": "pending",
+      "depends_on": [],
+      "description": "Lambda alert_handler 보강 — portal_url SSM 런타임 조회 + 딥링크 메시지 포맷 + IAM ssm:GetParameter 권한"
+    },
+    {
+      "step": 4,
+      "name": "alb-ingresses",
+      "status": "pending",
+      "depends_on": [],
+      "description": "Grafana + API ALB Ingress 2종 (internet-facing) + grafana_admin_password sensitive 변수화 검증"
+    },
+    {
+      "step": 5,
+      "name": "portal-and-ux-bugs",
+      "status": "pending",
+      "depends_on": [],
+      "description": "FastAPI 통합 관제 포털(portal.html) + Bedrock Sonnet 3.5 + slowapi rate limit + UX 버그 6건 idempotent 수정 (timezone/data_date/system 필드/DOMPurify/minReplicas/딥링크)"
+    },
+    {
+      "step": 6,
+      "name": "api-tests",
+      "status": "pending",
+      "depends_on": [5],
+      "description": "tests/api/(chat 6 + status 4) + tests/lambda/(alert 5) — 모든 boto3 Mock, 실 AWS 호출 0건"
     }
   ],
-  "created_at": "2026-04-27T00:50:51+0900",
-  "completed_at": "2026-04-27T00:55:03+0900"
+  "created_at": "2026-04-27T00:50:51+0900"
 }
