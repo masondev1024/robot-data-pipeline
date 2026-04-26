@@ -9,7 +9,7 @@ graph TD
   S0["0. flink-terraform"]
   class S0 completed;
   S1["1. flink-app"]
-  class S1 pending;
+  class S1 completed;
   S0 --> S1
   S2["2. flink-validation"]
   class S2 pending;
