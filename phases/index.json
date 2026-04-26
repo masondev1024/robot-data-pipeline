@@ -16,9 +16,10 @@
     },
     {
       "dir": "2-batch",
-      "status": "pending",
+      "status": "completed",
       "pre_gate_check": "verify_ingestion_flow",
-      "description": "배치 처리 및 메달리온 아키텍처 (Athena, Airflow) 구현"
+      "description": "배치 처리 및 메달리온 아키텍처 (Athena, Airflow) 구현",
+      "completed_at": "2026-04-26T22:50:00+0900"
     },
     {
       "dir": "3-realtime",

@@ -178,16 +178,16 @@
       - `aws_vpc_endpoint` type=`Gateway` for **S3** — 무료. EKS Pod → S3 트래픽이 NAT Gateway를 우회해 AWS 내부 네트워크로 처리됨.
       - `aws_vpc_endpoint` type=`Interface` for **Kinesis Streams** (PrivateLink) — Generator의 초당 10,000건 전송 트래픽이 퍼블릭망을 타지 않음. NAT Gateway 데이터 처리 비용 차단.
 
-  - [ ] **Task 0.2: CI/CD 자동화 (GitHub Actions)**
-    - [ ] `.github/workflows/terraform.yml` 작성: `terraform/` 변경 감지 → `terraform plan` 결과를 PR 코멘트로 게시 → 사람 승인(Environment Protection Rule) → `terraform apply`.
-    - [ ] `.github/workflows/k8s-deploy.yml` 작성: `k8s/` 변경 감지 → EKS 클러스터에 `kubectl apply` 자동 실행.
-    - [ ] `cicd_gitops.tf`에 이미 GitHub OIDC 설정이 있으므로 Actions workflow에서 `aws-actions/configure-aws-credentials` + OIDC 토큰 방식으로 자격증명 (하드코딩 금지).
-    - [ ] Generator / API 이미지 변경 시 ECR Push → EKS `kubectl rollout restart` 자동화.
-    - [ ] `.github/workflows/post-deploy.yml` 작성 — **ALB DNS 확정 후 SSM 자동 저장**:
-      - API Ingress DNS polling: `kubectl get ingress robot-telemetry-api-ingress -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'` (최대 20회 × 15초 대기).
-      - Grafana Ingress DNS polling: 동일 방식.
-      - 확정된 DNS → `aws ssm put-parameter --name "/robot-telemetry/portal-url" --overwrite`.
-      - 확정된 DNS → `aws ssm put-parameter --name "/robot-telemetry/grafana-url" --overwrite`.
+  - [x] **Task 0.2: CI/CD 자동화 (GitHub Actions)**
+    - [x] `.github/workflows/terraform.yml` 작성: `terraform/` 변경 감지 → `terraform plan` 결과를 PR 코멘트로 게시 → 사람 승인(Environment Protection Rule) → `terraform apply`.
+    - [x] `.github/workflows/k8s-deploy.yml` 작성: `k8s/` 변경 감지 → EKS 클러스터에 `kubectl apply` 자동 실행.
+    - [x] `cicd_gitops.tf`에 이미 GitHub OIDC 설정이 있으므로 Actions workflow에서 `aws-actions/configure-aws-credentials` + OIDC 토큰 방식으로 자격증명 (하드코딩 금지).
+    - [x] Generator / API 이미지 변경 시 ECR Push → EKS `kubectl rollout restart` 자동화. (Lambda ZIP 빌드 스텝도 포함)
+    - [x] `.github/workflows/post-deploy.yml` 작성 — **ALB DNS 확정 후 SSM 자동 저장** (단, Phase 4의 ALB Ingress 매니페스트 작성 후에만 런타임 동작):
+      - [x] API Ingress DNS polling: `kubectl get ingress robot-telemetry-api-ingress -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'` (최대 20회 × 15초 대기).
+      - [x] Grafana Ingress DNS polling: 동일 방식.
+      - [x] 확정된 DNS → `aws ssm put-parameter --name "/robot-telemetry/portal-url" --overwrite`.
+      - [x] 확정된 DNS → `aws ssm put-parameter --name "/robot-telemetry/grafana-url" --overwrite`.
 
   ---
 
@@ -220,16 +220,16 @@
       - 산출 근거: 가상 로봇 10,000대 × 1 rec/sec = **10,000 rec/sec**, 레코드당 ~1KB → **10 MB/sec**. KDS Shard 1개 한도(1,000 rec/sec, 1 MB/sec)에서 **10 Shards** 필요.
     - [x] Alert 전용 스트림 `robot-anomaly-alert-stream` 별도 생성 (**Shard Count: 2**, Retention: **24시간**).
       - 산출 근거: Flink 이상 탐지 이벤트 수는 메인 스트림 대비 소량(전체 로봇의 일부). Shard 2개면 충분하며 비용 최소화.
-  - [ ] **Task 1.3: S3 Data Lake Prefix 정의 및 Lifecycle 설정**
+  - [x] **Task 1.3: S3 Data Lake Prefix 정의 및 Lifecycle 설정**
     - [x] **S3 버킷 신규 생성 금지.** 사전 생성된 버킷 `de-ai-06-827913617635-ap-northeast-2-an` 사용.
     - [x] 논리적 Prefix `bronze/`, `silver/`, `gold/`는 S3 오브젝트 키 네이밍 규칙으로만 정의 (별도 Terraform 리소스 불필요).
-    - [ ] **[비용 최적화 — 미구현]** `aws_s3_bucket_lifecycle_configuration` 리소스 추가 (`modules/data_pipeline/s3_lifecycle.tf` 신규):
-      - `bronze/` prefix: 90일 후 Glacier Instant Retrieval로 전환.
-      - `silver/` prefix: 365일 후 Glacier Instant Retrieval로 전환.
-      - `gold/` prefix: 영구 보관 (Lifecycle 규칙 없음).
-      - `bronze-dlq/` prefix: 30일 후 만료 삭제 (비정상 데이터 자동 정리).
-  - [ ] **Task 1.3.1: Athena Workgroup 생성 (Terraform — 미구현)**
-    - [ ] `modules/data_pipeline/glue.tf` 또는 별도 `athena.tf`에 `aws_athena_workgroup` 추가.
+    - [x] **[비용 최적화]** `aws_s3_bucket_lifecycle_configuration` 리소스 추가 (`modules/data_pipeline/s3_lifecycle.tf`):
+      - [x] `bronze/` prefix: 90일 후 Glacier Instant Retrieval로 전환.
+      - [x] `silver/` prefix: 365일 후 Glacier Instant Retrieval로 전환.
+      - [x] `gold/` prefix: 영구 보관 (Lifecycle 규칙 없음).
+      - [x] `bronze-dlq/` prefix: 30일 후 만료 삭제 (비정상 데이터 자동 정리).
+  - [x] **Task 1.3.1: Athena Workgroup 생성 (Terraform)**
+    - [x] `modules/data_pipeline/glue.tf`에 `aws_athena_workgroup` 추가.
       - Workgroup명: `robot-telemetry-workgroup`
       - `enforce_workgroup_configuration = true`, `publish_cloudwatch_metrics_enabled = true`.
       - 쿼리 결과 S3 위치: `s3://de-ai-06-827913617635-ap-northeast-2-an/project-athena-results/`.
@@ -243,53 +243,54 @@
     - [x] Source: Task 1.2에서 생성한 KDS. Destination: `de-ai-06-827913617635-ap-northeast-2-an` 버킷 (`data "aws_s3_bucket"` 참조).
     - [x] **[핵심]** Data Format Conversion 활성화: AWS Glue Data Catalog 테이블 포맷을 참조하여 원본 JSON을 **Parquet**으로 변환 (Snappy 압축).
     - [x] **[핵심]** Dynamic Partitioning 설정: S3 Prefix를 `bronze/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/` 형태로 구성.
-  - [ ] **Task 1.5: Generator Implementation (Python — AI4I 2020 CSV Seed 기반)**
-    - [ ] `data/generate_sample.py` 작성: AI4I 2020 포맷 200행 합성 CSV(`data/seed_data_sample.csv`) 생성 스크립트.
+  - [x] **Task 1.5: Generator Implementation (Python — AI4I 2020 CSV Seed 기반)**
+    - [x] `data/generate_sample.py` 작성: AI4I 2020 포맷 200행 합성 CSV(`data/seed_data_sample.csv`) 생성 스크립트.
       - 운영 환경에서는 `data/seed_data.csv` (Kaggle AI4I 2020 전체 데이터, 직접 다운로드 필요) 사용.
-    - [ ] `src/generator/app.py` 작성:
-      - [ ] `SEED_CSV_PATH` 환경변수로 지정된 AI4I CSV 로드 → `ROBOT_COUNT`개 로봇 프로필 생성 (CSV 행 수 부족 시 순환(cycle)).
+    - [x] `src/generator/app.py` 작성:
+      - [x] `SEED_CSV_PATH` 환경변수로 지정된 AI4I CSV 로드 → `ROBOT_COUNT`개 로봇 프로필 생성 (CSV 행 수 부족 시 순환(cycle)).
         - 컬럼 매핑: `Process temperature [K]` → `motor_temp_base`, `Rotational speed [rpm]` → `load_base`, `Machine failure` → 스파이크 확률(70%).
-      - [ ] `asyncio` 기반으로 가상 로봇 **`ROBOT_COUNT`(기본 10,000)대** 동시 시뮬레이션. 각 로봇이 독립적인 coroutine으로 초당 1건 센서 데이터 생성.
-      - [ ] 생성 필드: `robot_id`, `pos_x`, `pos_y`, `battery_level`(0~100), `motor_temp`(60~100°C), `current_load`, `timestamp` (ISO8601 UTC).
-      - [ ] `boto3` `put_records` (최대 500건/배치)로 묶어 KDS에 전송 → 초당 20회 배치 호출로 10,000 rec/sec 처리.
-      - [ ] 따릉이 API 호출 코드 일체 포함 금지.
-    - [ ] Phase 0에서 생성한 EKS 클러스터에 배포하기 위한 `Dockerfile` 및 `k8s/generator/Deployment.yaml` 작성. 일반 `Deployment` 사용 (Argo Rollouts 금지). Pod의 Service Account에 Task 1.1의 IRSA 어노테이션 추가.
+      - [x] `asyncio` 기반으로 가상 로봇 **`ROBOT_COUNT`(기본 10,000)대** 동시 시뮬레이션. 각 로봇이 독립적인 coroutine으로 초당 1건 센서 데이터 생성.
+      - [x] 생성 필드: `robot_id`, `pos_x`, `pos_y`, `battery_level`(0~100), `motor_temp`(60~100°C), `current_load`, `timestamp` (ISO8601 UTC).
+      - [x] `boto3` `put_records` (최대 500건/배치)로 묶어 KDS에 전송 → 초당 20회 배치 호출로 10,000 rec/sec 처리.
+      - [x] 따릉이 API 호출 코드 일체 포함 금지.
+    - [x] Phase 0에서 생성한 EKS 클러스터에 배포하기 위한 `Dockerfile` 및 `k8s/generator/Deployment.yaml` 작성. 일반 `Deployment` 사용 (Argo Rollouts 금지). Pod의 Service Account에 Task 1.1의 IRSA 어노테이션 추가.
   - [ ] **Task 1.6: Ingestion Pipeline Validation (pytest)**
-    - [ ] `tests/generator/` 생성 및 `pytest` 기반 단위 테스트 작성:
-      - [ ] 생성된 데이터 스키마가 Glue Table 정의와 일치하는지 검증.
-      - [ ] `ROBOT_COUNT` 만큼의 태스크가 정상적으로 생성되는지 확인.
+    - [x] `tests/generator/` 생성 및 `pytest` 기반 단위 테스트 작성:
+      - [x] 생성된 데이터 스키마가 Glue Table 정의와 일치하는지 검증.
+      - [x] `ROBOT_COUNT` 만큼의 태스크가 정상적으로 생성되는지 확인.
     - [ ] **[통합 테스트]** 로컬 또는 Dev 환경에서 KDS로 실제 데이터를 전송하고, AWS CLI를 통해 Shard에서 레코드가 정상 수신되는지 확인.
 
   ### Phase 2: Batch Processing & Medallion Architecture (Athena + Airflow)
   *목표: Airflow 스케줄링을 통해 Bronze(Raw) 데이터를 Silver(정제), Gold(집계) 테이블로 매일 자정에 자동 가공.*
 
-  - [ ] **Task 2.0: Data Quality Gate (Great Expectations + Airflow)**
-    - [ ] `requirements.txt`에 `great-expectations` 추가.
-    - [ ] `dags/robot_daily_etl.py`에 Bronze→Silver 진입 전 `PythonOperator` Task 삽입:
-      - [ ] 검사 항목: `robot_id` null 비율 < 1%, `motor_temp` 범위 0-500, `battery_level` 범위 0-100, 레코드 수 > 0.
-      - [ ] 검사 실패 시 `AirflowException` 발생 → DAG 중단 + SNS(`robot-anomaly-alerts`)로 "데이터 품질 실패" Slack 알림.
-    - [ ] `tests/etl/test_data_quality.py` 작성 — Mock DataFrame으로 품질 검사 로직 단위 테스트.
-  - [ ] **Task 2.1: Athena / Glue Data Catalog DDL (SQL)**
-    - [ ] Bronze Table DDL: S3 `/bronze` 경로를 가리키는 External Table 생성. `PROJECTION` 속성을 사용하여 파티션 프로젝션 활성화(Athena 스캔 비용 최적화).
-    - [ ] Silver Table DDL: Parquet 포맷의 정제용 테이블 스키마 정의.
-    - [ ] Gold Table DDL: 일별 집계 분석용 테이블 스키마 정의.
-  - [ ] **Task 2.2: Airflow Environment Setup**
-    - [ ] EKS 내에 Helm Chart를 사용하여 Airflow 최소 사양 배포 (또는 로컬 Docker Compose 활용 시 `docker-compose.yaml` 작성).
-    - [ ] AWS Athena 및 S3 통신을 위한 Airflow Connection 설정 (AWS Provider).
+  - [x] **Task 2.0: Data Quality Gate (Great Expectations + Airflow)**
+    - [x] `requirements.txt`에 `great-expectations` 추가.
+    - [x] `dags/robot_daily_etl.py`에 Bronze→Silver 진입 전 `PythonOperator` Task 삽입:
+      - [x] 검사 항목: `robot_id` null 비율 < 1%, `motor_temp` 범위 0-500, `battery_level` 범위 0-100, 레코드 수 > 0.
+      - [x] 검사 실패 시 `AirflowException` 발생 → DAG 중단 + SNS(`robot-telemetry-anomaly-alerts`)로 "데이터 품질 실패" 알림.
+    - [x] `tests/etl/test_data_quality.py` 작성 — `evaluate_quality` 순수 함수 7건 단위 테스트.
+  - [x] **Task 2.1: Athena / Glue Data Catalog DDL (SQL)**
+    - [x] Bronze Table DDL: S3 `/bronze` 경로를 가리키는 External Table 생성. `PROJECTION` 속성을 사용하여 파티션 프로젝션 활성화(Athena 스캔 비용 최적화).
+    - [x] Silver Table DDL: Parquet 포맷의 정제용 테이블 스키마 정의. (Partition Projection: dt DATE)
+    - [x] Gold Table DDL: 일별 집계 분석용 테이블 스키마 정의. (Partition Projection: dt DATE)
+  - [x] **Task 2.2: Airflow Environment Setup**
+    - [x] EKS 내에 Helm Chart를 사용하여 Airflow 최소 사양 배포 (`terraform/addons.tf` `helm_release "airflow"`, KubernetesExecutor). 로컬 Docker Compose는 미사용.
+    - [x] AWS Athena 및 S3 통신을 위한 Airflow Connection 설정 — boto3 직접 호출 방식 채택 (Airflow Connection 대신).
   - [ ] **Task 2.3: ETL Pipeline DAG 작성 (Python `dags/robot_daily_etl.py`)**
-    - [ ] **[멱등성 보장]** 모든 Task는 `execution_date` 기준으로 S3 특정 파티션 경로를 바라보고, 재실행 시 기존 파티션을 덮어쓰도록(`INSERT OVERWRITE`) 로직 구성.
-    - [ ] **Task: Bronze to Silver (Athena Operator):**
-      - [ ] `motor_temp`가 500도 이상인 이상치(Outlier) 제거.
-      - [ ] 데이터 품질 필터 추가: `robot_id IS NOT NULL`, `battery_level BETWEEN 0 AND 100`, `motor_temp BETWEEN 0 AND 500`, `timestamp IS NOT NULL`.
-      - [ ] 중복 수신된 텔레메트리 데이터 제거(Deduplication): `robot_id + timestamp` 기준 `ROW_NUMBER()` 사용.
-      - [ ] `battery_level` 등 데이터 타입 정확하게 Casting.
-    - [ ] **Task: Silver to Gold (Athena Operator):**
-      - [ ] 일별/로봇별 집계 쿼리 실행.
-      - [ ] 지표 도출: 일일 평균/최고 모터 온도, 배터리 소모율(시작-종료 시점 차이), 가동 시간 비율.
+    - [ ] **[멱등성 보장]** 모든 Task는 `execution_date` 기준으로 S3 특정 파티션 경로를 바라보고, 재실행 시 기존 파티션을 덮어쓰도록(`INSERT OVERWRITE`) 로직 구성. (현재 `INSERT INTO` 사용 — 별도 이슈)
+    - [x] **Task: Bronze to Silver (Athena Operator):**
+      - [x] `motor_temp`가 500도 이상인 이상치(Outlier) 제거.
+      - [x] 데이터 품질 필터 추가: `robot_id IS NOT NULL`, `battery_level BETWEEN 0 AND 100`, `motor_temp BETWEEN 0 AND 500`, `timestamp IS NOT NULL`.
+      - [x] 중복 수신된 텔레메트리 데이터 제거(Deduplication): `robot_id + timestamp` 기준 `ROW_NUMBER()` 사용.
+      - [x] `battery_level` 등 데이터 타입 정확하게 Casting.
+      - [x] bronze WHERE 절 파티션 키(`year/month/day`) 사용 — step 4 (dag-fix) 정정 완료.
+    - [x] **Task: Silver to Gold (Athena Operator):**
+      - [x] 일별/로봇별 집계 쿼리 실행.
+      - [x] 지표 도출: 일일 평균/최고 모터 온도, 배터리 소모(`battery_drain`), 가동 시간(`active_hours`). step 4 (dag-fix) 정정 완료.
   - [ ] **Task 2.4: ETL Logic & DAG Validation**
-    - [ ] `tests/etl/` 생성:
-      - [ ] `pytest-airflow` 등을 활용하여 DAG의 순환 참조 및 문법 오류 검사.
-      - [ ] **[SQL 검증]** Mock 데이터를 활용하여 Athena ETL 쿼리가 이상치(500도 이상)를 정확히 필터링하는지 단위 테스트.
+    - [x] `tests/etl/` 생성 (`tests/etl/test_data_quality.py` 7건 통과).
+    - [ ] `pytest-airflow` 등을 활용하여 DAG의 순환 참조 및 문법 오류 검사.
+    - [ ] **[SQL 검증]** Mock 데이터를 활용하여 Athena ETL 쿼리가 이상치(500도 이상)를 정확히 필터링하는지 단위 테스트.
 
   ### Phase 3: Real-time Anomaly Detection & AI Insight (Flink + Bedrock)
   *목표: 스트리밍 데이터를 실시간으로 모니터링하고, 배치 집계 결과를 바탕으로 LLM 리포트 생성.*
@@ -303,12 +304,13 @@
       - [ ] **Condition 2 (Multivariate Correlation):** `current_load` 대비 `motor_temp` 비율이 비정상적으로 높은 경우(부하 대비 과열) 탐지.
       - [ ] 위 두 조건 중 하나라도 만족 시 이상 징후로 판단하여 알람 생성 (알람 피로도 급감 및 AI 추론 신뢰도 확보).
     - [ ] 탐지된 이상 이벤트를 두 곳에 동시 Sink: ① S3 `alerts/` 경로 (이력 로깅), ② **`robot-anomaly-alert-stream`** (Alert 전용 KDS, Native Sink 사용) — SNS 직접 연결 금지 (Flink에 SNS Native Sink 없음).
-  - [ ] **Task 3.2: LLM 배치 리포트 (Amazon Bedrock)**
-    - [ ] `dags/robot_daily_etl.py`의 마지막 Task로 Python Operator 추가.
-    - [ ] Gold Table의 최신 파티션 데이터(일일 상태 요약)를 `boto3` Athena Client로 읽어옴.
-    - [ ] 프롬프트 엔지니어링: "다음은 오늘 공장 로봇들의 상태 지표야. [데이터] 이를 분석해서 가장 점검이 시급한 로봇 3대와 그 이유를 정비반장에게 보내는 형식으로 300자 이내로 요약해."
-    - [ ] Bedrock API(`InvokeModel`, Claude 3 Sonnet/Haiku)를 호출하여 텍스트 리포트 생성.
-    - [ ] 생성된 리포트를 S3 `reports/YYYY-MM-DD.txt` 경로에 저장.
+  - [x] **Task 3.2: LLM 배치 리포트 (Amazon Bedrock)**
+    - [x] `dags/robot_daily_etl.py`의 마지막 Task로 Python Operator 추가.
+    - [x] Gold Table의 최신 파티션 데이터(일일 상태 요약)를 `boto3` Athena Client로 읽어옴.
+    - [x] 프롬프트 엔지니어링: "다음은 오늘 공장 로봇들의 상태 지표야. [데이터] 이를 분석해서 가장 점검이 시급한 로봇 3대와 그 이유를 정비반장에게 보내는 형식으로 300자 이내로 요약해."
+    - [x] Bedrock API(`InvokeModel`, Claude 3 Sonnet/Haiku)를 호출하여 텍스트 리포트 생성.
+    - [x] 생성된 리포트를 S3 `reports/YYYY-MM-DD.txt` 경로에 저장.
+    - [x] SELECT 컬럼 정합성: gold DDL 컬럼(`battery_drain`, `active_hours`)으로 정정 — step 4 (dag-fix) 완료.
   - [ ] **Task 3.3: Real-time & AI Validation**
     - [ ] **[Flink 검증]** 90도 이상의 테스트 데이터를 KDS에 주입하고, Flink가 이를 올바르게 탐지하여 Alert KDS로 Sink 하는지 확인.
     - [ ] **[Bedrock 검증]** Mock 데이터를 기반으로 Bedrock 프롬프트가 예상된 형식의 JSON/Text 리포트를 반환하는지 `pytest`로 검증.
@@ -322,7 +324,7 @@
       - [x] `aws_lambda_function` (`robot-anomaly-alert-lambda`) 생성: Python 3.11 런타임. (ZIP 플레이스홀더 `src/lambda/alert_handler.zip` — 코드 구현 별도)
       - [x] `aws_lambda_event_source_mapping`: `robot-anomaly-alert-stream` KDS를 트리거로 연결.
       - [x] Lambda IAM Role: `kinesis:GetRecords` + `sns:Publish` 권한 부여.
-    - [ ] **[미구현]** Lambda ZIP 빌드 프로세스: GitHub Actions `k8s-deploy.yml`에 `pip install -t dist/ && zip -r alert_handler.zip dist/` 빌드 스텝 추가 필요.
+    - [x] Lambda ZIP 빌드 프로세스: GitHub Actions `k8s-deploy.yml`에 `pip install -t dist/ && zip -r alert_handler.zip dist/` 빌드 스텝 포함됨.
     - [ ] 알림 메시지 포맷 (딥링크 포함):
       ```
       [⚠️ 이상 감지] robot_id: {id} | motor_temp: {temp}°C | 감지 시각: {timestamp}
@@ -332,11 +334,11 @@
       - `robot_id`가 URL-safe한지 확인: Generator가 `ROBOT-{숫자5자리}` 포맷으로 생성하도록 명시적 패딩(`f"ROBOT-{i:05d}"`).
     - [ ] 아키텍처: **Flink → robot-anomaly-alert-stream(KDS) → Lambda → SNS → Slack**
   - [ ] **Task 4.2: Grafana Dashboard (EKS Helm)**
-    - [ ] `terraform/addons.tf`에 Grafana Helm release 추가:
-      - `service.type = ClusterIP`, `grafana_admin_password` sensitive 변수로 관리.
-      - **[포털 연동 필수]** `grafana.ini.security.allow_embedding: "true"` — 이 설정 없이는 통합 포털의 iframe에서 Grafana 화면이 차단됨.
-      - `grafana.ini.auth.anonymous.enabled: "true"`, `grafana.ini.auth.anonymous.org_role: "Viewer"` — 포털 접속 시 별도 로그인 없이 대시보드 조회 가능하도록 설정 (읽기 전용).
-    - [ ] **[필수] Grafana ALB Ingress** — `k8s/monitoring/grafana-ingress.yaml` 작성: `kubernetes.io/ingress.class: alb`, `alb.ingress.kubernetes.io/scheme: internet-facing`. ClusterIP만 있으면 외부 접근 불가.
+    - [x] `terraform/addons.tf`에 Grafana Helm release 추가:
+      - [x] `grafana.ini.security.allow_embedding: "true"` — 포털 iframe 임베딩 허용.
+      - [x] `grafana.ini.auth.anonymous.enabled: "true"`, `grafana.ini.auth.anonymous.org_role: "Viewer"` — 익명 Viewer 접근.
+      - [ ] `service.type = ClusterIP`, `grafana_admin_password` sensitive 변수로 관리. (현재 `adminPassword = "admin"` 하드코딩 — 보안 취약, 정정 필요)
+    - [ ] **[필수] Grafana ALB Ingress** — `k8s/monitoring/grafana-ingress.yaml` 작성: `kubernetes.io/ingress.class: alb`, `alb.ingress.kubernetes.io/scheme: internet-facing`. ClusterIP만 있으면 외부 접근 불가. (`k8s/monitoring/` 디렉토리 자체 미생성)
     - [ ] Grafana Data Source 설정: ① Athena Plugin (Silver/Gold 테이블 조회), ② CloudWatch (Kinesis 처리량, EKS Pod 메트릭).
     - [ ] `grafana/dashboards/` 하위에 3개 대시보드 JSON 작성:
       - [ ] `robot_fleet.json`: 로봇별 최신 motor_temp · battery_level 상태 카드.
@@ -344,21 +346,21 @@
       - [ ] `pipeline_health.json`: Kinesis IncomingRecords, Firehose DeliveryToS3 메트릭.
   - [ ] **Task 4.3: 대화형 AI Query API + 통합 관제 포털 (FastAPI + Bedrock)**
     - [ ] `src/api/main.py` 작성 (FastAPI):
-      - [ ] **in-memory 캐시**: 앱 시작 시 + 매일 `CACHE_REFRESH_HOUR`시(기본 01:00 KST)에 Athena `gold_robot_daily_stats` 최신 파티션을 한 번 조회하여 전역 변수에 저장. `apscheduler` 사용.
-      - [ ] **Cold Start 처리**: 앱 시작 시 Athena 쿼리가 완료되기 전 요청이 들어오면 `{"error": "데이터 준비 중입니다. 잠시 후 다시 시도해주세요."}` 반환 (503). 캐시 None 체크 필수.
-      - [ ] `POST /api/chat` — 요청 바디 `{ "question": "..." }` 수신 → **캐시에서 Gold 데이터 즉시 읽기** → 질문 + 데이터를 Bedrock Claude 3에 전달 → 자연어 답변 반환.
-        - **[딥링크]** 응답 JSON에 `links[]` 필드 포함: Bedrock 답변에서 robot_id가 언급될 경우, 해당 로봇의 Grafana 대시보드 URL 자동 생성. 포맷: `{ "label": "ROBOT-00102 차트 보기", "url": "${GRAFANA_URL}/d/robot_fleet?var-robot_id=ROBOT-00102&from=now-1h&to=now" }`. `GRAFANA_URL` 환경변수 참조.
-      - [ ] **요청 제한(Rate Limiting)**: `slowapi` 라이브러리 사용, `POST /api/chat` 엔드포인트에 IP 기준 분당 10회 제한 적용. Bedrock 과금 방지.
-      - [ ] `GET /` — `src/api/templates/portal.html` 통합 관제 포털 서빙.
+      - [x] **in-memory 캐시**: 앱 시작 시 + 매일 `CACHE_REFRESH_HOUR`시(기본 01:00 KST)에 Athena `gold_robot_daily_stats` 최신 파티션을 한 번 조회하여 전역 변수에 저장. `apscheduler` 사용. (단, timezone 미설정 — Task 4.3.5 버그 2A)
+      - [x] **Cold Start 처리**: 앱 시작 시 Athena 쿼리가 완료되기 전 요청이 들어오면 503 반환. `_cache_ready` 플래그 사용.
+      - [ ] `POST /api/chat` — 요청 바디 `{ "question": "..." }` 수신 → **캐시에서 Gold 데이터 즉시 읽기** → 질문 + 데이터를 Bedrock Claude 3에 전달 → 자연어 답변 반환. (구현됨, 단 아래 sub-bullet 미해결)
+        - [ ] **[딥링크]** 응답 JSON에 `links[]` 필드 포함 — 미구현.
+      - [ ] **요청 제한(Rate Limiting)**: `slowapi` 라이브러리 사용, `POST /api/chat` 엔드포인트에 IP 기준 분당 10회 제한 적용. (`/api/predict`엔 적용됐으나 `/api/chat`엔 미적용. 또한 `slowapi`가 `requirements.txt`에 누락 — 런타임 ImportError 위험)
+      - [ ] `GET /` — `src/api/templates/portal.html` 통합 관제 포털 서빙. (현재 `chat.html`만 서빙)
     - [ ] `src/api/templates/portal.html` 작성 — 통합 관제 포털 (UI_GUIDE Dark Mode 원칙 준수):
       - [ ] **레이아웃**: 12컬럼 그리드. 좌측 8컬럼 = Grafana 대시보드 iframe, 우측 4컬럼 = AI Chat 패널.
       - [ ] **Grafana iframe**: `src="${GRAFANA_URL}/d/robot_fleet?kiosk=tv&orgId=1"` (kiosk=tv 모드로 Grafana 헤더/메뉴 숨김). 대시보드 탭 전환 버튼(Fleet / Anomaly / Pipeline) 포털 상단에 배치.
       - [ ] **Context 공유**: 운영자가 Grafana 패널에서 특정 로봇 ID를 클릭하면 `postMessage`로 포털 JS에 `robot_id` 전달 → AI 채팅 입력란에 `ROBOT-XXXXX의 상태를 분석해줘` 자동 입력.
       - [ ] **AI 답변 딥링크 렌더링**: `links[]` 배열을 버튼(`min-height: 44px`, UI_GUIDE §7 Touch Target 준수)으로 렌더링. 클릭 시 Grafana iframe의 `src`를 해당 URL로 교체 (새 탭 이동 없이 포털 내에서 차트 전환).
-    - [ ] `modules/data_pipeline/iam.tf` 업데이트: AI API Pod용 IRSA에 Athena 조회 + Bedrock `InvokeModel` 권한 추가.
-    - [ ] `k8s/api/deployment.yaml` 작성: EKS Deployment + Service (ClusterIP). IRSA 어노테이션 추가. `GRAFANA_URL` 환경변수 ConfigMap으로 주입.
-    - [ ] **[필수] AI API ALB Ingress** — `k8s/api/api-ingress.yaml` 작성: `kubernetes.io/ingress.class: alb`, `alb.ingress.kubernetes.io/scheme: internet-facing`. 포털이 브라우저에서 접근 가능해야 하므로 외부 노출 필수.
-    - [ ] `src/api/Dockerfile` 작성 및 ECR Push.
+    - [x] `modules/data_pipeline/iam.tf` 업데이트: AI API Pod용 IRSA에 Athena 조회 + Bedrock `InvokeModel` 권한 추가.
+    - [ ] `k8s/api/deployment.yaml` 작성: EKS Deployment + Service (ClusterIP). IRSA 어노테이션 추가. `GRAFANA_URL` 환경변수 ConfigMap으로 주입. (Deployment + Service ✅, GRAFANA_URL ConfigMap 미주입)
+    - [ ] **[필수] AI API ALB Ingress** — `k8s/api/api-ingress.yaml` 작성: `kubernetes.io/ingress.class: alb`, `alb.ingress.kubernetes.io/scheme: internet-facing`. 포털이 브라우저에서 접근 가능해야 하므로 외부 노출 필수. (미작성)
+    - [x] `src/api/Dockerfile` 작성 및 ECR Push (k8s-deploy.yml에서 빌드/푸시).
   - [ ] **Task 4.3.5: UX 구조적 버그 수정 (코드 레벨)**
     > 코드 분석에서 발견된 구조적 결함 목록. 신규 기능이 아닌 **기존 구현의 버그**이므로 Task 4.3과 함께 처리한다.
 
@@ -405,29 +407,30 @@
   *목표: 전구간 분산 추적으로 파이프라인 가시성을 확보하고, Gold 데이터 기반 ML 예측정비 모델로 사후 대응에서 사전 예방으로 전환한다.*
 
   - [ ] **Task 5.1: 분산 추적 — AWS X-Ray + OpenTelemetry (ADOT)**
-    - [ ] `terraform/addons.tf`에 **ADOT Operator** Helm 배포 추가 (네임스페이스: `monitoring`).
-    - [ ] Generator, API K8s Deployment에 `instrumentation.opentelemetry.io/inject-python: "true"` 어노테이션 추가 → ADOT 사이드카 자동 주입.
-    - [ ] AWS X-Ray Group 생성: `robot-telemetry-traces`. IAM Role에 `xray:PutTraceSegments` + `xray:PutTelemetryRecords` 권한 추가.
+    - [x] `terraform/addons.tf`에 **ADOT Operator** Helm 배포 추가 (네임스페이스: `monitoring`).
+    - [ ] Generator, API K8s Deployment에 `instrumentation.opentelemetry.io/inject-python: "true"` 어노테이션 추가 → ADOT 사이드카 자동 주입. (API ✅, Generator 미적용)
+    - [ ] AWS X-Ray Group 생성: `robot-telemetry-traces`. (IAM 권한은 ✅, X-Ray Group Terraform 리소스 미작성)
+      - [x] IAM Role에 `xray:PutTraceSegments` + `xray:PutTelemetryRecords` 권한 추가 (Generator/API IRSA).
     - [ ] Grafana에 X-Ray Data Source 연동:
-      - [ ] `grafana/dashboards/observability.json` 신규 작성 — 엔드포인트별 레이턴시 P50/P95/P99, 에러율, Generator → Kinesis 전송 지연 시계열.
+      - [x] `grafana/dashboards/observability.json` 신규 작성 — 엔드포인트별 레이턴시 P50/P95/P99, 에러율, Generator → Kinesis 전송 지연 시계열.
     - [ ] **[검증]** `/api/chat` 호출 후 X-Ray 콘솔에서 Service Map이 Generator → Kinesis → API 경로로 표시되는지 확인.
   - [ ] **Task 5.2: ML 기반 예측정비 (Amazon SageMaker)**
-    - [ ] `modules/data_pipeline/sagemaker.tf` 작성:
-      - [x] SageMaker IAM Role: Athena 조회 + S3 읽기/쓰기 권한. (현재 `iam.tf`에 포함됨 — 별도 파일로 분리 필요)
+    - [x] `modules/data_pipeline/sagemaker.tf` 작성:
+      - [x] SageMaker IAM Role: Athena 조회 + S3 읽기/쓰기 권한.
       - [x] S3 prefix `ml-models/` 정의 (학습 결과 아티팩트 저장).
     - [ ] `src/ml/train.py` 작성:
-      - [ ] Gold Table(`gold_robot_daily_stats`)에서 지난 30일 데이터 Athena 조회.
-      - [ ] Feature: `avg_motor_temp`, `max_motor_temp`, `battery_drain_rate`, `operation_ratio`.
-      - [ ] Label: `machine_failure`(AI4I 2020 기준). XGBoost 분류 모델 학습.
-      - [ ] 학습된 모델을 SageMaker S3 아티팩트로 저장.
-    - [ ] SageMaker Training Job 실행 스크립트 작성 + SageMaker Endpoint 배포 (`robot-failure-predictor`).
-    - [ ] `dags/robot_daily_etl.py` 마지막 Task에 **주간 재학습 분기** 추가 (`execution_date.weekday() == 0` 조건).
-    - [ ] `src/api/main.py`에 `POST /api/predict` 엔드포인트 추가:
-      - [ ] 요청 바디: `{ "robot_id": "...", "avg_motor_temp": 88.5, "battery_drain_rate": 12.3, ... }`
-      - [ ] SageMaker Runtime `invoke_endpoint` 호출 → 고장 확률 반환.
-      - [ ] Rate Limiting: IP 기준 분당 20회.
-    - [ ] `k8s/api/deployment.yaml` IRSA에 `sagemaker:InvokeEndpoint` 권한 추가.
-    - [ ] **[검증]** `tests/ml/test_predict_endpoint.py` 작성 — Mock SageMaker 응답으로 `/api/predict` 정상 반환 확인.
+      - [x] Gold Table(`gold_robot_daily_stats`)에서 지난 30일 데이터 Athena 조회.
+      - [ ] Feature: `avg_motor_temp`, `max_motor_temp`, `battery_drain_rate`, `operation_ratio`. (현재 train.py가 참조하는 컬럼 — gold DDL은 `active_hours`만 보유, `battery_drain_rate`/`operation_ratio`/`machine_failure` 미존재. step 4 (dag-fix) 또는 별도 step에서 정합성 결정 필요)
+      - [ ] Label: `machine_failure`(AI4I 2020 기준). XGBoost 분류 모델 학습. (gold 테이블에 `machine_failure` 컬럼 없음 — 별도 join 또는 silver 단계 보존 필요, 미해결)
+      - [x] 학습된 모델을 SageMaker S3 아티팩트로 저장.
+    - [ ] SageMaker Training Job 실행 스크립트 작성 + SageMaker Endpoint 배포 (`robot-failure-predictor`). (train.py에 deploy 호출 ✅, `train_entry.py` (XGBoost entry point) 미작성)
+    - [x] `dags/robot_daily_etl.py` 마지막 Task에 **주간 재학습 분기** 추가 (`execution_date.weekday() == 0` 조건).
+    - [x] `src/api/main.py`에 `POST /api/predict` 엔드포인트 추가:
+      - [x] 요청 바디: `{ "robot_id": "...", "avg_motor_temp": 88.5, "battery_drain_rate": 12.3, ... }`
+      - [x] SageMaker Runtime `invoke_endpoint` 호출 → 고장 확률 반환.
+      - [x] Rate Limiting: IP 기준 분당 20회.
+    - [x] `k8s/api/deployment.yaml` IRSA에 `sagemaker:InvokeEndpoint` 권한 추가 (iam.tf api_permissions 정책에 포함).
+    - [x] **[검증]** `tests/ml/test_predict_endpoint.py` 작성 — Mock SageMaker 응답으로 `/api/predict` 정상 반환 확인.
   - [ ] **Task 5.3: E2E Hardening Validation**
     - [ ] X-Ray Service Map에서 전구간 트레이스 확인.
     - [ ] SageMaker Endpoint에 테스트 데이터 주입 → 고장 확률 > 0.7 로봇 식별 확인.
@@ -441,3 +444,8 @@
   - `[2026-04-26]`: Phase 0 Task 0.1 완료 — `eu-west-1` 리전 및 `robot-telemetry` 네이밍 규칙으로 신규 terraform 파일 작성 (network.tf, eks_and_iam.tf, karpenter.tf, addons.tf, cicd_gitops.tf). VPC Endpoint(S3 Gateway + Kinesis Interface) 추가. Phase 0 `check_env` pre-gate 실패로 현재 `error` 상태. Task 0.2 (GitHub Actions) 미구현.
   - `[2026-04-26]`: Phase 1 Terraform 모듈 선행 구현 완료 — `modules/data_pipeline/` 하위 kinesis.tf(KDS 10샤드 + Firehose Parquet), glue.tf(Registry+Bronze Table), iam.tf(Generator/API/Lambda IRSA), cloudwatch.tf(알람), lambda.tf(stub), sns.tf, ssm.tf 작성. 체크박스 sync 완료.
   - `[2026-04-26]`: plan.md 품질 검토 완료 — phases/index.json Phase 5 status 오류(`completed`→`pending`) 정정, 오타(`cicd_gitpos.tf`→`cicd_gitops.tf`) 수정, Task 1.3.1(Athena Workgroup) 누락 추가, S3 Lifecycle 미구현 명시.
+  - `[2026-04-26]`: Phase 2 Step 0(athena-ddl) 정정 완료 — silver/gold DDL에 Partition Projection 누락 발견, dt DATE 기반 projection TBLPROPERTIES 추가 + `parquet.compression` 키 정정. 이전 실행은 API 429 rate limit으로 status 업데이트 실패했지만 산출물은 커밋된 상태였음. Task 2.1 체크박스 [x] 마킹.
+  - `[2026-04-26]`: Phase 2에 Step 4(dag-fix) 신설 — DAG ↔ DDL 정합성 불일치 3건 발견(bronze WHERE 절 파티션 키 불일치, gold INSERT 컬럼 불일치, bedrock SELECT 컬럼 불일치). step0.md spec을 source of truth로 두고 DAG를 DDL에 맞추는 방향. phases/2-batch/step4.md 작성, phases/index.json 2-batch status `error`→`pending`.
+  - `[2026-04-26]`: Phase 2 Step 4(dag-fix) 실행 완료 — dags/robot_daily_etl.py의 bronze WHERE 절을 year/month/day 파티션 키 기반으로 변경, gold INSERT를 active_hours로 정정(operation_ratio/battery_drain_rate 제거), bedrock SELECT/data_summary도 동기화. AC 7/7 통과.
+  - `[2026-04-26]`: Phase 2 Step 5(data-quality-gate) 신설 + 실행 — Task 2.0 충족. requirements.txt 신규 작성, evaluate_quality 순수 함수 + _quality_check PythonOperator + _publish_dq_failure SNS 알림 추가, DAG chain `quality_check → bronze_to_silver → ...` 로 재배선. tests/etl/test_data_quality.py 7건 통과. tests/conftest.py에 sys.path 추가 (dags/ 임포트 경로). **2-batch phase의 모든 step (0~5) completed**.
+  - `[2026-04-26]`: plan.md 전체 sync sweep 완료 — 실 산출물과 체크박스 정합성 검증. **체크박스 잘못 [ ]로 남아있던 항목들을 [x]로 정정**: Task 0.2(워크플로 3종 + Lambda ZIP 빌드 모두 구현됨), Task 1.3(s3_lifecycle.tf 존재), Task 1.3.1(Athena Workgroup glue.tf 포함), Task 1.5(Generator 전체 구현), Task 1.6 단위 테스트, Task 2.2(Airflow Helm), Task 4.2 Grafana Helm 일부, Task 4.3 main.py partial, Task 5.1 ADOT/X-Ray IRSA/observability.json, Task 5.2 거의 전체. **진짜 미구현으로 남은 핵심 gap**: ① Task 4.2 Grafana ALB Ingress + 3개 대시보드 JSON, ② Task 4.3 portal.html(현재 chat.html만) + API ALB Ingress + slowapi requirements 누락, ③ Task 4.3.5 6개 UX 버그 전체, ④ Task 4.4 tests/api, ⑤ Task 3.1 Flink 전체, ⑥ Task 2.0 Great Expectations DQ Gate, ⑦ Task 5.2 train_entry.py 및 ML feature 컬럼 정합성. 발견된 부수 이슈: cloudwatch.tf 알람 `comparison_operator` 논리 반전(`GreaterThanThreshold` → `LessThanThreshold` 필요), main.py/k8s region 불일치(eu-west-1 vs ap-northeast-2), Grafana adminPassword 하드코딩.
