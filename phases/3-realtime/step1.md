@@ -25,10 +25,28 @@ PyFlink Application을 작성하고 ZIP으로 패키징하라. 산출물은 다�
 from pyflink.table import EnvironmentSettings, TableEnvironment
 import os, json
 
-def get_property(prop_map: dict, key: str, default: str = None) -> str:
-    """Managed Flink runtime properties.json에서 값 읽기."""
-    # Application property group "robot-app-config"에서 읽음
-    ...
+
+# AWS Managed Service for Apache Flink — Python runtime property loader 표준 패턴
+# Managed Flink가 application 시작 시 /etc/flink/application_properties.json 에 자동 주입.
+# 의존성: 표준 라이브러리(json, os) 만 사용. 외부 패키지 X.
+APP_PROPS_PATH_RUNTIME = "/etc/flink/application_properties.json"
+APP_PROPS_PATH_LOCAL   = "application_properties.json"  # 로컬 개발용 fallback
+
+def load_application_properties(group_id: str) -> dict:
+    """Managed Flink가 주입한 PropertyGroup을 dict로 반환. 누락 시 빈 dict.
+
+    Args:
+        group_id: step 0의 environment_properties.property_group.property_group_id
+                  (예: "robot-app-config")
+    """
+    file_path = APP_PROPS_PATH_LOCAL if os.environ.get("IS_LOCAL") else APP_PROPS_PATH_RUNTIME
+    with open(file_path, "r") as f:
+        groups = json.load(f)
+    for prop in groups:
+        if prop["PropertyGroupId"] == group_id:
+            return prop["PropertyMapProperties"]
+    return {}
+
 
 def main():
     # 1) TableEnvironment 생성 (streaming mode)
@@ -134,6 +152,11 @@ def main():
     """)
 
     # 7) 1분 Tumbling Window 집계 (알람 폭주 방지)
+    #    Watermark 동작: WATERMARK = event_time - 10s 이므로
+    #    Window [T, T+1min) 은 watermark가 T+1min 도달 시 close.
+    #    → event_time ∈ [T, T+1min) 이벤트는 "최신 이벤트 시각 + 10s" 이내 도착 시 윈도우 포함.
+    #    → 그 이후 도착(very-late)은 drop. 본 use case에서는 의도된 동작이며
+    #      Cond1(5min OVER)이 누적이므로 다음 윈도우에서 재포착 가능.
     t_env.execute_sql("""
         CREATE TEMPORARY VIEW windowed AS
         SELECT
@@ -203,6 +226,8 @@ apache-flink==1.18.1
 ls flink/anomaly_detection.py flink/requirements.txt flink/build.sh
 
 # 2) PyFlink 핵심 요소
+grep -q "/etc/flink/application_properties.json" flink/anomaly_detection.py && echo "OK: managed flink properties path"
+grep -q "PropertyGroupId\|PropertyMapProperties" flink/anomaly_detection.py && echo "OK: standard loader pattern"
 grep -q "WATERMARK" flink/anomaly_detection.py && echo "OK: watermark"
 grep -q "RANGE BETWEEN INTERVAL '5' MINUTE PRECEDING" flink/anomaly_detection.py && echo "OK: 5-min OVER window"
 grep -q "GREATEST(stddev_temp" flink/anomaly_detection.py && echo "OK: sigma floor guard"
@@ -250,6 +275,15 @@ unzip -l flink/anomaly_detection.zip | grep -q "lib/flink-sql-connector-kinesis-
 
 ## 금지사항
 
+### 🚨 메타 파일 보호 (반드시 준수)
+
+- **`/plan.md`(프로젝트 루트의 master plan)을 절대 수정/덮어쓰기/삭제하지 마라.** 이유: plan.md는 Phase 0~5 전체 진행 상황을 기록하는 master 문서이며, step worker의 계획 메모장이 아니다. 본 step의 출력 산출물은 오직 `flink/anomaly_detection.py`, `flink/requirements.txt`, `flink/build.sh`, `flink/lib/*.jar`, 그리고 `phases/3-realtime/index.json`(step 1 entry만) 5종이다. 만약 작업 계획을 적고 싶다면 머릿속이나 turn 메시지 안에서 정리하라 — 파일로 쓰지 마라.
+- 프로젝트 루트의 `*.md`(plan.md, README.md, CLAUDE.md 등) 어떤 것도 수정하지 마라. step의 책임 범위는 `flink/` 하위 신규 파일과 `phases/3-realtime/index.json`(자기 step entry만)에 한정된다.
+- 다른 step 디렉토리(`phases/0-setup/`, `phases/2-batch/` 등)나 docs(`/docs/*.md`)를 수정하지 마라. 도메인 docs는 read-only.
+- `terraform/`, `dags/`, `src/`, `tests/`, `k8s/`, `grafana/` 어떤 디렉토리도 수정하지 마라 — `flink/`만 손대라.
+
+### 구현 규칙
+
 - SNS Sink를 직접 작성하지 마라. 이유: Flink에 SNS Native Connector가 없다 (ADR-007). Flink → KDS → Lambda → SNS 순서.
 - Z-Score / load_ratio / min_temp 등 숫자 threshold를 코드에 하드코딩하지 마라. 이유: 운영 튜닝 시 재배포 발생 (ADR-009 결정).
 - WATERMARK 선언을 생략하지 마라. 이유: CLAUDE.md 필수 규칙 + Late Data 처리 + state 무한 누적 방지.
@@ -257,3 +291,5 @@ unzip -l flink/anomaly_detection.zip | grep -q "lib/flink-sql-connector-kinesis-
 - 단순 임계값(`motor_temp > 90.0`)으로 폴백하지 마라. 이유: ADR-009가 고도화 결정. 단순 임계는 false positive 폭증.
 - `'aws.region' = 'ap-northeast-2'` 처럼 region을 hardcoding 하지 마라. 이유: 실제 인프라는 `eu-west-1`. region property로 주입.
 - `event_time`을 BIGINT epoch로 다루지 마라. 이유: Source DDL이 `TO_TIMESTAMP(timestamp, 'yyyy-MM-dd''T''HH:mm:ss''Z''')`로 STRING ISO8601 → TIMESTAMP 변환을 명시.
+- property loader를 `os.environ.get("kinesis.main.stream")`처럼 환경변수에서 직접 읽지 마라. 이유: Managed Flink는 property를 환경변수가 아닌 `/etc/flink/application_properties.json`에 JSON 형태로 주입. 환경변수 직접 조회는 항상 None 반환.
+- `boto3` 또는 `kinesis` Python SDK로 KDS Source/Sink를 직접 호출하지 마라. 이유: Flink kinesis connector(`flink-sql-connector-kinesis-1.18.1.jar`)가 backpressure·checkpoint·exactly-once를 처리. SDK 직접 호출은 이 보장을 무력화.
