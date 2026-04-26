@@ -53,7 +53,7 @@
       "description": "AI4I 2020 CSV Seed 기반 asyncio 로봇 텔레메트리 생성기 구현",
       "summary": "data/seed_data_sample.csv(AI4I 포맷 200행) + src/generator/app.py(asyncio 10,000로봇, put_records 배치, failure 프로필 스파이크 로직)",
       "started_at": "2026-04-26T21:01:11+0900",
-      "completed_at": "2026-04-26T21:30:00+0900"
+      "completed_at": "2026-04-26T21:02:46+0900"
     },
     {
       "step": 5,
