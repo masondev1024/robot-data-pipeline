@@ -10,7 +10,8 @@
       "depends_on": [],
       "description": "AWS Provider 및 공통 변수 정의",
       "started_at": "2026-04-26T17:09:52+0900",
-      "summary": "terraform/providers.tf + variables.tf 생성: cluster=robot-telemetry-cluster, vpc=10.0.32.0/16, node=t3.large"
+      "summary": "terraform/providers.tf + variables.tf 생성: cluster=robot-telemetry-cluster, vpc=10.0.32.0/16, node=t3.large",
+      "completed_at": "2026-04-26T17:10:37+0900"
     },
     {
       "step": 1,
