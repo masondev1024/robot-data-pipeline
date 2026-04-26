@@ -6,11 +6,17 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
+limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="Robot Telemetry AI Query API")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 _gold_cache: str = ""
 _cache_updated_at: str = ""
@@ -159,6 +165,42 @@ async def chat(req: ChatRequest):
         raise HTTPException(status_code=502, detail=f"Bedrock 호출 실패: {exc}")
 
     return {"answer": response_text, "cached_at": _cache_updated_at}
+
+
+sagemaker_runtime = boto3.client("sagemaker-runtime", region_name="eu-west-1")
+ENDPOINT_NAME = "robot-failure-predictor"
+
+
+class PredictRequest(BaseModel):
+    robot_id: str
+    avg_motor_temp: float
+    max_motor_temp: float
+    battery_drain_rate: float
+    operation_ratio: float
+
+
+@app.post("/api/predict")
+@limiter.limit("20/minute")
+async def predict_failure(request: Request, body: PredictRequest):
+    features = f"{body.avg_motor_temp},{body.max_motor_temp},{body.battery_drain_rate},{body.operation_ratio}"
+    loop = asyncio.get_event_loop()
+    try:
+        response = await loop.run_in_executor(
+            None,
+            lambda: sagemaker_runtime.invoke_endpoint(
+                EndpointName=ENDPOINT_NAME,
+                ContentType="text/csv",
+                Body=features,
+            ),
+        )
+        failure_prob = float(response["Body"].read().decode())
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"SageMaker 호출 실패: {exc}")
+    return {
+        "robot_id": body.robot_id,
+        "failure_probability": round(failure_prob, 4),
+        "risk_level": "high" if failure_prob > 0.7 else "medium" if failure_prob > 0.4 else "low",
+    }
 
 
 @app.get("/", response_class=HTMLResponse)
