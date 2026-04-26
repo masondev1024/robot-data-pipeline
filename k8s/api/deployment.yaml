@@ -1,0 +1,80 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: api-sa
+  namespace: robot-telemetry
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::827913617635:role/robot-telemetry-api-irsa  # replace with actual ARN
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: robot-telemetry-api
+  namespace: robot-telemetry
+  labels:
+    app: robot-telemetry-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: robot-telemetry-api
+  template:
+    metadata:
+      labels:
+        app: robot-telemetry-api
+    spec:
+      serviceAccountName: api-sa
+      containers:
+        - name: api
+          image: 827913617635.dkr.ecr.ap-northeast-2.amazonaws.com/robot-telemetry-api:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: BEDROCK_MODEL_ID
+              value: "anthropic.claude-3-haiku-20240307-v1:0"
+            - name: ATHENA_DATABASE
+              value: "robot_telemetry_db"
+            - name: ATHENA_WORKGROUP
+              value: "robot-telemetry-workgroup"
+            - name: ATHENA_OUTPUT_LOCATION
+              value: "s3://de-ai-06-827913617635-ap-northeast-2-an/project-athena-results/"
+            - name: CACHE_REFRESH_HOUR
+              value: "1"
+            - name: AWS_DEFAULT_REGION
+              value: "ap-northeast-2"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: robot-telemetry-api
+  namespace: robot-telemetry
+spec:
+  type: ClusterIP
+  selector:
+    app: robot-telemetry-api
+  ports:
+    - port: 80
+      targetPort: 8000
+      protocol: TCP
