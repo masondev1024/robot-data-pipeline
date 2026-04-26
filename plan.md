@@ -116,8 +116,8 @@
   # Slack (Incoming Webhook URL)
   SLACK_WEBHOOK_URL=
 
-  # Amazon Bedrock
-  BEDROCK_MODEL_ID=anthropic.claude-3-haiku-20240307-v1:0
+  # Amazon Bedrock (Sonnet 3.5 v2 — 운영 계정 모델 활성화 후 사용. 추후 변경 가능)
+  BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0
 
   # Athena
   ATHENA_DATABASE=robot_telemetry_db
@@ -480,5 +480,7 @@
     * Task 4.3: `portal.html`(통합 관제 포털, 12컬럼 그리드, Grafana iframe) 미작성, API ALB Ingress 미작성, `slowapi` requirements 누락, `GRAFANA_URL` ConfigMap 미주입
     * Task 4.3.5: 6개 UX 버그 전부 미해결
     * Task 4.4: `tests/api/` 미작성
+
+  - `[2026-04-27]`: Phase 4 cleanup step 4종 신설 (step 3-6) — 위 누락 항목을 step 단위로 보강. **추가 발견**: step 2 worker가 일부 UX 버그를 명세에 없음에도 미리 처리해놨음(`_data_date`, `_cache_ready` 플래그, `slowapi` import + Limiter, `pytz.timezone("Asia/Seoul")` 적용, `hpa.yaml minReplicas:1`). 따라서 step 5는 idempotent 안내 추가 — 이미 적용된 부분은 grep 검증만, 미적용분(Bedrock 모델 ID, /api/status, system 필드 분리, links[], portal.html, GET / 라우트)만 수정. **Bedrock 모델 결정**: 사용자 계정에 모델 미활성화 상태이므로 실 API 호출 없이 진행 + Sonnet 3.5 v2(`anthropic.claude-3-5-sonnet-20241022-v2:0`)를 기본값으로 채택(추후 변경 가능, env var override). step 6 검증은 100% Mock — 실 AWS 호출 0건. 각 step에 🚨 메타 파일 보호 섹션 + 산출물 N종 enumeration 적용. step 6은 step 5에 의존(`depends_on:[5]`), 나머지 3·4·5는 병렬.
 
   - `[2026-04-26]`: plan.md 전체 sync sweep 완료 — 실 산출물과 체크박스 정합성 검증. **체크박스 잘못 [ ]로 남아있던 항목들을 [x]로 정정**: Task 0.2(워크플로 3종 + Lambda ZIP 빌드 모두 구현됨), Task 1.3(s3_lifecycle.tf 존재), Task 1.3.1(Athena Workgroup glue.tf 포함), Task 1.5(Generator 전체 구현), Task 1.6 단위 테스트, Task 2.2(Airflow Helm), Task 4.2 Grafana Helm 일부, Task 4.3 main.py partial, Task 5.1 ADOT/X-Ray IRSA/observability.json, Task 5.2 거의 전체. **진짜 미구현으로 남은 핵심 gap**: ① Task 4.2 Grafana ALB Ingress + 3개 대시보드 JSON, ② Task 4.3 portal.html(현재 chat.html만) + API ALB Ingress + slowapi requirements 누락, ③ Task 4.3.5 6개 UX 버그 전체, ④ Task 4.4 tests/api, ⑤ Task 3.1 Flink 전체, ⑥ Task 2.0 Great Expectations DQ Gate, ⑦ Task 5.2 train_entry.py 및 ML feature 컬럼 정합성. 발견된 부수 이슈: cloudwatch.tf 알람 `comparison_operator` 논리 반전(`GreaterThanThreshold` → `LessThanThreshold` 필요), main.py/k8s region 불일치(eu-west-1 vs ap-northeast-2), Grafana adminPassword 하드코딩.
