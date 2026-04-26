@@ -16,11 +16,14 @@
     {
       "step": 1,
       "name": "network",
-      "status": "pending",
+      "status": "error",
       "depends_on": [
         0
       ],
-      "description": "3계층 VPC 및 인터페이스 엔드포인트 구성"
+      "description": "3계층 VPC 및 인터페이스 엔드포인트 구성",
+      "started_at": "2026-04-26T17:10:37+0900",
+      "error_message": "[3회 시도 후 실패] Step did not update status",
+      "failed_at": "2026-04-26T17:10:58+0900"
     },
     {
       "step": 2,
