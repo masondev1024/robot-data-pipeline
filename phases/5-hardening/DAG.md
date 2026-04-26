@@ -9,6 +9,6 @@ graph TD
   S0["0. observability"]
   class S0 completed;
   S1["1. predictive-maintenance"]
-  class S1 pending;
+  class S1 completed;
   S0 --> S1
 ```
