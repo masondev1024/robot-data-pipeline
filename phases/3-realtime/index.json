@@ -8,21 +8,28 @@
       "name": "flink-terraform",
       "status": "pending",
       "depends_on": [],
-      "description": "Managed Apache Flink 인프라 및 전용 IAM 구성"
+      "description": "Managed Flink Application 인프라 (IAM + S3 코드 ZIP + CloudWatch Logging + 외부화 threshold property_map) 구성"
     },
     {
       "step": 1,
-      "name": "flink-sql",
+      "name": "flink-app",
       "status": "pending",
       "depends_on": [0],
-      "description": "Watermark 포함 1분 Tumbling Window 기반 모터 온도 이상 탐지 로직 구현"
+      "description": "PyFlink 이상 탐지 앱 — Z-Score 5분 OVER + 다변량 OR + 1분 Tumbling + Dual Sink, ZIP 빌드"
     },
     {
       "step": 2,
-      "name": "bedrock-report",
+      "name": "flink-validation",
+      "status": "pending",
+      "depends_on": [1],
+      "description": "이상 탐지 순수 함수 단위 테스트 (Z-Score / load_ratio / is_anomaly + threshold tuning)"
+    },
+    {
+      "step": 3,
+      "name": "bedrock-report-tests",
       "status": "pending",
       "depends_on": [],
-      "description": "Gold 데이터 기반 Claude 3 정비 우선순위 리포트 생성기 구현"
+      "description": "Phase 2에서 구현된 _bedrock_report 함수 + DAG 토폴로지 검증 (Mock Athena/Bedrock/S3)"
     }
   ]
 }

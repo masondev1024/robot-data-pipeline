@@ -44,3 +44,26 @@
 **결정**: FastAPI 서버가 사용자 질문 수신 → Athena Gold 테이블 조회 → 데이터+질문을 Bedrock Claude 3에 전달 → 자연어 답변 반환. 채팅 UI는 FastAPI가 정적 HTML로 서빙
 **이유**: 별도 프론트엔드 프레임워크(React 등) 없이 FastAPI 단독으로 API + UI를 모두 처리해 복잡도 최소화. Athena 조회 결과를 프롬프트 컨텍스트로 주입하는 방식은 RAG의 경량 구현으로 포트폴리오 차별화 포인트. 기존 Generator의 `boto3` 패턴을 그대로 재사용 가능
 **트레이드오프**: Athena 쿼리 응답 지연(2~5초) 문제는 **in-memory 캐시**로 해결 — FastAPI 시작 시 및 매일 `CACHE_REFRESH_HOUR`시(Airflow 배치 완료 후)에 Gold 최신 파티션을 1회 조회하여 전역 캐시에 저장. 채팅 요청은 캐시에서 즉시 읽어 Bedrock 호출. 일별 집계 데이터 특성상 24시간 캐시 유효. 스트리밍 응답(SSE/WebSocket)은 초기 구현에서 제외
+
+### ADR-009: 고도화된 이상 탐지 — Z-Score + 다변량 상관 (vs 단순 임계값)
+**결정**: 단순 `motor_temp > 90°C` 단일 임계값을 **두 조건의 OR 결합**으로 고도화한다.
+- **Condition 1 (Moving Z-Score)**: 최근 5분간 robot_id별 `motor_temp` 평균 μ, 표준편차 σ를 OVER window로 계산 → `|temp - μ| / σ > 3` 시 통계적 이상
+- **Condition 2 (Multivariate Correlation)**: `motor_temp >= 85.0 AND (motor_temp / GREATEST(current_load, 1)) > 1.8` — 부하 대비 과열 (분모 0 division 가드 포함)
+- 두 조건 중 하나만 만족해도 alert 발생
+
+**이유**:
+- 단순 임계값은 노이즈 한 번에 false positive 발생 → **알람 피로도** 증가, 운영자가 알람 무시
+- Z-Score는 로봇별 베이스라인을 학습하므로 "이 로봇에게는 이상"인 신호를 정확히 잡음 (개별 로봇의 정상 운영 온도가 70~95°C 등 다양)
+- 다변량 상관은 "고부하인데 온도가 낮으면 정상" / "저부하인데 온도가 높으면 위험" 패턴 검출 → 단순 임계로는 못 잡는 sensor drift / 베어링 마모 등 조기 신호
+- AI4I 2020 데이터셋 자체가 다변수 (`Process temperature`, `Rotational speed`, `Tool wear`) 상관 기반 고장 라벨링 → 다변량 검출과 자연스럽게 정합
+- 데드라인 내 구현 가능: Flink Table API의 `OVER PARTITION BY robot_id ORDER BY event_time RANGE INTERVAL '5' MINUTE`로 Z-Score 즉시 계산
+
+**트레이드오프**:
+- 단순 SQL 1줄 → 이중 조건 + OVER window로 코드/디버깅 복잡도 증가
+- OVER window는 robot_id별 state를 유지 → state size 증가 (Managed Flink KPU 비용 약간 증가, 단 10,000 로봇 × 5분 × float = ~100MB 수준으로 미미)
+- threshold(`zscore=3.0`, `load_ratio=1.8`)는 운영 데이터로 튜닝 필요 → Flink `environment_properties`의 `property_map`으로 외부화하여 코드 수정 없이 조정 가능
+
+### ADR-010: PyFlink 채택 (vs Flink SQL CLI / Java / Studio Notebook)
+**결정**: Managed Flink Application 모드 + **PyFlink (Table API)** 로 이상 탐지 앱 구현. 코드를 ZIP으로 패키징하여 S3에 업로드, Terraform `aws_s3_object`로 추적
+**이유**: 팀의 주 언어가 Python (Generator, API, DAG 모두 Python). Java로 통일 시 학습 곡선 + 데드라인 위협. Studio Notebook(Zeppelin)은 운영 배포가 아닌 인터랙티브 분석용으로 부적합. Flink SQL CLI는 standalone 실행만 지원. PyFlink Table API는 SQL을 그대로 임베딩 가능하며 Managed Flink Application의 공식 지원 런타임
+**트레이드오프**: PyFlink는 Java 대비 약 5~10% 성능 손실 (PythonVM 브리징). 단, 10,000 rec/sec 스케일에서는 무시 가능. UDF 작성 시 Python ↔ JVM 직렬화 오버헤드 존재 → 본 프로젝트는 SQL OVER window만 사용하므로 영향 없음
