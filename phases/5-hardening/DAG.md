@@ -7,8 +7,8 @@ graph TD
   classDef error fill:#f44336,stroke:#fff,color:#fff;
   classDef blocked fill:#FF9800,stroke:#fff,color:#fff;
   S0["0. observability"]
-  class S0 pending;
+  class S0 completed;
   S1["1. predictive-maintenance"]
   class S1 pending;
-  Sobservability --> S1
+  S0 --> S1
 ```
