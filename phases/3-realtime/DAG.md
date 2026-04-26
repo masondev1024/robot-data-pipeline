@@ -12,7 +12,7 @@ graph TD
   class S1 completed;
   S0 --> S1
   S2["2. flink-validation"]
-  class S2 pending;
+  class S2 completed;
   S1 --> S2
   S3["3. bedrock-report-tests"]
   class S3 completed;
