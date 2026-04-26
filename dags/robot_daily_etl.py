@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timedelta
 
 import boto3
@@ -52,10 +53,67 @@ def _run_athena_query(query: str) -> str:
     raise TimeoutError("Athena query timed out after 120 seconds")
 
 
+def evaluate_quality(total: int, null_id: int, bad_temp: int, bad_battery: int) -> list[str]:
+    """Bronze 품질 게이트 평가. 빈 리스트 = 통과. 임계값 1%."""
+    if total == 0:
+        return ["레코드 0건"]
+
+    failures = []
+    if null_id    / total >= 0.01: failures.append(f"robot_id null 비율 {null_id/total:.2%}")
+    if bad_temp   / total >= 0.01: failures.append(f"motor_temp 이상치 비율 {bad_temp/total:.2%}")
+    if bad_battery / total >= 0.01: failures.append(f"battery_level 이상치 비율 {bad_battery/total:.2%}")
+    return failures
+
+
+def _publish_dq_failure(detail: str):
+    """SNS robot-telemetry-anomaly-alerts 토픽으로 DQ 실패 알림 발송."""
+    sns = boto3.client("sns", region_name="eu-west-1")
+    topic_arn = os.environ.get(
+        "DQ_SNS_TOPIC_ARN",
+        f"arn:aws:sns:eu-west-1:{os.environ.get('AWS_ACCOUNT_ID', '')}:robot-telemetry-anomaly-alerts",
+    )
+    sns.publish(
+        TopicArn=topic_arn,
+        Subject="[Robot ETL] 데이터 품질 검사 실패",
+        Message=f"Bronze 단계 품질 게이트 실패: {detail}",
+    )
+
+
+def _quality_check(**ctx):
+    """Bronze 데이터 품질 게이트. 임계 위반 시 SNS 알림 + AirflowException."""
+    from airflow.exceptions import AirflowException
+
+    execution_date = ctx["execution_date"]
+    year, month, day = execution_date.year, execution_date.month, execution_date.day
+
+    query = f"""
+SELECT
+    COUNT(*)                                                            AS total_count,
+    SUM(CASE WHEN robot_id IS NULL THEN 1 ELSE 0 END)                   AS null_robot_id,
+    SUM(CASE WHEN motor_temp NOT BETWEEN 0 AND 500 THEN 1 ELSE 0 END)   AS bad_temp,
+    SUM(CASE WHEN battery_level NOT BETWEEN 0 AND 100 THEN 1 ELSE 0 END) AS bad_battery
+FROM bronze_robot_telemetry
+WHERE year = {year} AND month = {month} AND day = {day}
+"""
+    execution_id = _run_athena_query(query)
+
+    athena = boto3.client("athena", region_name="eu-west-1")
+    rows = athena.get_query_results(QueryExecutionId=execution_id)["ResultSet"]["Rows"]
+    values = [cell.get("VarCharValue", "0") for cell in rows[1]["Data"]]
+    total, null_id, bad_temp, bad_battery = (int(v) for v in values)
+
+    failures = evaluate_quality(total, null_id, bad_temp, bad_battery)
+    if failures:
+        msg = "; ".join(failures)
+        _publish_dq_failure(msg)
+        raise AirflowException(f"Data quality check failed: {msg}")
+
+
 def _bronze_to_silver(**ctx):
-    """이상치 제거·중복 제거·타입 Casting 후 Silver 테이블에 INSERT OVERWRITE."""
+    """이상치 제거·중복 제거·타입 Casting 후 Silver 테이블에 INSERT."""
     execution_date = ctx["execution_date"]
     dt = execution_date.strftime("%Y-%m-%d")
+    year, month, day = execution_date.year, execution_date.month, execution_date.day
 
     query = f"""
 INSERT INTO silver_robot_telemetry
@@ -67,12 +125,12 @@ SELECT
     CAST(current_load AS INTEGER)  AS current_load,
     CAST(motor_temp AS DOUBLE)     AS motor_temp,
     timestamp,
-    '{dt}'                         AS dt
+    DATE '{dt}'                    AS dt
 FROM (
     SELECT *,
            ROW_NUMBER() OVER (PARTITION BY robot_id, timestamp ORDER BY timestamp) AS rn
     FROM bronze_robot_telemetry
-    WHERE dt = '{dt}'
+    WHERE year = {year} AND month = {month} AND day = {day}
       AND robot_id IS NOT NULL
       AND battery_level BETWEEN 0 AND 100
       AND motor_temp BETWEEN 0 AND 500
@@ -84,7 +142,7 @@ WHERE rn = 1
 
 
 def _silver_to_gold(**ctx):
-    """일별/로봇별 집계 후 Gold 테이블에 INSERT OVERWRITE."""
+    """일별/로봇별 집계 후 Gold 테이블에 INSERT."""
     execution_date = ctx["execution_date"]
     dt = execution_date.strftime("%Y-%m-%d")
 
@@ -92,16 +150,15 @@ def _silver_to_gold(**ctx):
 INSERT INTO gold_robot_daily_stats
 SELECT
     robot_id,
-    AVG(motor_temp)                                              AS avg_motor_temp,
-    MAX(motor_temp)                                              AS max_motor_temp,
-    MAX(battery_level)                                           AS battery_start,
-    MIN(battery_level)                                           AS battery_end,
-    MAX(battery_level) - MIN(battery_level)                      AS battery_drain,
-    CAST(COUNT(*) AS DOUBLE) / 86400.0                           AS operation_ratio,
-    MAX(battery_level) - MIN(battery_level)                      AS battery_drain_rate,
-    '{dt}'                                                       AS dt
+    AVG(motor_temp)                                                                     AS avg_motor_temp,
+    MAX(motor_temp)                                                                     AS max_motor_temp,
+    MAX(battery_level)                                                                  AS battery_start,
+    MIN(battery_level)                                                                  AS battery_end,
+    MAX(battery_level) - MIN(battery_level)                                             AS battery_drain,
+    CAST(COUNT(DISTINCT date_trunc('hour', from_iso8601_timestamp(timestamp))) AS INTEGER) AS active_hours,
+    DATE '{dt}'                                                                         AS dt
 FROM silver_robot_telemetry
-WHERE dt = '{dt}'
+WHERE dt = DATE '{dt}'
 GROUP BY robot_id
 """
     _run_athena_query(query)
@@ -115,9 +172,9 @@ def _bedrock_report(**ctx):
 
     athena = boto3.client("athena", region_name="eu-west-1")
     query = f"""
-SELECT robot_id, avg_motor_temp, max_motor_temp, battery_drain_rate, operation_ratio
+SELECT robot_id, avg_motor_temp, max_motor_temp, battery_drain, active_hours
 FROM gold_robot_daily_stats
-WHERE dt = '{dt}'
+WHERE dt = DATE '{dt}'
 ORDER BY avg_motor_temp DESC
 LIMIT 20
 """
@@ -135,7 +192,8 @@ LIMIT 20
             rows.append(dict(zip(columns, values)))
 
     data_summary = "\n".join(
-        f"{r['robot_id']}: 평균온도={r['avg_motor_temp']}°C, 배터리소모율={r['battery_drain_rate']}"
+        f"{r['robot_id']}: 평균온도={r['avg_motor_temp']}°C, 최고온도={r['max_motor_temp']}°C, "
+        f"배터리소모={r['battery_drain']}, 가동시간={r['active_hours']}h"
         for r in rows
     )
     prompt = (
@@ -174,6 +232,12 @@ def _retrain_model(**ctx):
     subprocess.run(["python", "src/ml/train.py"], check=True)
 
 
+quality_check = PythonOperator(
+    task_id="quality_check",
+    python_callable=_quality_check,
+    dag=dag,
+)
+
 bronze_to_silver = PythonOperator(
     task_id="bronze_to_silver",
     python_callable=_bronze_to_silver,
@@ -204,4 +268,4 @@ retrain_model = PythonOperator(
     dag=dag,
 )
 
-bronze_to_silver >> silver_to_gold >> bedrock_report >> check_monday >> retrain_model
+quality_check >> bronze_to_silver >> silver_to_gold >> bedrock_report >> check_monday >> retrain_model
