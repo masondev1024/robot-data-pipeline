@@ -85,7 +85,7 @@
       "description": "Generator pytest 단위 테스트 작성 (스키마 검증, 함수 존재, 프로필 생성)",
       "summary": "tests/generator/test_generator.py: 11개 테스트(load_profiles 7개+CSV스키마 2개+함수존재 2개) pytest 통과",
       "started_at": "2026-04-26T21:03:34+0900",
-      "completed_at": "2026-04-26T21:10:00+0900"
+      "completed_at": "2026-04-26T21:04:45+0900"
     }
   ],
   "created_at": "2026-04-26T21:00:42+0900"
