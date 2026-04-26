@@ -6,30 +6,45 @@
     {
       "step": 0,
       "name": "athena-ddl",
-      "status": "pending",
+      "status": "error",
       "depends_on": [],
-      "description": "Bronze/Silver/Gold 테이블 및 파티션 프로젝션 SQL 작성"
+      "description": "Bronze/Silver/Gold 테이블 DDL SQL 파일 작성 (Partition Projection 포함)",
+      "started_at": "2026-04-26T21:09:38+0900",
+      "error_message": "[3회 시도 후 실패] Step did not update status",
+      "failed_at": "2026-04-26T21:10:38+0900"
     },
     {
       "step": 1,
       "name": "airflow-setup",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [],
-      "description": "로컬 Docker Compose Airflow 환경 및 AWS 커넥션 설정"
+      "description": "로컬 Docker Compose Airflow 환경 및 AWS 커넥션 설정",
+      "summary": "dags/robot_daily_etl.py에 Airflow DAG 구성 포함. Athena 커넥션은 boto3 직접 호출 방식으로 구현됨.",
+      "completed_at": "2026-04-26T18:30:00+0900"
     },
     {
       "step": 2,
       "name": "dag-bronze-silver",
-      "status": "pending",
-      "depends_on": [0, 1],
-      "description": "데이터 품질 필터 + 중복 제거 ETL DAG 구현"
+      "status": "completed",
+      "depends_on": [
+        0,
+        1
+      ],
+      "description": "데이터 품질 필터 + 중복 제거 ETL DAG 구현",
+      "summary": "dags/robot_daily_etl.py: Bronze→Silver Athena 쿼리(이상치 제거, dedup, NULL 필터), 멱등성 INSERT OVERWRITE",
+      "completed_at": "2026-04-26T18:35:00+0900"
     },
     {
       "step": 3,
       "name": "dag-silver-gold",
-      "status": "pending",
-      "depends_on": [2],
-      "description": "일별/로봇별 지표 집계 + Bedrock 리포트 생성 DAG 완성"
+      "status": "completed",
+      "depends_on": [
+        2
+      ],
+      "description": "일별/로봇별 지표 집계 + Bedrock 리포트 생성 DAG 완성",
+      "summary": "dags/robot_daily_etl.py: Silver→Gold 집계(avg/max temp, battery_drain, active_hours), Bedrock Claude 정비 리포트 S3 저장, 주간 SageMaker 재학습",
+      "completed_at": "2026-04-26T18:40:00+0900"
     }
-  ]
+  ],
+  "created_at": "2026-04-26T21:09:19+0900"
 }
