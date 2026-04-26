@@ -23,7 +23,7 @@
       ],
       "description": "PyFlink 이상 탐지 앱 — Z-Score 5분 OVER + 다변량 OR + 1분 Tumbling + Dual Sink, ZIP 빌드",
       "started_at": "2026-04-27T00:29:58+0900",
-      "completed_at": "2026-04-27T00:35:42+0900"
+      "completed_at": "2026-04-27T00:32:57+0900"
     },
     {
       "step": 2,
