@@ -324,7 +324,7 @@
   - [ ] **Task 4.1: Real-time Slack Alert (Terraform — Alert KDS → Lambda → SNS → Slack)**
     - [x] `modules/data_pipeline/sns.tf` 작성: `aws_sns_topic` (`robot-anomaly-alerts`) 생성. (Note: Slack Webhook 구독은 Chatbot 또는 수동 설정 필요)
     - [x] `modules/data_pipeline/lambda.tf` 작성:
-      - [x] `aws_lambda_function` (`robot-anomaly-alert-lambda`) 생성: Python 3.11 런타임. (ZIP 플레이스홀더 `src/lambda/alert_handler.zip` — 코드 구현 별도)
+      - [x] `aws_lambda_function` (`robot-anomaly-alert-lambda`) 생성: Python 3.11 런타임. **Phase 4 step 0에서 `src/lambda/alert_handler.py` 실제 코드 구현 완료 (기본 메시지 포맷)**.
       - [x] `aws_lambda_event_source_mapping`: `robot-anomaly-alert-stream` KDS를 트리거로 연결.
       - [x] Lambda IAM Role: `kinesis:GetRecords` + `sns:Publish` 권한 부여.
     - [x] Lambda ZIP 빌드 프로세스: GitHub Actions `k8s-deploy.yml`에 `pip install -t dist/ && zip -r alert_handler.zip dist/` 빌드 스텝 포함됨.
@@ -343,10 +343,10 @@
       - [ ] `service.type = ClusterIP`, `grafana_admin_password` sensitive 변수로 관리. (현재 `adminPassword = "admin"` 하드코딩 — 보안 취약, 정정 필요)
     - [ ] **[필수] Grafana ALB Ingress** — `k8s/monitoring/grafana-ingress.yaml` 작성: `kubernetes.io/ingress.class: alb`, `alb.ingress.kubernetes.io/scheme: internet-facing`. ClusterIP만 있으면 외부 접근 불가. (`k8s/monitoring/` 디렉토리 자체 미생성)
     - [ ] Grafana Data Source 설정: ① Athena Plugin (Silver/Gold 테이블 조회), ② CloudWatch (Kinesis 처리량, EKS Pod 메트릭).
-    - [ ] `grafana/dashboards/` 하위에 3개 대시보드 JSON 작성:
-      - [ ] `robot_fleet.json`: 로봇별 최신 motor_temp · battery_level 상태 카드.
-      - [ ] `anomaly_timeline.json`: 시간대별 이상 탐지 건수 시계열 그래프.
-      - [ ] `pipeline_health.json`: Kinesis IncomingRecords, Firehose DeliveryToS3 메트릭.
+    - [x] `grafana/dashboards/` 하위에 3개 대시보드 JSON 작성: (**Phase 4 step 1 완료**)
+      - [x] `robot_fleet.json`: 로봇별 최신 motor_temp · battery_level 상태 카드.
+      - [x] `anomaly_timeline.json`: 시간대별 이상 탐지 건수 시계열 그래프.
+      - [x] `pipeline_health.json`: Kinesis IncomingRecords, Firehose DeliveryToS3 메트릭.
   - [ ] **Task 4.3: 대화형 AI Query API + 통합 관제 포털 (FastAPI + Bedrock)**
     - [ ] `src/api/main.py` 작성 (FastAPI):
       - [x] **in-memory 캐시**: 앱 시작 시 + 매일 `CACHE_REFRESH_HOUR`시(기본 01:00 KST)에 Athena `gold_robot_daily_stats` 최신 파티션을 한 번 조회하여 전역 변수에 저장. `apscheduler` 사용. (단, timezone 미설정 — Task 4.3.5 버그 2A)
@@ -469,5 +469,16 @@
   - `[2026-04-27]`: Phase 3 옵션 B 복구 — `git reset --hard 73e9027` 후 정상 산출물(`flink.tf` 241줄, `test_bedrock_report.py` 434줄)을 /tmp 백업에서 복원. 2개 깔끔한 commit으로 재구성: ① `docs(3-realtime): preflight clarifications + worker meta-file safeguards`(plan.md + step1.md + step2.md), ② `feat(3-realtime): recover step 0 + step 3 from chaos commit`(flink.tf + test_bedrock_report.py + index.json + DAG.md). step1.md/step2.md에 🚨 **메타 파일 보호 섹션** 신설: "/plan.md 절대 수정 금지", "루트 *.md 어떤 것도 수정 금지", "출력 산출물을 5종/3종으로 명시 제한" 등 명시.
 
   - `[2026-04-27]`: Phase 3 2차 실행 (safeguard 적용) — step 1 + step 2 모두 정상 완료. **plan.md 하이재킹 없음 — safeguard 정상 작동 확인**. 산출물: ① `flink/anomaly_detection.py`(206줄) — `load_application_properties` 표준 패턴 + `compute_zscore`/`compute_load_ratio`/`is_anomaly` 순수 함수 + WATERMARK + STDDEV_POP + 1min Tumbling + Statement Set Dual Sink, ② `flink/build.sh`(70줄) + Kinesis JAR 자동 다운로드 + ZIP 빌드, ③ `tests/flink/test_anomaly_detection.py`(194줄) — **18 케이스 전부 PASSED** (Zscore 5/load_ratio 4/is_anomaly 8/threshold tuning 1). 회귀: `tests/flink/` + `tests/etl/` 합산 **35 PASSED**. **Phase 3 (3-realtime) 모든 step completed**. plan.md Task 3.1 / 3.3 체크박스 업데이트.
+
+  - `[2026-04-27]`: Phase 4 진입 준비 — origin/feat-4-serving(이전 세션 stale 작업본) → `feat-4-serving-old`로 백업 rename. step0/1/2.md에 phase 3 사고 학습 적용: 🚨 **메타 파일 보호 섹션** 추가(plan.md/루트 *.md/타 phase 디렉토리 수정 금지 + 출력 산출물 4종/5종/6종 명시 enumeration). step2.md `AWS_DEFAULT_REGION=ap-northeast-2` → `eu-west-1` 정정. stale `step{0,1,2}-output.json` 삭제.
+
+  - `[2026-04-27]`: Phase 4 실행 (3 step 병렬, depends_on:[]) — **plan.md 하이재킹 없음, safeguard 정상 작동**. 새 `feat-4-serving` 브랜치 자동 생성 (옛 작업본은 `feat-4-serving-old` 보존). 산출물: ① step 0 — `terraform/modules/data_pipeline/sns.tf`, `lambda.tf`, `src/lambda/alert_handler.py` (기본 메시지 포맷, portal_url SSM 런타임 조회는 미구현 — 명세 외), ② step 1 — `terraform/addons.tf` Grafana helm release 추가 + `grafana/dashboards/{robot_fleet,anomaly_timeline,pipeline_health}.json` 3종, ③ step 2 — `src/api/main.py` (FastAPI + apscheduler 캐시 + Bedrock InvokeModel + Athena), `templates/chat.html`, `Dockerfile`, `k8s/api/deployment.yaml`, `iam.tf` API IRSA 추가. 검증: py_compile OK + dashboard JSON valid + region 일관성(eu-west-1). **Phase 4 모든 step completed**. plan.md Task 4.1/4.2/4.3 sub-bullet 일부 [x] 마킹.
+
+  - `[2026-04-27]`: Phase 4 후속 누락 항목 (다음 step 또는 별도 PR 처리 권장):
+    * Task 4.1: 알림 메시지 딥링크(`portal_url/?robot_id={id}`) + Lambda SSM 런타임 조회 미구현
+    * Task 4.2: Grafana ALB Ingress(`k8s/monitoring/grafana-ingress.yaml`) 미작성, `grafana_admin_password` sensitive 변수 처리 미확인
+    * Task 4.3: `portal.html`(통합 관제 포털, 12컬럼 그리드, Grafana iframe) 미작성, API ALB Ingress 미작성, `slowapi` requirements 누락, `GRAFANA_URL` ConfigMap 미주입
+    * Task 4.3.5: 6개 UX 버그 전부 미해결
+    * Task 4.4: `tests/api/` 미작성
 
   - `[2026-04-26]`: plan.md 전체 sync sweep 완료 — 실 산출물과 체크박스 정합성 검증. **체크박스 잘못 [ ]로 남아있던 항목들을 [x]로 정정**: Task 0.2(워크플로 3종 + Lambda ZIP 빌드 모두 구현됨), Task 1.3(s3_lifecycle.tf 존재), Task 1.3.1(Athena Workgroup glue.tf 포함), Task 1.5(Generator 전체 구현), Task 1.6 단위 테스트, Task 2.2(Airflow Helm), Task 4.2 Grafana Helm 일부, Task 4.3 main.py partial, Task 5.1 ADOT/X-Ray IRSA/observability.json, Task 5.2 거의 전체. **진짜 미구현으로 남은 핵심 gap**: ① Task 4.2 Grafana ALB Ingress + 3개 대시보드 JSON, ② Task 4.3 portal.html(현재 chat.html만) + API ALB Ingress + slowapi requirements 누락, ③ Task 4.3.5 6개 UX 버그 전체, ④ Task 4.4 tests/api, ⑤ Task 3.1 Flink 전체, ⑥ Task 2.0 Great Expectations DQ Gate, ⑦ Task 5.2 train_entry.py 및 ML feature 컬럼 정합성. 발견된 부수 이슈: cloudwatch.tf 알람 `comparison_operator` 논리 반전(`GreaterThanThreshold` → `LessThanThreshold` 필요), main.py/k8s region 불일치(eu-west-1 vs ap-northeast-2), Grafana adminPassword 하드코딩.
