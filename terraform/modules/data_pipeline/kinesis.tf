@@ -10,12 +10,12 @@ resource "aws_kinesis_stream" "main" {
 }
 
 resource "aws_kinesis_stream" "alert" {
-  name             = "${var.project_name}-anomaly-alert-stream"
+  name             = "robot-anomaly-alert-stream"
   shard_count      = 2
   retention_period = 24
 
   tags = {
-    Name = "${var.project_name}-anomaly-alert-stream"
+    Name = "robot-anomaly-alert-stream"
   }
 }
 

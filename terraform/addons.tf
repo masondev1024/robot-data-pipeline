@@ -92,7 +92,17 @@ resource "helm_release" "grafana" {
 
   set {
     name  = "adminPassword"
-    value = "admin" # Should be changed or handled via Secrets Manager
+    value = var.grafana_admin_password
+  }
+
+  set {
+    name  = "service.type"
+    value = "ClusterIP"
+  }
+
+  set {
+    name  = "persistence.enabled"
+    value = "true"
   }
 
   set {

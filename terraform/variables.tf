@@ -33,3 +33,9 @@ variable "github_repo" {
 variable "github_branch" {
   default = "main"
 }
+
+variable "grafana_admin_password" {
+  description = "Grafana admin password (managed by AWS Secrets Manager)"
+  type        = string
+  sensitive   = true
+}
