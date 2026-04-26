@@ -3,3 +3,5 @@ uvicorn[standard]
 boto3
 apscheduler
 pydantic
+slowapi
+pytz

@@ -30,7 +30,7 @@ spec:
       serviceAccountName: api-sa
       containers:
         - name: api
-          image: 827913617635.dkr.ecr.ap-northeast-2.amazonaws.com/robot-telemetry-api:latest
+          image: 827913617635.dkr.ecr.eu-west-1.amazonaws.com/robot-telemetry-api:latest
           ports:
             - containerPort: 8000
           env:
@@ -45,7 +45,7 @@ spec:
             - name: CACHE_REFRESH_HOUR
               value: "1"
             - name: AWS_DEFAULT_REGION
-              value: "ap-northeast-2"
+              value: "eu-west-1"
           resources:
             requests:
               cpu: "200m"
