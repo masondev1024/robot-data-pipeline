@@ -13,7 +13,8 @@
       "Bash(cp /tmp/phase3-recovery/plan.md /Users/mason/Desktop/Projects/robot-data-pipeline/plan.md)",
       "Bash(cp /tmp/phase3-recovery/step1_after_step0.md /Users/mason/Desktop/Projects/robot-data-pipeline/phases/3-realtime/step1.md)",
       "Bash(cp /tmp/phase3-recovery/flink.tf /Users/mason/Desktop/Projects/robot-data-pipeline/terraform/modules/data_pipeline/flink.tf)",
-      "Bash(cp /tmp/phase3-recovery/test_bedrock_report.py /Users/mason/Desktop/Projects/robot-data-pipeline/tests/etl/test_bedrock_report.py)"
+      "Bash(cp /tmp/phase3-recovery/test_bedrock_report.py /Users/mason/Desktop/Projects/robot-data-pipeline/tests/etl/test_bedrock_report.py)",
+      "Bash(echo \"exit=$?\")"
     ]
   }
 }
