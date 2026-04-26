@@ -28,11 +28,14 @@
     {
       "step": 2,
       "name": "flink-validation",
-      "status": "pending",
+      "status": "completed",
+      "summary": "tests/flink/test_anomaly_detection.py: Z-Score/load_ratio/is_anomaly 18케이스(σ guard 4건, load guard 2건, threshold tuning) 전부 PASSED",
       "depends_on": [
         1
       ],
-      "description": "이상 탐지 순수 함수 단위 테스트 (Z-Score / load_ratio / is_anomaly + threshold tuning)"
+      "description": "이상 탐지 순수 함수 단위 테스트 (Z-Score / load_ratio / is_anomaly + threshold tuning)",
+      "started_at": "2026-04-27T00:32:57+0900",
+      "completed_at": "2026-04-27T00:38:00+0900"
     },
     {
       "step": 3,
