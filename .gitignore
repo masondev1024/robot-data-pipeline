@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 *.pyo
+.DS_Store
 node_modules/
 .next/
 out/
@@ -30,11 +31,13 @@ terraform/lambda_*.zip
 data/seed_data.csv
 data/*.zip
 
-# 로컬 학습 문서 — 원격 저장소에 올리지 않음
+# 루트 — CLAUDE.md만 원격에 올림
 ARCHITECTURE_OVERVIEW.md
 DATA_FLOW_DETAILED.md
 PHASE_DEEP_DIVE.md
 OPERATIONAL_GUIDE.md
 DE_SKILLS_LEARNING_JOURNAL.md
 plan.md
+requirements.txt
 프로젝트 구성될때 물리적 빈틈.md
+빈틈.md
