@@ -7,34 +7,47 @@
       "step": 0,
       "name": "flink-terraform",
       "status": "completed",
+      "summary": "flink.tf: Application 모드 + PyFlink + S3 코드 ZIP + CloudWatch + 외부화 threshold (zscore=3.0, load_ratio=1.8)",
       "depends_on": [],
-      "description": "Managed Apache Flink 인프라 및 전용 IAM 구성",
-      "started_at": "2026-04-26T02:48:36+0900",
-      "summary": "flink.tf: robot-anomaly-detector Flink 앱, IAM(KDS Read + Alert Write + S3 Write)",
-      "completed_at": "2026-04-26T02:51:13+0900"
+      "description": "Managed Flink Application 인프라 (IAM + S3 코드 ZIP + CloudWatch Logging + 외부화 threshold property_map) 구성",
+      "started_at": "2026-04-27T00:06:05+0900",
+      "completed_at": "2026-04-27T00:10:36+0900"
     },
     {
       "step": 1,
-      "name": "flink-sql",
+      "name": "flink-app",
       "status": "completed",
+      "summary": "anomaly_detection.py: PyFlink Z-Score(5min OVER)+다변량 OR, 1min Tumbling, Dual Sink (S3+Alert KDS), threshold 외부화, ZIP 빌드 OK",
       "depends_on": [
         0
       ],
-      "description": "1분 Tumbling Window 기반 모터 온도 이상 탐지 로직 구현",
-      "started_at": "2026-04-26T02:51:13+0900",
-      "summary": "flink/anomaly_detection.sql: KDS Source, Dual Sink(S3 alerts/ + robot-anomaly-alert-stream), 1분 Tumbling Window, WATERMARK",
-      "completed_at": "2026-04-26T02:55:00+0900"
+      "description": "PyFlink 이상 탐지 앱 — Z-Score 5분 OVER + 다변량 OR + 1분 Tumbling + Dual Sink, ZIP 빌드",
+      "started_at": "2026-04-27T00:29:58+0900",
+      "completed_at": "2026-04-27T00:32:57+0900"
     },
     {
       "step": 2,
-      "name": "bedrock-report",
+      "name": "flink-validation",
       "status": "completed",
+      "summary": "tests/flink/test_anomaly_detection.py: Z-Score/load_ratio/is_anomaly 18케이스(σ guard 4건, load guard 2건, threshold tuning) 전부 PASSED",
+      "depends_on": [
+        1
+      ],
+      "description": "이상 탐지 순수 함수 단위 테스트 (Z-Score / load_ratio / is_anomaly + threshold tuning)",
+      "started_at": "2026-04-27T00:32:57+0900",
+      "completed_at": "2026-04-27T00:34:26+0900"
+    },
+    {
+      "step": 3,
+      "name": "bedrock-report-tests",
+      "status": "completed",
+      "summary": "tests/etl/test_bedrock_report.py: Athena+Bedrock+S3 호출 검증 10케이스 + DAG 토폴로지 4케이스 모두 PASSED",
       "depends_on": [],
-      "description": "Gold 데이터 기반 Claude 3 정비 우선순위 리포트 생성기 구현",
-      "started_at": "2026-04-26T02:48:36+0900",
-      "summary": "DAG 전체 체인 완성: bronze_to_silver >> silver_to_gold >> generate_bedrock_report(Bedrock Haiku → S3 reports/)",
-      "completed_at": "2026-04-26T02:49:27+0900"
+      "description": "Phase 2에서 구현된 _bedrock_report 함수 + DAG 토폴로지 검증 (Mock Athena/Bedrock/S3)",
+      "started_at": "2026-04-27T00:06:05+0900",
+      "completed_at": "2026-04-27T00:11:15+0900"
     }
   ],
-  "created_at": "2026-04-26T02:48:20+0900"
+  "created_at": "2026-04-27T00:29:40+0900",
+  "completed_at": "2026-04-27T00:34:26+0900"
 }

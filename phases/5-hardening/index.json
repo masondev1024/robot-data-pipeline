@@ -1,0 +1,31 @@
+{
+  "project": "Robot Telemetry Pipeline",
+  "phase": "5-hardening",
+  "domain": "mixed",
+  "steps": [
+    {
+      "step": 0,
+      "name": "observability",
+      "status": "completed",
+      "depends_on": [],
+      "description": "AWS X-Ray + ADOT 기반 전구간 분산 추적 구축",
+      "started_at": "2026-04-26T16:58:28+0900",
+      "summary": "ADOT Operator Helm(addons.tf) + X-Ray IAM(Generator+API IRSA) + OTEL inject-python 어노테이션(api/generator deployment) + observability.json 대시보드(Latency/ErrorRate/Kinesis/ServiceMap 4패널) 작성",
+      "completed_at": "2026-04-26T17:00:41+0900"
+    },
+    {
+      "step": 1,
+      "name": "predictive-maintenance",
+      "status": "completed",
+      "depends_on": [
+        0
+      ],
+      "description": "SageMaker XGBoost 고장 예측 모델 학습 및 API 엔드포인트 배포",
+      "started_at": "2026-04-26T17:01:50+0900",
+      "completed_at": "2026-04-26T17:05:53+0900",
+      "summary": "sagemaker.tf(IAM Role+S3 ml-models권한) + train.py(Athena 30일 조회+XGBoost 학습+ml.t2.medium 배포) + /api/predict 엔드포인트(slowapi 20/min 제한) + 주간 재학습 DAG Task(check_monday→retrain_ml_model) + API IRSA sagemaker:InvokeEndpoint 권한 추가"
+    }
+  ],
+  "created_at": "2026-04-26T00:00:00+0900",
+  "completed_at": "2026-04-26T17:05:53+0900"
+}

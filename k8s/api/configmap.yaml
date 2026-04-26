@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-config
+  namespace: robot-telemetry
+data:
+  grafana_url: "https://k8s-monitoring-grafana-PLACEHOLDER.elb.amazonaws.com"
