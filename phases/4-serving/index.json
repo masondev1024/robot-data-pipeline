@@ -76,5 +76,6 @@
       "summary": "tests/api/(test_chat.py 6 + test_status.py 4) + tests/lambda/test_alert_handler.py 5 = 15 PASSED, 모든 boto3 mock처리, 회귀테스트 65 PASSED"
     }
   ],
-  "created_at": "2026-04-27T00:50:51+0900"
+  "created_at": "2026-04-27T00:50:51+0900",
+  "completed_at": "2026-04-27T01:17:42+0900"
 }
