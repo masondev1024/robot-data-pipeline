@@ -1,0 +1,78 @@
+name: k8s-deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'k8s/**'
+      - 'src/**'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-west-1
+
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Generator image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          if [ -f src/generator/Dockerfile ]; then
+            docker build -t $ECR_REGISTRY/robot-telemetry-generator:$IMAGE_TAG src/generator/
+            docker push $ECR_REGISTRY/robot-telemetry-generator:$IMAGE_TAG
+            docker tag $ECR_REGISTRY/robot-telemetry-generator:$IMAGE_TAG $ECR_REGISTRY/robot-telemetry-generator:latest
+            docker push $ECR_REGISTRY/robot-telemetry-generator:latest
+          fi
+
+      - name: Build and push API image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          if [ -f src/api/Dockerfile ]; then
+            docker build -t $ECR_REGISTRY/robot-telemetry-api:$IMAGE_TAG src/api/
+            docker push $ECR_REGISTRY/robot-telemetry-api:$IMAGE_TAG
+            docker tag $ECR_REGISTRY/robot-telemetry-api:$IMAGE_TAG $ECR_REGISTRY/robot-telemetry-api:latest
+            docker push $ECR_REGISTRY/robot-telemetry-api:latest
+          fi
+
+      - name: Build Lambda ZIP
+        run: |
+          if [ -f src/lambda/alert_handler.py ]; then
+            mkdir -p src/lambda/dist
+            if [ -f src/lambda/requirements.txt ]; then
+              pip install -r src/lambda/requirements.txt -t src/lambda/dist/ --quiet
+            fi
+            cp src/lambda/alert_handler.py src/lambda/dist/
+            cd src/lambda && zip -r alert_handler.zip dist/ -x "*.pyc" -x "*/__pycache__/*"
+            echo "Lambda ZIP built: $(du -sh alert_handler.zip | cut -f1)"
+          fi
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name robot-telemetry-cluster --region eu-west-1
+
+      - name: Apply Kubernetes manifests
+        run: |
+          if [ -d k8s/ ] && [ "$(ls -A k8s/)" ]; then
+            kubectl apply -f k8s/ --recursive
+          fi
+
+      - name: Restart deployments
+        run: |
+          kubectl rollout restart deployment/robot-telemetry-generator -n robot-telemetry 2>/dev/null || true
+          kubectl rollout restart deployment/robot-telemetry-api -n robot-telemetry 2>/dev/null || true

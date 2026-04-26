@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Telemetry Portal</title>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+        header {
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .header-info {
+            font-size: 14px;
+            color: #666;
+        }
+        .dashboard-tabs {
+            display: flex;
+            gap: 8px;
+            margin-left: auto;
+        }
+        .dashboard-tab {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            background: white;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .dashboard-tab:hover {
+            background: #f9f9f9;
+        }
+        .dashboard-tab.active {
+            background: #1976d2;
+            color: white;
+            border-color: #1976d2;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 16px;
+            padding: 16px;
+            height: calc(100vh - 70px);
+        }
+        .grafana-section {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        #grafana-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        .chat-section {
+            background: white;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .chat-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .chat-messages {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .message {
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .message.user {
+            background: #e3f2fd;
+            color: #0d47a1;
+            align-self: flex-end;
+            max-width: 90%;
+        }
+        .message.assistant {
+            background: #f5f5f5;
+            color: #333;
+            align-self: flex-start;
+            max-width: 90%;
+        }
+        .links-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .link-button {
+            padding: 10px 12px;
+            background: #fff3e0;
+            border: 1px solid #ffe0b2;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            text-align: left;
+            transition: all 0.2s;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+        }
+        .link-button:hover {
+            background: #ffe0b2;
+            border-color: #ffb74d;
+        }
+        .chat-input-area {
+            padding: 12px 16px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 8px;
+        }
+        .chat-input-area input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .chat-input-area input:focus {
+            outline: none;
+            border-color: #1976d2;
+            box-shadow: 0 0 0 2px rgba(25,118,210,0.1);
+        }
+        .chat-input-area button {
+            padding: 10px 16px;
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s;
+            min-height: 44px;
+        }
+        .chat-input-area button:hover {
+            background: #1565c0;
+        }
+        .chat-input-area button:active {
+            background: #1565c0;
+            transform: scale(0.98);
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            color: #999;
+            font-size: 12px;
+            padding: 8px;
+        }
+        .loading.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-title">Robot Telemetry Portal</div>
+        <div class="header-info" id="status-info">Loading...</div>
+        <div class="dashboard-tabs">
+            <button class="dashboard-tab active" data-uid="robot-fleet-001">Fleet</button>
+            <button class="dashboard-tab" data-uid="anomaly-timeline-001">Anomaly</button>
+            <button class="dashboard-tab" data-uid="pipeline-health-001">Pipeline</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="grafana-section">
+            <iframe id="grafana-frame" src=""></iframe>
+        </div>
+
+        <div class="chat-section">
+            <div class="chat-header">AI 상담</div>
+            <div class="chat-messages" id="chat-messages"></div>
+            <div class="loading" id="loading">답변 중...</div>
+            <div class="chat-input-area">
+                <input type="text" id="chat-input" placeholder="로봇 상태를 물어보세요...">
+                <button id="send-btn">전송</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const grafanaUrl = "{{ GRAFANA_URL }}" || "http://localhost:3000";
+        const robotId = "{{ robot_id }}";
+        let currentDashboardUid = "robot-fleet-001";
+
+        // API Status 조회
+        async function loadStatus() {
+            try {
+                const resp = await fetch("/api/status");
+                const data = await resp.json();
+                if (data.cached_at && data.data_date) {
+                    const cachedTime = new Date(data.cached_at).toLocaleTimeString('ko-KR');
+                    document.getElementById('status-info').textContent =
+                        `${data.data_date} 기준 데이터 · ${cachedTime} 갱신`;
+                }
+            } catch (e) {
+                console.error("Status load failed:", e);
+            }
+        }
+
+        // 대시보드 탭 전환
+        document.querySelectorAll('.dashboard-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.dashboard-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                currentDashboardUid = tab.dataset.uid;
+                updateGrafanaFrame();
+            });
+        });
+
+        // Grafana iframe 업데이트
+        function updateGrafanaFrame() {
+            const src = `${grafanaUrl}/d/${currentDashboardUid}?kiosk=tv&orgId=1`;
+            document.getElementById('grafana-frame').src = src;
+        }
+
+        // 채팅 메시지 렌더
+        function addMessage(text, isUser, links = []) {
+            const container = document.getElementById('chat-messages');
+            const msg = document.createElement('div');
+            msg.className = `message ${isUser ? 'user' : 'assistant'}`;
+
+            const content = document.createElement('div');
+            content.textContent = text;
+            msg.appendChild(content);
+
+            if (!isUser && links.length > 0) {
+                const linksDiv = document.createElement('div');
+                linksDiv.className = 'links-container';
+                links.forEach(link => {
+                    const btn = document.createElement('button');
+                    btn.className = 'link-button';
+                    btn.textContent = link.label;
+                    btn.onclick = () => {
+                        const params = new URLSearchParams(link.url.split('?')[1]);
+                        if (params.has('robot_id')) {
+                            document.getElementById('grafana-frame').src =
+                                `${grafanaUrl}/d/${currentDashboardUid}?kiosk=tv&orgId=1&var-robot_id=${params.get('robot_id')}`;
+                        }
+                    };
+                    linksDiv.appendChild(btn);
+                });
+                msg.appendChild(linksDiv);
+            }
+
+            container.appendChild(msg);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // 채팅 전송
+        async function sendChat() {
+            const input = document.getElementById('chat-input');
+            const question = input.value.trim();
+            if (!question) return;
+
+            addMessage(question, true);
+            input.value = '';
+            document.getElementById('loading').classList.add('show');
+
+            try {
+                const resp = await fetch("/api/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ question })
+                });
+                const data = await resp.json();
+                addMessage(data.answer, false, data.links || []);
+            } catch (e) {
+                addMessage(`오류: ${e.message}`, false);
+            } finally {
+                document.getElementById('loading').classList.remove('show');
+            }
+        }
+
+        document.getElementById('send-btn').addEventListener('click', sendChat);
+        document.getElementById('chat-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendChat();
+        });
+
+        // 페이지 로드 시 초기화
+        loadStatus();
+        updateGrafanaFrame();
+
+        // 딥링크: robot_id 파라미터가 있으면 자동 질문
+        if (robotId) {
+            setTimeout(() => {
+                const question = `${robotId}의 현재 상태를 분석해줘`;
+                document.getElementById('chat-input').value = question;
+                sendChat();
+            }, 500);
+        }
+    </script>
+</body>
+</html>
