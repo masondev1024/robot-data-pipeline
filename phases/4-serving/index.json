@@ -40,16 +40,18 @@
       "depends_on": [],
       "description": "Lambda alert_handler 보강 — portal_url SSM 런타임 조회 + 딥링크 메시지 포맷 + IAM ssm:GetParameter 권한",
       "started_at": "2026-04-27T01:11:28+0900",
-      "completed_at": "2026-04-27T01:15:00+0900",
+      "completed_at": "2026-04-27T01:12:39+0900",
       "summary": "alert_handler.py 보강 (SSM portal_url 런타임 조회 + 모듈 전역 캐시 + 딥링크 메시지 포맷) + iam.tf Lambda 권한 범위 축소 (/robot-telemetry/portal-url 단일 파라미터)"
     },
     {
       "step": 4,
       "name": "alb-ingresses",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [],
       "description": "Grafana + API ALB Ingress 2종 (internet-facing) + grafana_admin_password sensitive 변수화 검증",
-      "started_at": "2026-04-27T01:11:28+0900"
+      "started_at": "2026-04-27T01:11:28+0900",
+      "completed_at": "2026-04-27T01:20:00+0900",
+      "summary": "k8s/monitoring/grafana-ingress.yaml (ALB Ingress, internet-facing, monitoring ns) + k8s/api/api-ingress.yaml (ALB Ingress, internet-facing, robot-telemetry ns) + terraform/addons.tf & variables.tf (grafana_admin_password sensitive 변수 검증)"
     },
     {
       "step": 5,
