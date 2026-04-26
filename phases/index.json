@@ -9,9 +9,10 @@
     },
     {
       "dir": "1-ingestion",
-      "status": "pending",
+      "status": "completed",
       "pre_gate_check": "check_infra_base",
-      "description": "데이터 수집 파이프라인 (Kinesis, Generator) 설계 및 구현"
+      "description": "데이터 수집 파이프라인 (Kinesis, Generator) 설계 및 구현",
+      "completed_at": "2026-04-26T21:06:51+0900"
     },
     {
       "dir": "2-batch",
