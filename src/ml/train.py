@@ -10,11 +10,12 @@ MODEL_PREFIX = "ml-models/robot-failure-predictor"
 
 QUERY = """
 SELECT
+    robot_id,
     avg_motor_temp,
     max_motor_temp,
-    battery_drain_rate,
-    operation_ratio,
-    machine_failure
+    battery_drain,
+    active_hours,
+    CASE WHEN max_motor_temp > 90.0 THEN 1 ELSE 0 END AS label
 FROM gold_robot_daily_stats
 WHERE dt >= date_format(current_date - interval '30' day, '%Y-%m-%d')
 """

@@ -22,8 +22,8 @@ def test_predict_high_risk(mock_sm):
             "robot_id": "ROBOT-00001",
             "avg_motor_temp": 92.5,
             "max_motor_temp": 97.0,
-            "battery_drain_rate": 18.3,
-            "operation_ratio": 0.95,
+            "battery_drain": 30,
+            "active_hours": 8,
         },
     )
     assert resp.status_code == 200
@@ -47,8 +47,8 @@ def test_predict_medium_risk(mock_sm):
             "robot_id": "ROBOT-00002",
             "avg_motor_temp": 75.0,
             "max_motor_temp": 80.0,
-            "battery_drain_rate": 10.0,
-            "operation_ratio": 0.7,
+            "battery_drain": 20,
+            "active_hours": 6,
         },
     )
     assert resp.status_code == 200
@@ -69,8 +69,8 @@ def test_predict_low_risk(mock_sm):
             "robot_id": "ROBOT-00003",
             "avg_motor_temp": 65.0,
             "max_motor_temp": 70.0,
-            "battery_drain_rate": 5.0,
-            "operation_ratio": 0.5,
+            "battery_drain": 10,
+            "active_hours": 4,
         },
     )
     assert resp.status_code == 200
@@ -92,8 +92,8 @@ def test_predict_returns_robot_id(mock_sm):
             "robot_id": "ROBOT-00042",
             "avg_motor_temp": 68.0,
             "max_motor_temp": 72.0,
-            "battery_drain_rate": 7.0,
-            "operation_ratio": 0.6,
+            "battery_drain": 15,
+            "active_hours": 5,
         },
     )
     assert resp.status_code == 200
