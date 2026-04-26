@@ -27,9 +27,10 @@
     },
     {
       "dir": "4-serving",
-      "status": "pending",
+      "status": "completed",
       "pre_gate_check": "check_env",
-      "description": "서비스 레이어 (Slack, Grafana, AI API) 최종 구축"
+      "description": "서비스 레이어 (Slack, Grafana, AI API) 최종 구축",
+      "completed_at": "2026-04-26T10:48:46+0900"
     }
   ]
 }
