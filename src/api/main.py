@@ -121,8 +121,7 @@ async def startup():
             await asyncio.sleep(10)
     scheduler = AsyncIOScheduler()
     hour = int(os.environ.get("CACHE_REFRESH_HOUR", "1"))
-    kst = pytz.timezone("Asia/Seoul")
-    scheduler.add_job(refresh_cache, "cron", hour=hour, minute=0, timezone=kst)
+    scheduler.add_job(refresh_cache, "cron", hour=hour, minute=0, timezone="Asia/Seoul")
     scheduler.start()
 
 
@@ -246,4 +245,12 @@ async def predict_failure(request: Request, body: PredictRequest):
 
 @app.get("/", response_class=HTMLResponse)
 async def portal(request: Request, robot_id: str = ""):
-    return templates.TemplateResponse("portal.html", {"request": request, "robot_id": robot_id})
+    grafana_url = os.environ.get("GRAFANA_URL", "http://localhost:3000")
+    return templates.TemplateResponse(
+        "portal.html",
+        {
+            "request": request,
+            "robot_id": robot_id,
+            "GRAFANA_URL": grafana_url,
+        },
+    )
