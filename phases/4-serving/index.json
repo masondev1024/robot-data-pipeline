@@ -56,10 +56,12 @@
     {
       "step": 5,
       "name": "portal-and-ux-bugs",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [],
       "description": "FastAPI 통합 관제 포털(portal.html) + Bedrock Sonnet 3.5 + slowapi rate limit + UX 버그 6건 idempotent 수정 (timezone/data_date/system 필드/DOMPurify/minReplicas/딥링크)",
-      "started_at": "2026-04-27T01:11:28+0900"
+      "started_at": "2026-04-27T01:11:28+0900",
+      "completed_at": "2026-04-27T01:30:00+0900",
+      "summary": "main.py 보강(Sonnet 3.5 + system 필드 분리 + slowapi 10/minute + /api/status + GET / portal.html + timezone KST + links[] 딥링크) + portal.html 신규(12col grid + Grafana iframe + AI Chat + DOMPurify + 딥링크) + requirements.txt slowapi 추가 + k8s/api/deployment.yaml GRAFANA_URL ConfigMap + k8s/api/configmap.yaml 신규 + hpa.yaml minReplicas:1 확인"
     },
     {
       "step": 6,
