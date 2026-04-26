@@ -28,16 +28,20 @@
     {
       "step": 2,
       "name": "observability-completion",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [],
-      "description": "Generator OTEL inject-python annotation + AWS X-Ray Group Terraform 리소스 + sampling rule (cost control)"
+      "description": "Generator OTEL inject-python annotation + AWS X-Ray Group Terraform 리소스 + sampling rule (cost control)",
+      "started_at": "2026-04-27T01:27:19+0900",
+      "completed_at": "2026-04-27T01:30:00+0900",
+      "summary": "k8s/generator OTEL inject-python annotation + xray.tf (Group robot-telemetry-traces + sampling 5%)"
     },
     {
       "step": 3,
       "name": "ml-feature-alignment",
       "status": "pending",
       "depends_on": [],
-      "description": "ML 코드를 gold DDL 실제 컬럼에 정렬: train.py SELECT 정정(avg/max_motor_temp/battery_drain/active_hours) + 룰 라벨(max_motor_temp>90) + train_entry.py 신규 + /api/predict 4-feature schema"
+      "description": "ML 코드를 gold DDL 실제 컬럼에 정렬: train.py SELECT 정정(avg/max_motor_temp/battery_drain/active_hours) + 룰 라벨(max_motor_temp>90) + train_entry.py 신규 + /api/predict 4-feature schema",
+      "started_at": "2026-04-27T01:27:19+0900"
     },
     {
       "step": 4,
