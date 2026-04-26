@@ -1,0 +1,22 @@
+{
+  "project": "Robot Telemetry Pipeline",
+  "phase": "5-hardening",
+  "domain": "mixed",
+  "steps": [
+    {
+      "step": 0,
+      "name": "observability",
+      "status": "pending",
+      "depends_on": [],
+      "description": "AWS X-Ray + ADOT 기반 전구간 분산 추적 구축"
+    },
+    {
+      "step": 1,
+      "name": "predictive-maintenance",
+      "status": "pending",
+      "depends_on": ["observability"],
+      "description": "SageMaker XGBoost 고장 예측 모델 학습 및 API 엔드포인트 배포"
+    }
+  ],
+  "created_at": "2026-04-26T00:00:00+0900"
+}

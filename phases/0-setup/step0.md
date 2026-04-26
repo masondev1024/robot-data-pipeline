@@ -21,7 +21,7 @@
 아래 변수를 **확정값 그대로** 선언하라:
 
 ```hcl
-variable "aws_region"          { default = "ap-northeast-2" }
+variable "aws_region"          { default = "eu-west-1" }
 variable "project_name"        { default = "robot-telemetry" }
 variable "eks_cluster_name"    { default = "robot-telemetry-cluster" }
 variable "vpc_cidr"            { default = "10.0.32.0/16" }
