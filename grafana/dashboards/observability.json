@@ -1,0 +1,147 @@
+{
+  "title": "Robot Telemetry — Observability",
+  "uid": "robot-observability",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Endpoint Latency — /api/chat & /api/predict (P50/P95/P99)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+      "targets": [
+        {
+          "refId": "A",
+          "namespace": "AWS/ApplicationELB",
+          "metricName": "TargetResponseTime",
+          "statistics": ["p50"],
+          "dimensions": { "TargetGroup": "robot-telemetry-api" },
+          "alias": "/api/chat P50"
+        },
+        {
+          "refId": "B",
+          "namespace": "AWS/ApplicationELB",
+          "metricName": "TargetResponseTime",
+          "statistics": ["p95"],
+          "dimensions": { "TargetGroup": "robot-telemetry-api" },
+          "alias": "/api/chat P95"
+        },
+        {
+          "refId": "C",
+          "namespace": "AWS/ApplicationELB",
+          "metricName": "TargetResponseTime",
+          "statistics": ["p99"],
+          "dimensions": { "TargetGroup": "robot-telemetry-api" },
+          "alias": "/api/chat P99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Error Rate — 5xx Responses (%)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+      "targets": [
+        {
+          "refId": "A",
+          "namespace": "AWS/ApplicationELB",
+          "metricName": "HTTPCode_Target_5XX_Count",
+          "statistics": ["Sum"],
+          "dimensions": { "TargetGroup": "robot-telemetry-api" },
+          "alias": "5xx Count"
+        },
+        {
+          "refId": "B",
+          "namespace": "AWS/ApplicationELB",
+          "metricName": "RequestCount",
+          "statistics": ["Sum"],
+          "dimensions": { "TargetGroup": "robot-telemetry-api" },
+          "alias": "Total Requests"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "5xx Rate (%)",
+            "mode": "reduceRow",
+            "reduce": { "reducer": "sum" },
+            "binary": {
+              "left": "5xx Count",
+              "right": "Total Requests",
+              "operator": "/"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": { "lineWidth": 2 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Generator → Kinesis PutRecords Latency (avg ms)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+      "targets": [
+        {
+          "refId": "A",
+          "namespace": "AWS/Kinesis",
+          "metricName": "PutRecords.Latency",
+          "statistics": ["Average"],
+          "dimensions": { "StreamName": "robot-telemetry-stream" },
+          "alias": "PutRecords Avg Latency"
+        },
+        {
+          "refId": "B",
+          "namespace": "AWS/Kinesis",
+          "metricName": "PutRecords.SuccessfulRecords",
+          "statistics": ["Sum"],
+          "dimensions": { "StreamName": "robot-telemetry-stream" },
+          "alias": "Successful Records"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": { "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "X-Ray Service Map",
+      "type": "text",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "options": {
+        "mode": "html",
+        "content": "<div style=\"display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column\"><p style=\"font-size:14px;color:#aaa\">X-Ray Service Map</p><p style=\"font-size:12px;color:#666\">Open AWS Console → X-Ray → Service Map<br/>Filter: robot-telemetry namespace</p><a href=\"https://ap-northeast-2.console.aws.amazon.com/xray/home#/service-map\" target=\"_blank\" style=\"color:#5794f2\">View in AWS Console →</a></div>"
+      }
+    }
+  ],
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "links": []
+}

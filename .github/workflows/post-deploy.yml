@@ -1,0 +1,83 @@
+name: post-deploy
+
+on:
+  workflow_run:
+    workflows: ["k8s-deploy"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  store-dns:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-west-1
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name robot-telemetry-cluster --region eu-west-1
+
+      - name: Wait for API ALB DNS
+        id: api-dns
+        run: |
+          DNS=""
+          for i in $(seq 1 20); do
+            DNS=$(kubectl get ingress robot-telemetry-api-ingress \
+              -n robot-telemetry \
+              -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+            if [ -n "$DNS" ] && [ "$DNS" != "null" ]; then
+              echo "dns=$DNS" >> $GITHUB_OUTPUT
+              echo "API ALB DNS 확정: $DNS"
+              break
+            fi
+            echo "[$i/20] API ALB 대기 중... (15초)"
+            sleep 15
+          done
+          if [ -z "$DNS" ]; then
+            echo "API ALB DNS 확정 실패 (300초 초과)"
+            exit 1
+          fi
+
+      - name: Wait for Grafana ALB DNS
+        id: grafana-dns
+        run: |
+          DNS=""
+          for i in $(seq 1 20); do
+            DNS=$(kubectl get ingress grafana-ingress \
+              -n monitoring \
+              -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+            if [ -n "$DNS" ] && [ "$DNS" != "null" ]; then
+              echo "dns=$DNS" >> $GITHUB_OUTPUT
+              echo "Grafana ALB DNS 확정: $DNS"
+              break
+            fi
+            echo "[$i/20] Grafana ALB 대기 중... (15초)"
+            sleep 15
+          done
+          if [ -z "$DNS" ]; then
+            echo "Grafana ALB DNS 확정 실패 (300초 초과)"
+            exit 1
+          fi
+
+      - name: Store DNS values to SSM
+        run: |
+          aws ssm put-parameter \
+            --name "/robot-telemetry/portal-url" \
+            --value "http://${{ steps.api-dns.outputs.dns }}" \
+            --type String \
+            --overwrite
+          aws ssm put-parameter \
+            --name "/robot-telemetry/grafana-url" \
+            --value "http://${{ steps.grafana-dns.outputs.dns }}" \
+            --type String \
+            --overwrite
+          echo "SSM 저장 완료:"
+          echo "  /robot-telemetry/portal-url = http://${{ steps.api-dns.outputs.dns }}"
+          echo "  /robot-telemetry/grafana-url = http://${{ steps.grafana-dns.outputs.dns }}"
