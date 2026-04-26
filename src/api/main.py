@@ -14,6 +14,7 @@ app = FastAPI(title="Robot Telemetry AI Query API")
 
 _gold_cache: str = ""
 _cache_updated_at: str = ""
+_cache_ready: bool = False
 
 
 def _run_athena_query(query: str, database: str, workgroup: str, output_location: str) -> list[dict]:
@@ -92,15 +93,30 @@ LIMIT 100
         print(f"[refresh_cache] 실패: {exc}")
         if not _gold_cache:
             _gold_cache = ""
+    else:
+        global _cache_ready
+        _cache_ready = True
 
 
 @app.on_event("startup")
 async def startup():
-    await refresh_cache()
+    for attempt in range(3):
+        await refresh_cache()
+        if _cache_ready:
+            break
+        if attempt < 2:
+            await asyncio.sleep(10)
     scheduler = AsyncIOScheduler()
     hour = int(os.environ.get("CACHE_REFRESH_HOUR", "1"))
     scheduler.add_job(refresh_cache, "cron", hour=hour, minute=0)
     scheduler.start()
+
+
+@app.get("/healthz")
+async def healthz():
+    if not _cache_ready:
+        raise HTTPException(status_code=503, detail="cache not ready")
+    return {"status": "ok", "cached_at": _cache_updated_at}
 
 
 class ChatRequest(BaseModel):

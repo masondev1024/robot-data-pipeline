@@ -1,0 +1,36 @@
+# KEDA TriggerAuthentication — IRSA podIdentity 방식
+# KEDA operator SA의 IRSA 역할로 KDS DescribeStreamSummary 호출
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: keda-aws-kds-auth
+  namespace: robot-telemetry
+spec:
+  podIdentity:
+    provider: aws
+
+---
+# KEDA ScaledObject — KDS 샤드 수 기반 Generator 오토스케일링
+# 로직: 활성 샤드 수 ÷ shardCount(1) = 목표 레플리카 수
+# 10,000 로봇 트래픽(10샤드 풀 활성) → Generator 10 레플리카까지 확장
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: robot-telemetry-generator-scaledobject
+  namespace: robot-telemetry
+spec:
+  scaleTargetRef:
+    name: robot-telemetry-generator
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  pollingInterval: 30     # 30초마다 KDS 샤드 상태 폴링
+  cooldownPeriod:  120    # 스케일 다운 대기 2분
+  triggers:
+    - type: aws-kinesis-stream
+      metadata:
+        streamName: robot-telemetry-stream
+        shardCount: "1"            # 샤드 1개당 Generator 레플리카 1개
+        awsRegion: ap-northeast-2
+        activationShardCount: "2"  # 2샤드 초과 시 스케일 시작 (평상시 트래픽 무시)
+      authenticationRef:
+        name: keda-aws-kds-auth
