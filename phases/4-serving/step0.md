@@ -111,6 +111,14 @@ grep -q "robot-anomaly-alert-stream" terraform/modules/data_pipeline/lambda.tf &
 
 ## 금지사항
 
+### 🚨 메타 파일 보호 (반드시 준수)
+
+- **`/plan.md`(프로젝트 루트의 master plan)을 절대 수정/덮어쓰기/삭제하지 마라.** 이유: plan.md는 Phase 0~5 전체 진행 상황을 기록하는 master 문서이며, step worker의 계획 메모장이 아니다. 본 step의 출력 산출물은 오직 `terraform/modules/data_pipeline/sns.tf`, `terraform/modules/data_pipeline/lambda.tf`, `src/lambda/alert_handler.py`, 그리고 `phases/4-serving/index.json`(step 0 entry만) 4종이다.
+- 프로젝트 루트의 `*.md`(plan.md, README.md, CLAUDE.md 등) 어떤 것도 수정하지 마라.
+- 다른 step 디렉토리(`phases/0-setup/`, `phases/3-realtime/` 등)나 docs(`/docs/*.md`)를 수정하지 마라.
+
+### 구현 규칙
+
 - Slack Webhook URL을 코드나 Terraform 파일에 하드코딩하지 마라. 이유: `var.slack_webhook_url` sensitive 변수로만 관리
 - Lambda에 SNS Sink를 직접 만들지 말고 SNS `Publish`만 호출하라. 이유: SNS가 Slack 구독을 처리한다
 - `robot-anomaly-alert-stream` 대신 메인 스트림을 트리거로 연결하지 마라. 이유: Alert 전용 스트림을 사용해야 메인 데이터 처리에 영향 없음
