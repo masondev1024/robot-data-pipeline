@@ -217,6 +217,13 @@ class StepExecutor:
 
     def run(self):
         self._print_header()
+        
+        # [CRITICAL] Plan Approval Gate
+        if not self._check_plan_approval():
+            print(f"\n  ✗ ERROR: '/plan.md'의 상태가 [APPROVED]가 아닙니다.")
+            print(f"    작업을 시작하려면 먼저 '/plan.md'를 검토하고 상태를 [APPROVED]로 변경하십시오.")
+            sys.exit(1)
+
         self._generate_dag_graph()
         
         # Phase Gate Check
@@ -251,6 +258,23 @@ class StepExecutor:
             self._generate_simulation_report()
         else:
             self._finalize()
+
+    # ------------------------------------------------------------------
+    # Plan Approval Gate
+    # ------------------------------------------------------------------
+
+    def _check_plan_approval(self) -> bool:
+        """plan.md 파일의 상태가 APPROVED인지 확인한다."""
+        plan_path = Path(self._root) / "plan.md"
+        if not plan_path.exists():
+            return False
+        
+        content = plan_path.read_text(encoding="utf-8")
+        # 대소문자 구분 없이 [APPROVED] 또는 `APPROVED` 패턴 확인
+        import re
+        if re.search(r"\[APPROVED\]|`APPROVED`", content, re.IGNORECASE):
+            return True
+        return False
 
     # ------------------------------------------------------------------
     # Phase Gate — Smart Gate Logic
