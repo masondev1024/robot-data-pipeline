@@ -82,7 +82,7 @@ env:
   - ATHENA_WORKGROUP=robot-telemetry-workgroup
   - ATHENA_OUTPUT_LOCATION=s3://.../project-athena-results/
   - CACHE_REFRESH_HOUR=1
-  - AWS_DEFAULT_REGION=ap-northeast-2
+  - AWS_DEFAULT_REGION=eu-west-1
 resources: { requests: "200m/256Mi", limits: "1/1Gi" }
 ```
 
@@ -121,6 +121,15 @@ grep -q "bedrock:InvokeModel" terraform/modules/data_pipeline/iam.tf && echo "OK
    - 실패 → `"status": "error"`, `"error_message": "구체적 에러"`
 
 ## 금지사항
+
+### 🚨 메타 파일 보호 (반드시 준수)
+
+- **`/plan.md`(프로젝트 루트의 master plan)을 절대 수정/덮어쓰기/삭제하지 마라.** 이유: plan.md는 Phase 0~5 전체 진행 상황을 기록하는 master 문서이며, step worker의 계획 메모장이 아니다. 본 step의 출력 산출물은 오직 `src/api/main.py`, `src/api/templates/chat.html`, `src/api/Dockerfile`, `k8s/api/deployment.yaml`, `terraform/modules/data_pipeline/iam.tf`(API IRSA 추가), 그리고 `phases/4-serving/index.json`(step 2 entry만) 6종이다.
+- 프로젝트 루트의 `*.md`(plan.md, README.md, CLAUDE.md 등) 어떤 것도 수정하지 마라.
+- 다른 step 디렉토리나 docs(`/docs/*.md`)를 수정하지 마라.
+- `terraform/modules/data_pipeline/iam.tf`의 기존 IRSA(Generator/Lambda 등)를 삭제하지 마라 — API IRSA Role/Policy만 추가.
+
+### 구현 규칙
 
 - `POST /api/chat`에서 매 요청마다 Athena 실시간 조회를 실행하지 마라. 이유: Athena 쿼리는 수 초 걸려 채팅 UX를 망친다. 반드시 캐시에서 읽어라
 - `BEDROCK_MODEL_ID`를 코드에 하드코딩하지 마라. 이유: 환경변수로 관리

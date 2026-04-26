@@ -94,6 +94,15 @@ print('OK: all dashboards valid JSON with panels')
 
 ## 금지사항
 
+### 🚨 메타 파일 보호 (반드시 준수)
+
+- **`/plan.md`(프로젝트 루트의 master plan)을 절대 수정/덮어쓰기/삭제하지 마라.** 이유: plan.md는 Phase 0~5 전체 진행 상황을 기록하는 master 문서이며, step worker의 계획 메모장이 아니다. 본 step의 출력 산출물은 오직 `terraform/addons.tf`(Grafana Helm release 추가), `grafana/dashboards/robot_fleet.json`, `grafana/dashboards/anomaly_timeline.json`, `grafana/dashboards/pipeline_health.json`, 그리고 `phases/4-serving/index.json`(step 1 entry만) 5종이다.
+- 프로젝트 루트의 `*.md`(plan.md, README.md, CLAUDE.md 등) 어떤 것도 수정하지 마라.
+- 다른 step 디렉토리나 docs(`/docs/*.md`)를 수정하지 마라.
+- `terraform/addons.tf`의 기존 리소스(EKS addons 등)를 삭제하지 마라 — Grafana Helm release만 추가.
+
+### 구현 규칙
+
 - `grafana_admin_password`를 하드코딩하지 마라. 이유: `var.grafana_admin_password` sensitive 변수로만 관리
 - `service.type = "LoadBalancer"`로 설정하지 마라. 이유: ClusterIP + ALB Ingress를 통해 노출 (비용 절약)
 - Athena 쿼리 결과를 Grafana Dashboard JSON에 하드코딩하지 마라. 이유: 동적 파라미터($__from, $__to)를 사용해야 한다
