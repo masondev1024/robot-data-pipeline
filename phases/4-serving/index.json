@@ -16,10 +16,12 @@
     {
       "step": 1,
       "name": "grafana-helm",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [],
       "description": "Grafana Helm(allow_embedding) + ALB Ingress + 대시보드 3종 구축",
-      "started_at": "2026-04-27T00:51:04+0900"
+      "started_at": "2026-04-27T00:51:04+0900",
+      "completed_at": "2026-04-27T01:15:00+0900",
+      "summary": "terraform/variables.tf(grafana_admin_password sensitive var) + addons.tf(Grafana Helm Release: var.grafana_admin_password, service.type=ClusterIP, persistence.enabled=true, allow_embedding, anonymous) + grafana/dashboards/(robot_fleet.json: motor_temp+battery_drain Top 10 Athena, anomaly_timeline.json: 24h anomaly trend, pipeline_health.json: Kinesis+Firehose+EKS CloudWatch)"
     },
     {
       "step": 2,
