@@ -11,7 +11,7 @@ Harness Step Executor — phase 내 step을 순차/병렬 실행하고 자가 �
 6. Future/Promise     : Librarian Future 선행 스케줄 → Worker 블로킹 보장
 
 Usage:
-    python3 scripts/execute.py <phase-dir> [--push] [--preflight]
+    python3 scripts/execute.py <phase-dir> [--push] [--preflight] [--preflight-yes]
 """
 
 import argparse
@@ -155,8 +155,25 @@ class StepExecutor:
     TZ = timezone(timedelta(hours=9))
     SHADOW_DIR = ".harness_shadow"
 
+    # Named gate lookup — phases/index.json 의 `pre_gate_check` 가 이 키 중 하나면
+    # 아래 리스트의 파일들이 모두 존재하는지로 검증된다.
+    # 새 phase 는 named gate 추가 대신 phases/index.json 에
+    # `"gate_files": ["relative/path", ...]` 를 직접 선언하는 것을 권장한다.
+    _NAMED_GATES: dict[str, list[str]] = {
+        "check_env":              [".env.example"],
+        "check_infra_base":       ["terraform/variables.tf"],
+        "verify_ingestion_flow":  [
+            "src/generator/app.py",
+            "terraform/modules/data_pipeline/glue.tf",
+        ],
+        "verify_batch_output":    ["dags/robot_daily_etl.py"],
+        "check_serving_deps":     ["src/api/main.py"],
+        "verify_serving_layer":   ["src/api/main.py"],
+    }
+
     def __init__(self, phase_dir_name: str, *,
-                 auto_push: bool = False, preflight: bool = False, simulate: bool = False):
+                 auto_push: bool = False, preflight: bool = False,
+                 preflight_yes: bool = False, simulate: bool = False):
         self._root            = str(ROOT)
         self._phases_dir      = ROOT / "phases"
         self._phase_dir       = self._phases_dir / phase_dir_name
@@ -164,6 +181,7 @@ class StepExecutor:
         self._top_index_file  = self._phases_dir / "index.json"
         self._auto_push       = auto_push
         self._preflight       = preflight
+        self._preflight_yes   = preflight_yes
         self._simulate        = simulate
         self._shadow_root     = ROOT / self.SHADOW_DIR
         self._commit_lock     = threading.Lock()
@@ -281,45 +299,44 @@ class StepExecutor:
     # ------------------------------------------------------------------
 
     def _run_phase_gate(self) -> bool:
-        """이전 Phase의 물리적/논리적 완결성을 검증한다."""
-        top = self._read_json(self._top_index_file)
-        gate_cmd = ""
-        for p in top.get("phases", []):
+        """이전 Phase의 물리적/논리적 완결성을 검증한다.
+
+        검증 대상 파일 목록은 두 가지 경로로 결정된다 (선언적 우선).
+            1) phases/index.json의 해당 phase entry에 `gate_files: [...]` 가 있으면 그 목록.
+            2) `pre_gate_check: "<named>"` 가 있으면 `_NAMED_GATES` 표에서 lookup.
+        둘 다 없으면 gate 없음 → 통과.
+        """
+        phase_entry = {}
+        for p in self._read_json(self._top_index_file).get("phases", []):
             if p["dir"] == self._phase_dir_name:
-                gate_cmd = p.get("pre_gate_check", "")
+                phase_entry = p
                 break
-        
-        if not gate_cmd:
+
+        gate_files: list[str] = phase_entry.get("gate_files", []) or []
+        gate_cmd:   str       = phase_entry.get("pre_gate_check", "") or ""
+
+        if not gate_files and gate_cmd:
+            if gate_cmd in self._NAMED_GATES:
+                gate_files = self._NAMED_GATES[gate_cmd]
+            else:
+                print(f"  Gate: '{gate_cmd}' 알 수 없는 named gate — 통과 처리")
+                return True
+
+        if not gate_files:
             return True
 
-        print(f"  Gate: '{gate_cmd}' 검증 중...")
-        
-        # Simulation 모드일 경우 Mock 검증 로직
+        label = gate_cmd or "gate_files"
+        print(f"  Gate: '{label}' 검증 중... ({len(gate_files)}개 파일)")
+
         if self._simulate:
             return self._verify_logical_connection(gate_cmd)
 
-        # 실제 실행 모드: 논리적 파일 존재 검증
         root = Path(self._root)
-        if gate_cmd == "check_env":
-            return (root / ".env.example").exists()
-
-        if gate_cmd == "check_infra_base":
-            return (root / "terraform" / "variables.tf").exists()
-
-        if gate_cmd == "verify_ingestion_flow":
-            return (
-                (root / "src" / "generator" / "app.py").exists()
-                and (root / "terraform" / "modules" / "data_pipeline" / "glue.tf").exists()
-            )
-
-        if gate_cmd == "verify_batch_output":
-            return (root / "dags" / "robot_daily_etl.py").exists()
-
-        if gate_cmd in ("check_serving_deps", "verify_serving_layer"):
-            return (root / "src" / "api" / "main.py").exists()
-
-        # 알 수 없는 gate는 통과
-        print(f"  Gate: '{gate_cmd}' 알 수 없는 게이트 — 통과 처리")
+        missing = [f for f in gate_files if not (root / f).exists()]
+        if missing:
+            for f in missing:
+                print(f"    [FAIL] 누락: {f}")
+            return False
         return True
 
     def _verify_logical_connection(self, gate_cmd: str) -> bool:
@@ -471,10 +488,16 @@ class StepExecutor:
             print("  Simulation 모드이므로 자동으로 Enter를 처리합니다.")
             return True
 
+        if self._preflight_yes:
+            print("  --preflight-yes: 비인터랙티브 모드 — 자동 통과.")
+            return True
+
         try:
             answer = input("  계속하려면 Enter, 중단하려면 q: ").strip()
         except EOFError:
-            answer = ""
+            # stdin 닫힘(non-TTY 환경): 안전하게 통과 처리
+            print("  stdin 닫힘 — 자동 통과.")
+            return True
 
         if answer.lower() == "q":
             print("  Pre-flight: 실행 중단.")
@@ -939,13 +962,19 @@ def main():
                         help="Push branch after completion")
     parser.add_argument("--preflight", action="store_true",
                         help="Run Socratic pre-flight check before execution")
+    parser.add_argument("--preflight-yes", action="store_true",
+                        help="Pre-flight 질문은 출력하되 stdin 입력 없이 자동 통과 (CI/agent용)")
     parser.add_argument("--simulate",  action="store_true",
                         help="Run in simulation mode (Shadow writes, No real AWS)")
     args = parser.parse_args()
 
-    StepExecutor(args.phase_dir, 
-                 auto_push=args.push, 
-                 preflight=args.preflight, 
+    # --preflight-yes 는 --preflight 를 암묵 활성화 (편의)
+    preflight = args.preflight or args.preflight_yes
+
+    StepExecutor(args.phase_dir,
+                 auto_push=args.push,
+                 preflight=preflight,
+                 preflight_yes=args.preflight_yes,
                  simulate=args.simulate).run()
 
 
