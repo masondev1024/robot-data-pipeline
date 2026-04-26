@@ -11,4 +11,11 @@ graph TD
   S1["1. predictive-maintenance"]
   class S1 completed;
   S0 --> S1
+  S2["2. observability-completion"]
+  class S2 completed;
+  S3["3. ml-feature-alignment"]
+  class S3 completed;
+  S4["4. hardening-tests"]
+  class S4 completed;
+  S3 --> S4
 ```
