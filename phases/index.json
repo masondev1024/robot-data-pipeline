@@ -2,10 +2,9 @@
   "phases": [
     {
       "dir": "0-setup",
-      "status": "error",
+      "status": "pending",
       "pre_gate_check": "check_env",
-      "description": "기초 인프라 (VPC, EKS) 설계 및 Terraform 기반 구축",
-      "failed_at": "2026-04-26T00:35:00+0900"
+      "description": "기초 인프라 (VPC, EKS) 설계 및 Terraform 기반 구축"
     },
     {
       "dir": "1-ingestion",
@@ -21,16 +20,21 @@
     },
     {
       "dir": "3-realtime",
-      "status": "completed",
+      "status": "pending",
       "pre_gate_check": "verify_batch_output",
       "description": "실시간 이상 탐지 및 AI 리포트 (Flink, Bedrock) 구현"
     },
     {
       "dir": "4-serving",
-      "status": "completed",
-      "pre_gate_check": "check_env",
-      "description": "서비스 레이어 (Slack, Grafana, AI API) 최종 구축",
-      "completed_at": "2026-04-26T10:48:46+0900"
+      "status": "pending",
+      "pre_gate_check": "check_serving_deps",
+      "description": "서비스 레이어 (Slack, Grafana, AI API) 최종 구축"
+    },
+    {
+      "dir": "5-hardening",
+      "status": "pending",
+      "pre_gate_check": "verify_serving_layer",
+      "description": "Observability (X-Ray/OTEL) 및 ML 예측정비 (SageMaker) 구현"
     }
   ]
 }
