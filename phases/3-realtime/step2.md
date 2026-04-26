@@ -104,6 +104,15 @@ pytest tests/flink/test_anomaly_detection.py -v 2>&1 | grep -c "PASSED"
 
 ## 금지사항
 
+### 🚨 메타 파일 보호 (반드시 준수)
+
+- **`/plan.md`(프로젝트 루트의 master plan)을 절대 수정/덮어쓰기/삭제하지 마라.** 이유: plan.md는 Phase 0~5 전체 진행 상황을 기록하는 master 문서이며, step worker의 계획 메모장이 아니다. 본 step의 출력 산출물은 오직 `tests/flink/test_anomaly_detection.py`, `tests/flink/__init__.py`, 그리고 `phases/3-realtime/index.json`(step 2 entry만) 3종이다.
+- 프로젝트 루트의 `*.md`(plan.md, README.md, CLAUDE.md 등) 어떤 것도 수정하지 마라.
+- 다른 step 디렉토리나 docs(`/docs/*.md`)를 수정하지 마라.
+- `flink/anomaly_detection.py`를 수정하지 마라 — 본 step은 **검증 전용**. 함수 시그니처 불일치 발견 시 step `blocked`로 마킹하고 중단.
+
+### 구현 규칙
+
 - LocalStack / Moto 등으로 실제 KDS/S3를 mock 하지 마라. 이유: 본 step은 **순수 함수 단위 테스트**. 통합 테스트는 운영 인프라 배포 후 별도 (plan.md Task 3.3 통합 검증 항목).
 - PyFlink TableEnvironment를 import 하지 마라. 이유: 단위 테스트 환경에 Java JVM 미설치 가정. import 오류로 전체 collection 실패 위험. 순수 함수만 import.
 - `compute_zscore`, `compute_load_ratio`, `is_anomaly` 외 함수를 새로 정의하지 마라. 이유: 테스트는 step 1 산출물 검증용. 알고리즘 추가는 `flink/anomaly_detection.py` 수정 작업.

@@ -441,6 +441,15 @@
 
   ---
 
+  ## 🧯 알려진 후속 이슈 (Phase 3 외, 별도 PR 권장)
+
+  > Phase 3 진입 preflight에서 발견된 부수 이슈. 본 phase 범위 외이므로 별도 cleanup PR로 처리.
+
+  - **[기술 부채] Bedrock 모델 마이그레이션** — `dags/robot_daily_etl.py:211`, `src/api/main.py:137`이 `anthropic.claude-3-haiku-20240307-v1:0`(2024-03 모델) 사용 중. 2026 시점 deprecate 우려 + Claude 4.5 Haiku(`anthropic.claude-haiku-4-5-20251001-v1:0`) 등 신모델 미반영. 액션: AWS 콘솔 `Bedrock → Model access`에서 `eu-west-1` 가용 모델 확인 → `BEDROCK_MODEL_ID` 환경변수 기본값 갱신 + 회귀 테스트.
+  - **[코드 정합] S3 bucket datasource 중복** — `terraform/modules/data_pipeline/iam.tf:1`의 `data "aws_s3_bucket" "existing"`과 `s3_lifecycle.tf:1`의 `data "aws_s3_bucket" "main"`이 동일 버킷을 두 이름으로 참조. terraform plan은 통과하지만 코드 정합성 불량. 액션: `main` 참조처를 `existing`으로 일괄 교체 후 `s3_lifecycle.tf`의 datasource 블록 삭제.
+
+  ---
+
   ## 📝 AI Action Log
   *작업이 완료될 때마다 날짜, 완료된 Task, 변경된 파일, 이슈 사항을 기록하십시오.*
 
