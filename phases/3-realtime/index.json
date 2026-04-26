@@ -16,15 +16,22 @@
     {
       "step": 1,
       "name": "flink-app",
-      "status": "pending",
-      "depends_on": [0],
-      "description": "PyFlink 이상 탐지 앱 — Z-Score 5분 OVER + 다변량 OR + 1분 Tumbling + Dual Sink, ZIP 빌드"
+      "status": "completed",
+      "summary": "anomaly_detection.py: PyFlink Z-Score(5min OVER)+다변량 OR, 1min Tumbling, Dual Sink (S3+Alert KDS), threshold 외부화, ZIP 빌드 OK",
+      "depends_on": [
+        0
+      ],
+      "description": "PyFlink 이상 탐지 앱 — Z-Score 5분 OVER + 다변량 OR + 1분 Tumbling + Dual Sink, ZIP 빌드",
+      "started_at": "2026-04-27T00:29:58+0900",
+      "completed_at": "2026-04-27T00:35:42+0900"
     },
     {
       "step": 2,
       "name": "flink-validation",
       "status": "pending",
-      "depends_on": [1],
+      "depends_on": [
+        1
+      ],
       "description": "이상 탐지 순수 함수 단위 테스트 (Z-Score / load_ratio / is_anomaly + threshold tuning)"
     },
     {
@@ -37,5 +44,6 @@
       "started_at": "2026-04-27T00:06:05+0900",
       "completed_at": "2026-04-27T00:11:15+0900"
     }
-  ]
+  ],
+  "created_at": "2026-04-27T00:29:40+0900"
 }
