@@ -42,7 +42,7 @@
       "depends_on": [],
       "description": "ML 코드를 gold DDL 실제 컬럼에 정렬: train.py SELECT 정정(avg/max_motor_temp/battery_drain/active_hours) + 룰 라벨(max_motor_temp>90) + train_entry.py 신규 + /api/predict 4-feature schema",
       "started_at": "2026-04-27T01:27:19+0900",
-      "completed_at": "2026-04-26T16:28:39+0900",
+      "completed_at": "2026-04-27T01:30:40+0900",
       "summary": "train.py SELECT 컬럼 정정(gold DDL 일치) + 룰 라벨(max_motor_temp>90) + train_entry.py 신규(SageMaker entry point) + /api/predict 4-feature schema 정정 + test 회귀"
     },
     {
