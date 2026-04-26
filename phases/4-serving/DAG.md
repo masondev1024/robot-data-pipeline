@@ -7,9 +7,9 @@ graph TD
   classDef error fill:#f44336,stroke:#fff,color:#fff;
   classDef blocked fill:#FF9800,stroke:#fff,color:#fff;
   S0["0. lambda-alert"]
-  class S0 pending;
+  class S0 completed;
   S1["1. grafana-helm"]
-  class S1 pending;
+  class S1 completed;
   S2["2. api-server"]
-  class S2 pending;
+  class S2 completed;
 ```
