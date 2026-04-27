@@ -12,8 +12,9 @@ resource "aws_cloudwatch_metric_alarm" "firehose_delivery_errors" {
   statistic           = "Average"
   threshold           = "95" # Alarm if success rate is below 95%
   alarm_description   = "Firehose delivery to S3 success rate is low"
-  actions_enabled     = true
-  alarm_actions       = [aws_sns_topic.alerts.arn]
+  # ⚠️ DATA-ONLY DEPLOY: SNS 비활성화. Alarm은 생성되지만 알림 액션 없음 (CloudWatch 콘솔에서 확인 가능).
+  actions_enabled = false
+  # alarm_actions = [aws_sns_topic.alerts.arn]
 
   dimensions = {
     DeliveryStreamName = aws_kinesis_firehose_delivery_stream.main.name

@@ -1,26 +1,26 @@
 # Reference: Kinesis Alert Stream (created in kinesis.tf)
 
-# Archive Lambda Handler Code
-data "archive_file" "alert_handler" {
-  type        = "zip"
-  source_file = "${path.module}/../../src/lambda/alert_handler.py"
-  output_path = "${path.module}/lambda_alert.zip"
-}
+# ⚠️ DATA-ONLY DEPLOY: archive_file 데이터 소스가 빈 zip 생성하는 알려진 버그 발생.
+# 우회: lambda_alert.zip을 수동으로 생성한 뒤 직접 참조 (사전 작업 필요).
+#   $ cd src/lambda && zip ../../terraform/modules/data_pipeline/lambda_alert.zip alert_handler.py
+# 복구 시 archive_file 다시 사용 가능한지 검증 필요.
 
 # Lambda Function: Alert Handler
 resource "aws_lambda_function" "alert" {
   function_name    = "robot-anomaly-alert-lambda"
   runtime          = "python3.10"
   handler          = "alert_handler.handler"
-  filename         = data.archive_file.alert_handler.output_path
-  source_code_hash = data.archive_file.alert_handler.output_base64sha256
+  filename         = "${path.module}/lambda_alert.zip"
+  source_code_hash = filebase64sha256("${path.module}/lambda_alert.zip")
   role             = aws_iam_role.lambda_alert_role.arn
 
-  environment {
-    variables = {
-      SNS_TOPIC_ARN = aws_sns_topic.alerts.arn
-    }
-  }
+  # ⚠️ DATA-ONLY DEPLOY: SNS 비활성화 상태이므로 SNS_TOPIC_ARN 미주입.
+  # 복구 시 environment 블록 다시 추가 필요.
+  # environment {
+  #   variables = {
+  #     SNS_TOPIC_ARN = aws_sns_topic.alerts.arn
+  #   }
+  # }
 
   depends_on = [aws_iam_role_policy.lambda_alert_policy]
 
