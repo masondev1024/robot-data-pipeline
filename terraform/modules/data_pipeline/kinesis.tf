@@ -31,9 +31,9 @@ resource "aws_kinesis_firehose_delivery_stream" "main" {
     prefix              = "bronze/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
     error_output_prefix = "bronze-dlq/!{firehose:error-output-type}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
 
-    buffering_size     = 128
-    buffering_interval = 300
-    compression_format = "UNCOMPRESSED" # Parquet format conversion handles its own compression (Snappy)
+    buffer_size        = 128
+    buffer_interval    = 300
+    compression_format = "UNCOMPRESSED"
 
     dynamic_partitioning_configuration {
       enabled = true
@@ -61,7 +61,7 @@ resource "aws_kinesis_firehose_delivery_stream" "main" {
       }
     }
 
-    s3_backup_mode = "FailedDataOnly"
+    s3_backup_mode = "Enabled"
   }
 
   kinesis_source_configuration {
