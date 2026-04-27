@@ -41,7 +41,13 @@
       "Bash(tee flink_deploy.log)",
       "Bash(terraform output *)",
       "Bash(BACKFILL_DAYS=1 BACKFILL_INTERVAL_MIN=5 ROBOT_COUNT=100 KINESIS_STREAM_NAME=robot-telemetry-stream SEED_CSV_PATH=data/seed_data_sample.csv AWS_DEFAULT_REGION=eu-west-1 python -m src.generator.backfill)",
-      "Bash(BACKFILL_DAYS=1 BACKFILL_INTERVAL_MIN=5 ROBOT_COUNT=100 KINESIS_STREAM_NAME=robot-telemetry-stream SEED_CSV_PATH=data/seed_data_sample.csv AWS_DEFAULT_REGION=eu-west-1 python3 -m src.generator.backfill)"
+      "Bash(BACKFILL_DAYS=1 BACKFILL_INTERVAL_MIN=5 ROBOT_COUNT=100 KINESIS_STREAM_NAME=robot-telemetry-stream SEED_CSV_PATH=data/seed_data_sample.csv AWS_DEFAULT_REGION=eu-west-1 python3 -m src.generator.backfill)",
+      "Bash(aws s3 *)",
+      "Bash(aws athena start-query-execution *)",
+      "Bash(aws athena *)",
+      "Bash(aws kinesis *)",
+      "Bash(aws glue *)",
+      "Bash(tee /tmp/query.json)"
     ]
   }
 }

@@ -31,8 +31,8 @@ resource "aws_kinesis_firehose_delivery_stream" "main" {
     prefix              = "bronze/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
     error_output_prefix = "bronze-dlq/!{firehose:error-output-type}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
 
-    buffer_size        = 128
-    buffer_interval    = 300
+    buffer_size        = 64 # 최소값 (format conversion 필수)
+    buffer_interval    = 60 # 테스트용: 1분마다 플러시
     compression_format = "UNCOMPRESSED"
 
     # ⚠️ DATA-ONLY DEPLOY: Dynamic Partitioning 비활성화 (timestamp namespace만 사용 — built-in 지원).
