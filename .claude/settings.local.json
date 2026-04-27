@@ -47,7 +47,12 @@
       "Bash(aws athena *)",
       "Bash(aws kinesis *)",
       "Bash(aws glue *)",
-      "Bash(tee /tmp/query.json)"
+      "Bash(tee /tmp/query.json)",
+      "Bash(aws kinesisanalytics *)",
+      "Bash(aws logs *)",
+      "Bash(ROBOT_COUNT=100 KINESIS_STREAM_NAME=robot-telemetry-stream SEED_CSV_PATH=data/seed_data_sample.csv AWS_DEFAULT_REGION=eu-west-1 timeout 30 python3 -m src.generator.app)",
+      "Bash(xargs -I {} aws kinesis get-records --shard-iterator {} --region eu-west-1)",
+      "Bash(aws kinesisanalyticsv2 *)"
     ]
   }
 }
