@@ -1,12 +1,5 @@
-output "grafana_irsa_role_arn" {
-  description = "Grafana ServiceAccount IRSA Role ARN (Athena + CloudWatch Data Source 접근용)"
-  value       = aws_iam_role.grafana_irsa.arn
-}
-
-output "airflow_irsa_role_arn" {
-  description = "Airflow Worker ServiceAccount IRSA Role ARN (Athena + S3 + SNS + Bedrock)"
-  value       = aws_iam_role.airflow_irsa.arn
-}
+# ⚠️ DATA-ONLY DEPLOY: EKS IRSA outputs는 비활성화 시점에 제거됨.
+# 복구 시 grafana_irsa_role_arn, airflow_irsa_role_arn을 다시 추가해야 addons.tf에서 참조 가능.
 
 output "datalake_bucket" {
   description = "Data Lake S3 Bucket name (Bronze/Silver/Gold)"
