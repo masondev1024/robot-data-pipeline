@@ -26,7 +26,7 @@ resource "aws_kinesis_firehose_delivery_stream" "main" {
 
   extended_s3_configuration {
     role_arn   = aws_iam_role.firehose_delivery_role.arn
-    bucket_arn = data.aws_s3_bucket.existing.arn
+    bucket_arn = aws_s3_bucket.datalake.arn
 
     prefix              = "bronze/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
     error_output_prefix = "bronze-dlq/!{firehose:error-output-type}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"

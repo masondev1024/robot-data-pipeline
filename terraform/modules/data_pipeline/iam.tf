@@ -1,7 +1,3 @@
-data "aws_s3_bucket" "existing" {
-  bucket = "de-ai-06-827913617635-ap-northeast-2-an"
-}
-
 # ── Generator IRSA Role (EKS Pod → Kinesis) ─────────────────────
 
 data "aws_iam_policy_document" "generator_assume_role" {
@@ -76,8 +72,8 @@ data "aws_iam_policy_document" "firehose_delivery" {
       "s3:AbortMultipartUpload",
     ]
     resources = [
-      data.aws_s3_bucket.existing.arn,
-      "${data.aws_s3_bucket.existing.arn}/*",
+      aws_s3_bucket.datalake.arn,
+      "${aws_s3_bucket.datalake.arn}/*",
     ]
   }
 
@@ -145,8 +141,8 @@ data "aws_iam_policy_document" "api_permissions" {
       "s3:ListBucket",
     ]
     resources = [
-      data.aws_s3_bucket.existing.arn,
-      "${data.aws_s3_bucket.existing.arn}/*",
+      aws_s3_bucket.datalake.arn,
+      "${aws_s3_bucket.datalake.arn}/*",
     ]
   }
 

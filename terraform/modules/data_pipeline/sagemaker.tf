@@ -25,8 +25,8 @@ resource "aws_iam_role_policy" "sagemaker_s3" {
       Effect = "Allow"
       Action = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]
       Resource = [
-        "arn:aws:s3:::de-ai-06-827913617635-ap-northeast-2-an",
-        "arn:aws:s3:::de-ai-06-827913617635-ap-northeast-2-an/ml-models/*"
+        aws_s3_bucket.datalake.arn,
+        "${aws_s3_bucket.datalake.arn}/ml-models/*"
       ]
     }]
   })

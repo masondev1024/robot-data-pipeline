@@ -63,7 +63,7 @@ data "aws_iam_policy_document" "flink_policy" {
       "s3:PutObjectAcl",
       "s3:AbortMultipartUpload",
     ]
-    resources = ["${data.aws_s3_bucket.existing.arn}/alerts/*"]
+    resources = ["${aws_s3_bucket.datalake.arn}/alerts/*"]
   }
 
   # S3 Read — flink-code prefix (application code zip)
@@ -73,7 +73,7 @@ data "aws_iam_policy_document" "flink_policy" {
     actions = [
       "s3:GetObject",
     ]
-    resources = ["${data.aws_s3_bucket.existing.arn}/flink-code/*"]
+    resources = ["${aws_s3_bucket.datalake.arn}/flink-code/*"]
   }
 
   # CloudWatch Logs
@@ -116,7 +116,7 @@ resource "aws_cloudwatch_log_stream" "flink" {
 # ── S3 Object: Flink Application Code ZIP ───────────────────────
 
 resource "aws_s3_object" "flink_code" {
-  bucket = data.aws_s3_bucket.existing.id
+  bucket = aws_s3_bucket.datalake.id
   key    = "flink-code/anomaly_detection.zip"
   source = "${path.module}/../../../flink/anomaly_detection.zip"
   etag   = filemd5("${path.module}/../../../flink/anomaly_detection.zip")
@@ -139,7 +139,7 @@ resource "aws_kinesisanalyticsv2_application" "detector" {
   application_code_configuration {
     code_content {
       s3_content_location {
-        bucket_arn = data.aws_s3_bucket.existing.arn
+        bucket_arn = aws_s3_bucket.datalake.arn
         file_key   = aws_s3_object.flink_code.key
       }
     }
@@ -197,7 +197,7 @@ resource "aws_kinesisanalyticsv2_application" "detector" {
 
       property {
         key   = "s3.alerts.path"
-        value = "s3://${data.aws_s3_bucket.existing.bucket}/alerts/"
+        value = "s3://${aws_s3_bucket.datalake.bucket}/alerts/"
       }
 
       property {
