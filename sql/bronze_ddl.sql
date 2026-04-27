@@ -9,7 +9,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS robot_telemetry_db.bronze_robot_telemetry (
 )
 PARTITIONED BY (year INT, month INT, day INT, hour INT)
 STORED AS PARQUET
-LOCATION 's3://de-ai-06-827913617635-ap-northeast-2-an/bronze/'
+LOCATION 's3://de-ai-06-smartfactory-bucket/bronze/'
 TBLPROPERTIES (
     'projection.enabled'        = 'true',
     'projection.year.type'      = 'integer',
@@ -24,5 +24,5 @@ TBLPROPERTIES (
     'projection.hour.range'     = '0,23',
     'projection.hour.digits'    = '2',
     'storage.location.template' =
-        's3://de-ai-06-827913617635-ap-northeast-2-an/bronze/year=${year}/month=${month}/day=${day}/hour=${hour}/'
+        's3://de-ai-06-smartfactory-bucket/bronze/year=${year}/month=${month}/day=${day}/hour=${hour}/'
 );

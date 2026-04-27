@@ -62,8 +62,7 @@ resource "aws_subnet" "db_private" {
 
 # NAT Gateways
 resource "aws_eip" "nat" {
-  count  = 2
-  domain = "vpc"
+  count = 2
 }
 
 resource "aws_nat_gateway" "nat" {

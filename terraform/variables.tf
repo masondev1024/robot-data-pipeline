@@ -11,7 +11,7 @@ variable "eks_cluster_name" {
 }
 
 variable "vpc_cidr" {
-  default = "10.0.32.0/16"
+  default = "10.0.0.0/16"
 }
 
 variable "node_instance_type" {
@@ -34,8 +34,16 @@ variable "github_branch" {
   default = "main"
 }
 
+variable "slack_webhook_url" {
+  description = "Slack Incoming Webhook URL (managed by AWS Secrets Manager)"
+  type        = string
+  sensitive   = true
+  default     = "https://hooks.slack.com/services/CHANGEME"
+}
+
 variable "grafana_admin_password" {
   description = "Grafana admin password (managed by AWS Secrets Manager)"
   type        = string
   sensitive   = true
+  default     = "changeme123"
 }

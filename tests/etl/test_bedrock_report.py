@@ -391,7 +391,7 @@ class TestBedrockReportS3:
 
         # Verify S3 put_object call
         call_args = mock_s3_client.put_object.call_args
-        assert call_args.kwargs["Bucket"] == "de-ai-06-827913617635-ap-northeast-2-an"
+        assert call_args.kwargs["Bucket"] == "de-ai-06-smartfactory-bucket"
         assert call_args.kwargs["Key"] == "reports/2026-04-25.txt"
         assert call_args.kwargs["Body"] == report_text.encode("utf-8")
 

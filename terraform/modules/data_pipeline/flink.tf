@@ -130,111 +130,26 @@ resource "aws_s3_object" "flink_code" {
 
 # ── Managed Flink Application ────────────────────────────────────
 
-resource "aws_kinesisanalyticsv2_application" "detector" {
-  name                       = "${var.project_name}-anomaly-detector"
-  runtime_environment        = "FLINK-1_18"
-  service_execution_role_arn = aws_iam_role.flink.arn
-  start_application          = true
-
-  application_code_configuration {
-    code_content {
-      s3_content_location {
-        bucket_arn = aws_s3_bucket.datalake.arn
-        file_key   = aws_s3_object.flink_code.key
-      }
-    }
-    code_content_type = "ZIPFILE"
-  }
-
-  flink_application_configuration {
-    checkpoint_configuration {
-      configuration_type    = "CUSTOM"
-      checkpointing_enabled = true
-      checkpoint_interval   = 60000
-    }
-
-    monitoring_configuration {
-      configuration_type = "CUSTOM"
-      log_level          = "INFO"
-      metrics_level      = "APPLICATION"
-    }
-
-    parallelism_configuration {
-      configuration_type   = "CUSTOM"
-      parallelism          = 1
-      parallelism_per_kpu  = 1
-      auto_scaling_enabled = true
-    }
-  }
-
-  environment_properties {
-    property_group {
-      property_group_id = "kinesis.analytics.flink.run.options"
-
-      property {
-        key   = "python"
-        value = "anomaly_detection.py"
-      }
-
-      property {
-        key   = "jarfile"
-        value = "lib/flink-sql-connector-kinesis-1.18.1.jar"
-      }
-    }
-
-    property_group {
-      property_group_id = "robot-app-config"
-
-      property {
-        key   = "kinesis.main.stream"
-        value = aws_kinesis_stream.main.name
-      }
-
-      property {
-        key   = "kinesis.alert.stream"
-        value = aws_kinesis_stream.alert.name
-      }
-
-      property {
-        key   = "s3.alerts.path"
-        value = "s3://${aws_s3_bucket.datalake.bucket}/alerts/"
-      }
-
-      property {
-        key   = "aws.region"
-        value = var.aws_region
-      }
-
-      property {
-        key   = "zscore.threshold"
-        value = "3.0"
-      }
-
-      property {
-        key   = "zscore.sigma.floor"
-        value = "0.5"
-      }
-
-      property {
-        key   = "load.ratio.threshold"
-        value = "1.8"
-      }
-
-      property {
-        key   = "load.ratio.min.temp"
-        value = "85.0"
-      }
-    }
-  }
-
-  cloudwatch_logging_options {
-    log_stream_arn = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:${aws_cloudwatch_log_group.flink.name}:log-stream:${aws_cloudwatch_log_stream.flink.name}"
-  }
-
-  tags = {
-    Name = "${var.project_name}-anomaly-detector"
-  }
-}
+# ── Managed Flink Application (Manual Deployment) ────────────────
+# NOTE: Terraform does not fully support aws_kinesisanalyticsv2_application configuration.
+# Deploy Flink app manually after terraform apply:
+#
+#   aws kinesisanalyticsv2 create-application \
+#     --application-name robot-telemetry-anomaly-detector \
+#     --runtime-environment FLINK_1_18 \
+#     --service-execution-role-arn arn:aws:iam::ACCOUNT_ID:role/robot-telemetry-flink-role \
+#     --application-code-configuration '{
+#         "CodeContentType": "ZIPFILE",
+#         "CodeContent": {
+#           "S3ContentLocation": {
+#             "BucketARN": "arn:aws:s3:::de-ai-06-smartfactory-bucket",
+#             "FileKey": "flink-code/anomaly_detection.zip"
+#           }
+#         }
+#       }' \
+#     --region eu-west-1
+#
+# OR use flink/deploy.sh script (to be created) for automated deployment.
 
 # ── Data Source: Current AWS Account ID ──────────────────────────
 

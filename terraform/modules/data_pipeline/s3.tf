@@ -19,7 +19,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "datalake" {
       prefix = "bronze/"
     }
 
-    transitions {
+    transition {
       days          = 90
       storage_class = "GLACIER_IR"
     }
@@ -33,7 +33,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "datalake" {
       prefix = "silver/"
     }
 
-    transitions {
+    transition {
       days          = 365
       storage_class = "GLACIER_IR"
     }

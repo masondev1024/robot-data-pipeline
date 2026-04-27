@@ -1,7 +1,9 @@
+# NOTE: GRAFANA_URL은 SSM /robot-telemetry/grafana-url 에서 런타임 조회로 변경됨 (Late-binding).
+# post-deploy.yml GitHub Actions job이 ALB DNS 확정 후 SSM에 자동 저장.
+# 따라서 ConfigMap에서 grafana_url 키 제거 — Pod 재배포 없이 SSM 값 갱신만으로 반영 가능.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: api-config
   namespace: robot-telemetry
-data:
-  grafana_url: "https://k8s-monitoring-grafana-PLACEHOLDER.elb.amazonaws.com"
+data: {}

@@ -4,8 +4,8 @@ import sagemaker
 from sagemaker.xgboost import XGBoost
 
 ATHENA_DATABASE = "robot_telemetry_db"
-ATHENA_OUTPUT = "s3://de-ai-06-827913617635-ap-northeast-2-an/project-athena-results/"
-S3_BUCKET = "de-ai-06-827913617635-ap-northeast-2-an"
+ATHENA_OUTPUT = "s3://de-ai-06-smartfactory-bucket/project-athena-results/"
+S3_BUCKET = "de-ai-06-smartfactory-bucket"
 MODEL_PREFIX = "ml-models/robot-failure-predictor"
 
 QUERY = """

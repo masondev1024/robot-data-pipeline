@@ -1,7 +1,4 @@
-# Data Source: Kinesis Alert Stream
-data "aws_kinesis_stream" "robot_anomaly_alert_stream" {
-  name = "robot-anomaly-alert-stream"
-}
+# Reference: Kinesis Alert Stream (created in kinesis.tf)
 
 # Archive Lambda Handler Code
 data "archive_file" "alert_handler" {
@@ -13,7 +10,7 @@ data "archive_file" "alert_handler" {
 # Lambda Function: Alert Handler
 resource "aws_lambda_function" "alert" {
   function_name    = "robot-anomaly-alert-lambda"
-  runtime          = "python3.11"
+  runtime          = "python3.10"
   handler          = "alert_handler.handler"
   filename         = data.archive_file.alert_handler.output_path
   source_code_hash = data.archive_file.alert_handler.output_base64sha256
@@ -34,7 +31,7 @@ resource "aws_lambda_function" "alert" {
 
 # Event Source Mapping: Kinesis Alert Stream → Lambda
 resource "aws_lambda_event_source_mapping" "alert_kds" {
-  event_source_arn  = data.aws_kinesis_stream.robot_anomaly_alert_stream.arn
+  event_source_arn  = aws_kinesis_stream.alert.arn
   function_name     = aws_lambda_function.alert.arn
   starting_position = "LATEST"
   batch_size        = 10

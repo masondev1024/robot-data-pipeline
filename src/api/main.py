@@ -27,6 +27,20 @@ _gold_cache: str = ""
 _cache_updated_at: str = ""
 _data_date: str = ""
 _cache_ready: bool = False
+_grafana_url: str | None = None
+
+
+def _get_grafana_url() -> str:
+    """Late-binding: post-deploy.yml이 ALB DNS를 SSM에 저장한 뒤 첫 호출 시 1회 조회 + 모듈 캐시."""
+    global _grafana_url
+    if _grafana_url is None:
+        try:
+            ssm = boto3.client("ssm", region_name=os.environ.get("AWS_DEFAULT_REGION", "eu-west-1"))
+            _grafana_url = ssm.get_parameter(Name="/robot-telemetry/grafana-url")["Parameter"]["Value"]
+        except Exception as e:
+            print(f"SSM get_parameter /robot-telemetry/grafana-url failed: {str(e)}")
+            _grafana_url = os.environ.get("GRAFANA_URL", "http://localhost:3000")
+    return _grafana_url
 
 
 def _run_athena_query(query: str, database: str, workgroup: str, output_location: str) -> list[dict]:
@@ -75,7 +89,7 @@ async def refresh_cache():
     workgroup = os.environ.get("ATHENA_WORKGROUP", "robot-telemetry-workgroup")
     output_location = os.environ.get(
         "ATHENA_OUTPUT_LOCATION",
-        "s3://de-ai-06-827913617635-ap-northeast-2-an/project-athena-results/",
+        "s3://de-ai-06-smartfactory-bucket/project-athena-results/",
     )
 
     yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -245,12 +259,11 @@ async def predict_failure(request: Request, body: PredictRequest):
 
 @app.get("/", response_class=HTMLResponse)
 async def portal(request: Request, robot_id: str = ""):
-    grafana_url = os.environ.get("GRAFANA_URL", "http://localhost:3000")
     return templates.TemplateResponse(
         "portal.html",
         {
             "request": request,
             "robot_id": robot_id,
-            "GRAFANA_URL": grafana_url,
+            "GRAFANA_URL": _get_grafana_url(),
         },
     )

@@ -14,7 +14,21 @@
       "Bash(cp /tmp/phase3-recovery/step1_after_step0.md /Users/mason/Desktop/Projects/robot-data-pipeline/phases/3-realtime/step1.md)",
       "Bash(cp /tmp/phase3-recovery/flink.tf /Users/mason/Desktop/Projects/robot-data-pipeline/terraform/modules/data_pipeline/flink.tf)",
       "Bash(cp /tmp/phase3-recovery/test_bedrock_report.py /Users/mason/Desktop/Projects/robot-data-pipeline/tests/etl/test_bedrock_report.py)",
-      "Bash(echo \"exit=$?\")"
+      "Bash(echo \"exit=$?\")",
+      "Bash(python -m pytest tests/generator/test_backfill.py -v)",
+      "Bash(python *)",
+      "Bash(grep -E \"\\\\.tf$\")",
+      "Bash(terraform validate *)",
+      "Bash(terraform init *)",
+      "Bash(grep -E \"\\\\.tf$|flink\")",
+      "Bash(terraform plan *)",
+      "Bash(terraform providers *)",
+      "WebFetch(domain:registry.terraform.io)",
+      "Bash(terraform destroy *)",
+      "Bash(chmod +x *)",
+      "Bash(/Library/Frameworks/Python.framework/Versions/3.14/bin/pytest tests/etl/test_sql_filters.py tests/etl/test_dag_structure.py -v)",
+      "Bash(/Library/Frameworks/Python.framework/Versions/3.14/bin/pytest tests/)",
+      "Bash(grep -E \"\\\\.\\(yaml|yml|tf\\)$\")"
     ]
   }
 }

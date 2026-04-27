@@ -31,26 +31,18 @@ resource "helm_release" "alb_controller" {
   repository = "https://aws.github.io/eks-charts"
   chart      = "aws-load-balancer-controller"
   namespace  = "kube-system"
+  timeout    = 600
 
-  set {
-    name  = "clusterName"
-    value = var.eks_cluster_name
-  }
-
-  set {
-    name  = "serviceAccount.create"
-    value = "true"
-  }
-
-  set {
-    name  = "serviceAccount.name"
-    value = "aws-load-balancer-controller"
-  }
-
-  set {
-    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-    value = aws_iam_role.alb_controller.arn
-  }
+  values = [jsonencode({
+    clusterName = var.eks_cluster_name
+    serviceAccount = {
+      create = true
+      name   = "aws-load-balancer-controller"
+      annotations = {
+        "eks.amazonaws.com/role-arn" = aws_iam_role.alb_controller.arn
+      }
+    }
+  })]
 
   depends_on = [aws_eks_node_group.main]
 }
@@ -62,6 +54,7 @@ resource "helm_release" "external_secrets" {
   chart            = "external-secrets"
   namespace        = "kube-system"
   create_namespace = false
+  timeout          = 600
 
   depends_on = [aws_eks_node_group.main]
 }
@@ -73,13 +66,23 @@ resource "helm_release" "airflow" {
   chart            = "airflow"
   namespace        = "airflow"
   create_namespace = true
+  timeout          = 900
 
-  set {
-    name  = "executor"
-    value = "KubernetesExecutor"
-  }
+  values = [jsonencode({
+    executor = "KubernetesExecutor"
+    # Worker IRSA — DAG 안에서 Athena/S3/SNS/Bedrock 호출 권한 (KubernetesExecutor의 Worker Pod에 적용)
+    workers = {
+      serviceAccount = {
+        create = true
+        name   = "airflow-worker"
+        annotations = {
+          "eks.amazonaws.com/role-arn" = module.data_pipeline.airflow_irsa_role_arn
+        }
+      }
+    }
+  })]
 
-  depends_on = [aws_eks_node_group.main]
+  depends_on = [aws_eks_node_group.main, module.data_pipeline]
 }
 
 # Grafana
@@ -89,53 +92,108 @@ resource "helm_release" "grafana" {
   chart            = "grafana"
   namespace        = "monitoring"
   create_namespace = true
+  timeout          = 600
 
-  set {
-    name  = "adminPassword"
-    value = var.grafana_admin_password
-  }
+  values = [jsonencode({
+    adminPassword = var.grafana_admin_password
+    service = {
+      type = "ClusterIP"
+    }
+    persistence = {
+      enabled = true
+    }
+    "grafana.ini" = {
+      security = {
+        allow_embedding = true
+      }
+      auth = {
+        anonymous = {
+          enabled  = true
+          org_role = "Viewer"
+        }
+      }
+    }
 
-  set {
-    name  = "service.type"
-    value = "ClusterIP"
-  }
+    # Plugins (Athena, X-Ray; CloudWatch는 built-in)
+    plugins = [
+      "grafana-athena-datasource",
+      "grafana-x-ray-datasource",
+    ]
 
-  set {
-    name  = "persistence.enabled"
-    value = "true"
-  }
+    # ServiceAccount IRSA — Athena + CloudWatch 접근 권한
+    serviceAccount = {
+      create = true
+      name   = "grafana"
+      annotations = {
+        "eks.amazonaws.com/role-arn" = module.data_pipeline.grafana_irsa_role_arn
+      }
+    }
 
-  set {
-    name  = "grafana\\.ini.security.allow_embedding"
-    value = "true"
-  }
+    # Data Sources 자동 프로비저닝
+    datasources = {
+      "datasources.yaml" = {
+        apiVersion = 1
+        datasources = [
+          {
+            name      = "CloudWatch"
+            type      = "cloudwatch"
+            uid       = "cloudwatch"
+            access    = "proxy"
+            isDefault = false
+            jsonData = {
+              authType      = "default"
+              defaultRegion = var.aws_region
+            }
+          },
+          {
+            name      = "Athena"
+            type      = "grafana-athena-datasource"
+            uid       = "athena"
+            access    = "proxy"
+            isDefault = true
+            jsonData = {
+              authType      = "default"
+              defaultRegion = var.aws_region
+              catalog       = "AwsDataCatalog"
+              database      = "robot_telemetry_db"
+              workgroup     = "robot-telemetry-workgroup"
+              outputLocation = "s3://${module.data_pipeline.datalake_bucket}/project-athena-results/"
+            }
+          },
+          {
+            name   = "X-Ray"
+            type   = "grafana-x-ray-datasource"
+            uid    = "xray"
+            access = "proxy"
+            jsonData = {
+              authType      = "default"
+              defaultRegion = var.aws_region
+            }
+          },
+        ]
+      }
+    }
+  })]
 
-  set {
-    name  = "grafana\\.ini.auth\\.anonymous.enabled"
-    value = "true"
-  }
-
-  set {
-    name  = "grafana\\.ini.auth\\.anonymous.org_role"
-    value = "Viewer"
-  }
-
-  depends_on = [aws_eks_node_group.main]
+  depends_on = [aws_eks_node_group.main, module.data_pipeline]
 }
 
-# ADOT Operator (OpenTelemetry)
-resource "helm_release" "adot_operator" {
-  name             = "adot-operator"
-  repository       = "https://aws.github.io/eks-charts"
-  chart            = "aws-otel-operator"
-  namespace        = "monitoring"
-  create_namespace = false
-  version          = "0.3.0"
-
-  set {
-    name  = "manager.env.AWS_REGION"
-    value = var.aws_region
-  }
-
-  depends_on = [aws_eks_node_group.main]
-}
+# ADOT Operator (OpenTelemetry) — TODO: chart not found in AWS repository
+# Commented out for initial deployment. Enable after verifying correct chart name/repository.
+# resource "helm_release" "adot_operator" {
+#   name             = "adot-operator"
+#   repository       = "https://aws.github.io/eks-charts"
+#   chart            = "aws-otel-operator"
+#   namespace        = "monitoring"
+#   create_namespace = false
+#
+#   values = [jsonencode({
+#     manager = {
+#       env = {
+#         AWS_REGION = var.aws_region
+#       }
+#     }
+#   })]
+#
+#   depends_on = [aws_eks_node_group.main]
+# }
