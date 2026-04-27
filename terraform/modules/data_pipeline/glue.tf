@@ -13,7 +13,7 @@ resource "aws_glue_catalog_table" "bronze" {
   }
 
   storage_descriptor {
-    location      = "s3://de-ai-06-827913617635-ap-northeast-2-an/bronze/"
+    location      = "s3://${aws_s3_bucket.datalake.bucket}/bronze/"
     input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
     output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
 
@@ -106,7 +106,7 @@ resource "aws_athena_workgroup" "main" {
     publish_cloudwatch_metrics_enabled = true
 
     result_configuration {
-      output_location = "s3://${var.s3_bucket_name}/project-athena-results/"
+      output_location = "s3://${aws_s3_bucket.datalake.bucket}/project-athena-results/"
     }
   }
 
