@@ -8,6 +8,8 @@ from pathlib import Path
 
 import boto3
 
+from src.generator.schema_validator import validate_record
+
 
 # ── 1. Seed CSV 로딩 ──────────────────────────────────────────
 
@@ -109,6 +111,8 @@ async def batch_sender(queue: asyncio.Queue,
         while len(batch) < 500:
             try:
                 record = queue.get_nowait()
+                if not validate_record(record):
+                    continue  # schema 불일치 → drop (carrier로 들어가지 않음)
                 batch.append({
                     "Data":         json.dumps(record).encode(),
                     "PartitionKey": record["robot_id"],

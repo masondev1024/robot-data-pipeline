@@ -24,3 +24,9 @@ variable "slack_webhook_url" {
   type        = string
   sensitive   = true
 }
+
+variable "grafana_admin_password" {
+  description = "Grafana admin password (managed by AWS Secrets Manager)"
+  type        = string
+  sensitive   = true
+}

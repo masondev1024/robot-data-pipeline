@@ -5,7 +5,7 @@ import boto3
 from airflow import DAG
 from airflow.operators.python import PythonOperator, ShortCircuitOperator
 
-S3_BUCKET = "de-ai-06-827913617635-ap-northeast-2-an"
+S3_BUCKET = "de-ai-06-smartfactory-bucket"
 ATHENA_DATABASE = "robot_telemetry_db"
 ATHENA_WORKGROUP = "robot-telemetry-workgroup"
 ATHENA_OUTPUT = f"s3://{S3_BUCKET}/project-athena-results/"
@@ -109,11 +109,38 @@ WHERE year = {year} AND month = {month} AND day = {day}
         raise AirflowException(f"Data quality check failed: {msg}")
 
 
+def _delete_s3_partition(prefix: str) -> int:
+    """[멱등성] S3 prefix 하위 모든 객체 삭제. Athena INSERT INTO 전 호출하여
+    재실행 시 동일 파티션 중복 누적을 방지한다 (INSERT OVERWRITE 대체).
+
+    Args:
+        prefix: 'silver/dt=2026-04-27/' 같은 S3 키 prefix.
+    Returns:
+        삭제된 객체 수.
+    """
+    s3 = boto3.client("s3", region_name="eu-west-1")
+    paginator = s3.get_paginator("list_objects_v2")
+    deleted = 0
+    for page in paginator.paginate(Bucket=S3_BUCKET, Prefix=prefix):
+        contents = page.get("Contents", [])
+        if not contents:
+            continue
+        objects = [{"Key": obj["Key"]} for obj in contents]
+        s3.delete_objects(Bucket=S3_BUCKET, Delete={"Objects": objects, "Quiet": True})
+        deleted += len(objects)
+    if deleted:
+        print(f"[idempotency] Deleted {deleted} objects under s3://{S3_BUCKET}/{prefix}")
+    return deleted
+
+
 def _bronze_to_silver(**ctx):
-    """이상치 제거·중복 제거·타입 Casting 후 Silver 테이블에 INSERT."""
+    """이상치 제거·중복 제거·타입 Casting 후 Silver 테이블에 INSERT (멱등)."""
     execution_date = ctx["execution_date"]
     dt = execution_date.strftime("%Y-%m-%d")
     year, month, day = execution_date.year, execution_date.month, execution_date.day
+
+    # 멱등성: 이미 존재하는 silver/dt={dt}/ 파티션을 삭제 후 INSERT
+    _delete_s3_partition(f"silver/dt={dt}/")
 
     query = f"""
 INSERT INTO silver_robot_telemetry
@@ -142,9 +169,12 @@ WHERE rn = 1
 
 
 def _silver_to_gold(**ctx):
-    """일별/로봇별 집계 후 Gold 테이블에 INSERT."""
+    """일별/로봇별 집계 후 Gold 테이블에 INSERT (멱등)."""
     execution_date = ctx["execution_date"]
     dt = execution_date.strftime("%Y-%m-%d")
+
+    # 멱등성: 이미 존재하는 gold/dt={dt}/ 파티션을 삭제 후 INSERT
+    _delete_s3_partition(f"gold/dt={dt}/")
 
     query = f"""
 INSERT INTO gold_robot_daily_stats

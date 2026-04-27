@@ -41,16 +41,13 @@ spec:
             - name: ATHENA_WORKGROUP
               value: "robot-telemetry-workgroup"
             - name: ATHENA_OUTPUT_LOCATION
-              value: "s3://de-ai-06-827913617635-ap-northeast-2-an/project-athena-results/"
+              value: "s3://de-ai-06-smartfactory-bucket/project-athena-results/"
             - name: CACHE_REFRESH_HOUR
               value: "1"
             - name: AWS_DEFAULT_REGION
               value: "eu-west-1"
-            - name: GRAFANA_URL
-              valueFrom:
-                configMapKeyRef:
-                  name: api-config
-                  key: grafana_url
+            # NOTE: GRAFANA_URL은 SSM /robot-telemetry/grafana-url 에서 런타임 조회 (Late-binding)
+            # 환경변수 주입은 fallback 용도 — post-deploy job이 SSM 갱신 후 자동 사용
           resources:
             requests:
               cpu: "200m"
