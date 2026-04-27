@@ -136,7 +136,7 @@ async def main() -> None:
     print(f"Loading profiles from {csv_path} for {robot_count} robots...")
     profiles = load_profiles(csv_path, robot_count)
 
-    kinesis = boto3.client("kinesis", region_name=os.environ.get("AWS_DEFAULT_REGION", "ap-northeast-2"))
+    kinesis = boto3.client("kinesis", region_name=os.environ.get("AWS_DEFAULT_REGION", "eu-west-1"))
     queue   = asyncio.Queue(maxsize=robot_count * 2)
 
     tasks = [asyncio.create_task(simulate_robot(p, queue)) for p in profiles]
