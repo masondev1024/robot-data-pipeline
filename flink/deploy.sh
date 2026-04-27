@@ -10,7 +10,7 @@ cd "$SCRIPT_DIR"
 
 # Configuration
 APP_NAME="robot-anomaly-detection"
-RUNTIME="FLINK_1_18"
+RUNTIME="FLINK-1_15"
 SERVICE_EXEC_ROLE_ARN=""  # Will be fetched from Terraform
 S3_BUCKET=""  # Will be fetched from Terraform
 S3_KEY="flink-code/anomaly_detection.zip"
@@ -96,7 +96,7 @@ if [ -z "$APP_DETAILS" ]; then
         --application-name "$APP_NAME" \
         --runtime-environment "$RUNTIME" \
         --region "$AWS_REGION" \
-        --service-execution-role-arn "$SERVICE_EXEC_ROLE_ARN" \
+        --service-execution-role "$SERVICE_EXEC_ROLE_ARN" \
         --application-configuration '{
             "ApplicationCodeConfiguration": {
                 "CodeContent": {
@@ -112,7 +112,7 @@ if [ -z "$APP_DETAILS" ]; then
                 "PropertyGroups": [
                     {
                         "PropertyGroupId": "robot-app-config",
-                        "PropertyMapProperties": {
+                        "PropertyMap": {
                             "KINESIS_INPUT_STREAM": "'$KINESIS_INPUT_STREAM'",
                             "KINESIS_OUTPUT_STREAM": "'$KINESIS_OUTPUT_STREAM'",
                             "AWS_REGION": "'$AWS_REGION'",

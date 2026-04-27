@@ -1,0 +1,8 @@
+=== AWS Managed Service for Apache Flink Deployment ===
+Application: robot-anomaly-detection
+Runtime: FLINK_1_18
+Region: eu-west-1
+
+[*] Fetching Terraform outputs...
+[WARN] Could not fetch all Terraform outputs.
+[*] Attempting to fetch from AWS resources...

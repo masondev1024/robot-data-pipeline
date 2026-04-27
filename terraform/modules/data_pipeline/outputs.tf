@@ -6,7 +6,17 @@ output "datalake_bucket" {
   value       = aws_s3_bucket.datalake.bucket
 }
 
+output "datalake_bucket_name" {
+  description = "Data Lake S3 Bucket name (for Flink deploy.sh)"
+  value       = aws_s3_bucket.datalake.id
+}
+
 output "datalake_bucket_arn" {
   description = "Data Lake S3 Bucket ARN"
   value       = aws_s3_bucket.datalake.arn
+}
+
+output "flink_service_execution_role_arn" {
+  description = "Flink Service Execution IAM Role ARN"
+  value       = aws_iam_role.flink.arn
 }

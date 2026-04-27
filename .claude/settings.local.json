@@ -28,7 +28,20 @@
       "Bash(chmod +x *)",
       "Bash(/Library/Frameworks/Python.framework/Versions/3.14/bin/pytest tests/etl/test_sql_filters.py tests/etl/test_dag_structure.py -v)",
       "Bash(/Library/Frameworks/Python.framework/Versions/3.14/bin/pytest tests/)",
-      "Bash(grep -E \"\\\\.\\(yaml|yml|tf\\)$\")"
+      "Bash(grep -E \"\\\\.\\(yaml|yml|tf\\)$\")",
+      "Bash(ls *.tf)",
+      "Bash(ls modules/data_pipeline/*.tf)",
+      "Bash(terraform show *)",
+      "Bash(terraform apply *)",
+      "Bash(unzip -l /Users/mason/Desktop/Projects/robot-data-pipeline/terraform/modules/data_pipeline/lambda_alert.zip)",
+      "Bash(rm -f /Users/mason/Desktop/Projects/robot-data-pipeline/terraform/modules/data_pipeline/lambda_alert.zip)",
+      "Bash(zip /Users/mason/Desktop/Projects/robot-data-pipeline/terraform/modules/data_pipeline/lambda_alert.zip alert_handler.py)",
+      "Bash(terraform state *)",
+      "Bash(bash deploy.sh)",
+      "Bash(tee flink_deploy.log)",
+      "Bash(terraform output *)",
+      "Bash(BACKFILL_DAYS=1 BACKFILL_INTERVAL_MIN=5 ROBOT_COUNT=100 KINESIS_STREAM_NAME=robot-telemetry-stream SEED_CSV_PATH=data/seed_data_sample.csv AWS_DEFAULT_REGION=eu-west-1 python -m src.generator.backfill)",
+      "Bash(BACKFILL_DAYS=1 BACKFILL_INTERVAL_MIN=5 ROBOT_COUNT=100 KINESIS_STREAM_NAME=robot-telemetry-stream SEED_CSV_PATH=data/seed_data_sample.csv AWS_DEFAULT_REGION=eu-west-1 python3 -m src.generator.backfill)"
     ]
   }
 }
