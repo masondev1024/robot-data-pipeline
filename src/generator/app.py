@@ -4,11 +4,40 @@ import json
 import os
 import random
 import signal
+import time
 from datetime import datetime, timezone
 
 import boto3
 
 from src.generator.schema_validator import get_failure_count, validate_record
+
+
+# 시연 통제용: SIGUSR1 수신 시 N초 동안 모든 로봇 모터 온도 강제 spike.
+# 0이면 비활성. handler가 time.time()+duration 으로 갱신.
+_force_anomaly_until_ts: float = 0.0
+
+
+def _should_spike(profile: dict, now_ts: float, force_until_ts: float) -> bool:
+    """이번 tick에서 motor_temp spike 여부 결정.
+
+    - force window 내(now < force_until_ts): 모든 로봇 무조건 spike
+    - 그 외: 기존 룰(is_faulty 로봇만 5% 확률)
+    """
+    if now_ts < force_until_ts:
+        return True
+    return profile["is_faulty"] and random.random() < 0.05
+
+
+def _trigger_force_anomaly() -> None:
+    """SIGUSR1 핸들러 — FORCE_ANOMALY_DURATION_SEC 초 동안 모든 로봇 spike."""
+    global _force_anomaly_until_ts
+    duration = int(os.environ.get("FORCE_ANOMALY_DURATION_SEC", "60"))
+    _force_anomaly_until_ts = time.time() + duration
+    print(json.dumps({
+        "event": "force_anomaly_triggered",
+        "duration_sec": duration,
+        "until_ts": _force_anomaly_until_ts,
+    }))
 
 
 # ── 1. Seed CSV 로딩 ──────────────────────────────────────────
@@ -71,7 +100,7 @@ async def simulate_robot(profile: dict,
         # motor_temp: 베이스 ± 가우시안 노이즈 + 드리프트
         noise = random.gauss(0, 2)
         spike = 0.0
-        if profile["is_faulty"] and random.random() < 0.05:
+        if _should_spike(profile, time.time(), _force_anomaly_until_ts):
             spike = random.uniform(91, 99) - profile["motor_temp_base"]
         drift = drift * 0.99 + random.gauss(0, 0.1)
         motor_temp = round(
@@ -238,6 +267,12 @@ async def main() -> None:
         except NotImplementedError:
             # Windows에서 add_signal_handler 미지원 → KeyboardInterrupt로 처리됨
             pass
+
+    # SIGUSR1: 시연자가 알람 폭주를 무대 위에서 토글
+    try:
+        loop.add_signal_handler(signal.SIGUSR1, _trigger_force_anomaly)
+    except (NotImplementedError, AttributeError):
+        pass  # Windows: SIGUSR1 미존재
 
     sim_tasks = [asyncio.create_task(simulate_robot(p, queue, tick_interval, shutdown))
                  for p in profiles]
