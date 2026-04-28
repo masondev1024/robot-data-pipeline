@@ -9,6 +9,11 @@ pytest.importorskip("airflow")
 from robot_daily_etl import _bedrock_report, dag
 
 
+@pytest.fixture(autouse=True)
+def _isolate_bedrock_env(monkeypatch):
+    monkeypatch.delenv("BEDROCK_MODEL_ID", raising=False)
+
+
 @pytest.fixture
 def mock_athena_response():
     """get_query_results paginator가 반환할 가짜 페이지."""
