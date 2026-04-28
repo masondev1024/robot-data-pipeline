@@ -248,11 +248,6 @@ resource "aws_iam_role_policy" "lambda_alert_policy" {
       },
       {
         Effect   = "Allow"
-        Action   = ["sns:Publish"]
-        Resource = [aws_sns_topic.alerts.arn]
-      },
-      {
-        Effect   = "Allow"
         Action   = ["ssm:GetParameter"]
         Resource = ["arn:aws:ssm:${var.aws_region}:*:parameter/robot-telemetry/portal-url"]
       },
