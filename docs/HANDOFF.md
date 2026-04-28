@@ -1,11 +1,66 @@
-# Session Handoff — 2026-04-28 (Windows → Mac)
+# Session Handoff — 2026-04-29 (Mac, P1 진입)
 
-## TL;DR
-인프라는 이미 `terraform apply` 완료된 상태에서 이번 세션은 **데이터 흐름 회복 + Grafana 배포 + Bedrock 모델 통일**을 끝냈다. 발표 시연 가능 최소 형태(P0) 도달. 다음은 Flink anomaly → Slack 검증(P1)부터.
+## TL;DR (2026-04-29 세션)
+**P1-1(Slack 알람 경로) 사실상 완료, P1-2(시연 통제력) 코드 완료/배포 검증 대기.** SNS HTTPS 구독이 PendingConfirmation 상태로 영구 고착되는 구조적 한계를 발견하고 Lambda → Slack 직접 POST로 우회. 동시에 alert KDS에 분당 ~16 records가 정체불명으로 들어오는 걸 추적해 **Flink Studio Notebook이 이미 동작 중**이었다는 사실 확인 (HANDOFF 2026-04-28 표기와 다름). Generator에 SIGUSR1 핸들러 추가해 무대 위에서 `kubectl exec ... kill -USR1 1` 한 줄로 알람 폭주 시연 가능해짐.
 
 - 리전: `eu-west-1` / 계정: `827913617635` / 클러스터: `robot-telemetry-cluster`
-- HEAD: `a8b4b2b` (이번 세션 변경은 모두 uncommitted — 아래 "동기화" 섹션 참조)
+- HEAD: `88b9597` (작성 시점, ECR 새 이미지 push 검증 대기 중)
 - Bedrock 모델: `eu.anthropic.claude-sonnet-4-5-20250929-v1:0` (EU inference profile, Sonnet 4.5)
+
+---
+
+## 🆕 2026-04-29 세션 결과
+
+### ✅ 완료
+1. **Lambda → Slack 직접 POST 변경** (commit `6bfd47d`)
+   - `src/lambda/alert_handler.py`: `sns.publish(...)` → `urllib.request` 로 Slack Webhook에 직접 POST
+   - `terraform/modules/data_pipeline/lambda.tf`: env vars `SNS_TOPIC_ARN` 제거 + `SLACK_WEBHOOK_URL` 추가, `timeout = 10` 명시
+   - `terraform/modules/data_pipeline/iam_eks_irsa_full.tf`: `lambda_alert_policy`에서 `sns:Publish` 제거
+   - `tests/lambda/test_alert_handler.py`: 5건 SNS publish mock → urllib HTTPS POST mock (5/5 PASSED)
+   - 검증: alert KDS에 mock record put → Lambda 트리거 → Slack 채널 도착 확인
+   - SNS topic 자체는 유지(다른 통로 재활용 여지)
+
+2. **Generator SIGUSR1 force-anomaly 윈도우** (commit `88b9597`)
+   - `src/generator/app.py`: `_force_anomaly_until_ts` 모듈 전역 + `_should_spike` 헬퍼 + `_trigger_force_anomaly` SIGUSR1 핸들러
+   - `tests/generator/test_force_anomaly.py`: 8 케이스 PASSED (회귀 43/43)
+   - **시연 명령어**: `kubectl exec -n robot-telemetry deploy/robot-telemetry-generator -- kill -USR1 1` → 60초 동안 모든 로봇 spike → 자동 복귀
+   - 윈도우 길이 조정: `kubectl set env ... FORCE_ANOMALY_DURATION_SEC=30`
+
+3. **GitHub Actions workflow 빌드 컨텍스트 버그 정정** (commit `88b9597`)
+   - `.github/workflows/k8s-deploy.yml`의 generator 빌드 단계: `docker build src/generator/` → `docker build -f src/generator/Dockerfile .`
+   - 기존 워크플로는 Dockerfile의 `COPY src/generator/...` 경로와 어긋나 빌드 실패 상태였음
+
+4. **claude-code 로컬 환경 문제 해결**
+   - npm global prefix를 `/usr/local/...` (root 소유) → `~/.npm-global` (user 소유)로 변경
+   - 옛 `/usr/local/bin/claude` symlink 및 `/usr/local/lib/node_modules/@anthropic-ai/` 정리
+   - `~/.zshrc`에 `export PATH=~/.npm-global/bin:$PATH` 추가
+   - 이제 `npm i -g @anthropic-ai/claude-code` 가 sudo 없이 동작
+
+### 🔍 결정적 학습
+
+**SNS HTTPS 구독은 Slack Webhook과 자동 연결 안 됨** — Slack Incoming Webhook은 SNS의 SubscribeURL을 GET하지 않아 구독이 영구 PendingConfirmation 상태. AWS 권장 패턴이 아님. Lambda에서 직접 POST 또는 AWS Chatbot 경유가 정답.
+
+**Flink Studio Notebook이 실제로 동작 중** — HANDOFF 2026-04-28 문서엔 "미검증"으로 적혀 있었지만, alert KDS에 분당 ~16 records가 일정하게 들어오는 걸 추적한 결과 Flink가 이미 deploy되어 anomaly detection 중. 사용자가 threshold만 튜닝하면 됨. P1-1은 사실상 끝났다는 의미.
+
+**Lambda timeout 3s는 빠듯함** — SSM get_parameter + urllib Slack POST + boto3 cold start 합치면 2.5~3초 소요. timeout 3s 기본값으로는 간헐적 실패. **10s로 상향 필수**.
+
+### ⏳ 미검증/대기 중
+
+- **Generator 새 이미지 deploy** — commit `88b9597` push 후 GitHub Actions가 이미지 빌드 → ECR push → kubectl rollout restart 진행 중. ECR `robot-telemetry-generator:latest` 디지털이 갱신되면 새 코드 반영. 자기 전 시점 ECR digest는 여전히 `5997968...` (2026-04-28 16:36 빌드)로 미갱신. 워크플로 실패 가능성 있어 GitHub Actions UI 확인 필요.
+- **SIGUSR1 실 환경 검증** — 위 deploy 완료 후 `kubectl exec ... kill -USR1 1` 호출 → Slack 알람 폭주 → 60초 후 자동 복귀 확인 필요.
+
+### 🟢 현재 상태 스냅샷 (자기 직전)
+
+| 컴포넌트 | 상태 |
+|---|---|
+| Generator pod | Running (옛 이미지 `5997968...`, force-anomaly 미반영) |
+| API pod | Running |
+| Grafana | Running |
+| Kinesis 메인 스트림 | 분당 ~6,000 records 유입 |
+| Alert KDS | 분당 ~2-3 records (Flink threshold 튜닝 후) |
+| Lambda | timeout=10s, env=SLACK_WEBHOOK_URL, ESM `Enabled` |
+| SNS topic | 유지(Slack 구독은 PendingConfirmation, 실 사용 안 함) |
+| Slack 알람 | 정상 도착 중, 분당 ~2-3개 |
 
 ---
 
@@ -230,10 +285,34 @@ curl -s http://k8s-monitori-grafanai-2ac32d9244-945675115.eu-west-1.elb.amazonaw
 
 ---
 
-## 📍 다음 단계 (P1 — 발표 임팩트)
+## 📍 다음 단계 (2026-04-29 자고 일어난 후 우선순위)
 
-### P1-1. Flink anomaly → Slack 끝까지 검증
-가장 미검증 구간. AWS Console → Managed Service for Apache Flink → Studio Notebooks 진입. `flink/anomaly_detection.py` 코드를 노트북 환경에 붙여 실행 → Alert KDS에 record 떨어지는지 → Lambda 트리거 → Slack 채널 메시지 도착. SNS metric `NumberOfMessagesPublished` > 0 으로 정량 검증.
+### 🔥 P0 — 자고 일어나서 첫 번째로 할 것
+**Generator 새 이미지 deploy 검증** (어젯밤 commit `88b9597` push 후 GitHub Actions 결과)
+
+```bash
+# 1) ECR latest digest가 갱신됐는지 (어젯밤 기준 5997968... 이면 미갱신)
+aws ecr describe-images --repository-name robot-telemetry-generator \
+  --region eu-west-1 --image-ids imageTag=latest \
+  --query "imageDetails[0].{Digest:imageDigest, PushedAt:imagePushedAt}"
+
+# 2) Pod의 imageID 확인 (digest가 ECR latest와 일치해야 새 코드 도는 중)
+kubectl get pod -n robot-telemetry -l app=robot-telemetry-generator \
+  -o jsonpath='{.items[0].status.containerStatuses[0].imageID}{"\n"}'
+
+# 3) 새 코드 반영됐으면 SIGUSR1 시연 검증
+kubectl exec -n robot-telemetry deploy/robot-telemetry-generator -- kill -USR1 1
+kubectl logs -n robot-telemetry deploy/robot-telemetry-generator --tail=5
+# → "force_anomaly_triggered" 이벤트 보여야 함, 이후 60초간 Slack 알람 폭주
+```
+
+**워크플로 실패 시**: GitHub Actions UI(`https://github.com/masondev1024/robot-data-pipeline/actions`)에서 최근 run 확인. 자주 발생하는 실패: ECR auth (OIDC role), Docker layer cache 미스, build context. 빌드 컨텍스트 버그는 commit `88b9597`에서 정정함 — 다른 원인이라면 로그 보고 대응.
+
+### P1-1 — 사실상 완료
+Flink Studio Notebook 동작 중, alert KDS → Lambda → Slack 흐름 살아있음. 재검증 필요한 케이스: threshold 튜닝 또는 Flink 노트북 세션 종료 시.
+
+(이전 HANDOFF의 P1-1 원문):
+> 가장 미검증 구간. AWS Console → Managed Service for Apache Flink → Studio Notebooks 진입. `flink/anomaly_detection.py` 코드를 노트북 환경에 붙여 실행 → Alert KDS에 record 떨어지는지 → Lambda 트리거 → Slack 채널 메시지 도착. SNS metric `NumberOfMessagesPublished` > 0 으로 정량 검증.
 
 관련 파일: `flink/anomaly_detection.py`, `flink/deploy.sh`, `src/lambda/alert_handler.py`.
 
