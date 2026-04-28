@@ -1,6 +1,6 @@
 # S3 Data Lake Bucket
 resource "aws_s3_bucket" "datalake" {
-  bucket = "de-ai-06-smartfactory-bucket"
+  bucket = var.datalake_bucket_name
 
   tags = {
     Name = "robot-telemetry-datalake"

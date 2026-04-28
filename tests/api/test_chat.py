@@ -39,7 +39,7 @@ class TestChatApi:
     @patch("src.api.main.boto3.client")
     def test_chat_normal_response(self, mock_boto, monkeypatch, mock_bedrock_response, setup_cache):
         """POST /api/chat returns 200 with answer, cached_at, data_date, links."""
-        monkeypatch.setenv("BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20241022-v2:0")
+        monkeypatch.setenv("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0")
         client = TestClient(app)
 
         mock_bedrock_client = MagicMock()
@@ -63,7 +63,7 @@ class TestChatApi:
     @patch("src.api.main.boto3.client")
     def test_chat_bedrock_invoke_params(self, mock_boto, monkeypatch, mock_bedrock_response, setup_cache):
         """Verify Bedrock invoke_model call params: modelId, system field, max_tokens."""
-        monkeypatch.setenv("BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20241022-v2:0")
+        monkeypatch.setenv("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0")
         client = TestClient(app)
 
         mock_bedrock_client = MagicMock()
@@ -79,7 +79,7 @@ class TestChatApi:
         client.post("/api/chat", json={"question": "문제가 있는 로봇은?"})
 
         call_args = mock_bedrock_client.invoke_model.call_args
-        assert call_args.kwargs["modelId"] == "anthropic.claude-3-5-sonnet-20241022-v2:0"
+        assert call_args.kwargs["modelId"] == "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
 
         body_str = call_args.kwargs["body"]
         body = json.loads(body_str)
@@ -90,7 +90,7 @@ class TestChatApi:
     @patch("src.api.main.boto3.client")
     def test_chat_links_extraction(self, mock_boto, monkeypatch, mock_bedrock_response, setup_cache):
         """Extract links from response text matching [ROBOT-XXXXX] pattern."""
-        monkeypatch.setenv("BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20241022-v2:0")
+        monkeypatch.setenv("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0")
         client = TestClient(app)
 
         mock_bedrock_client = MagicMock()
@@ -116,7 +116,7 @@ class TestChatApi:
     @patch("src.api.main.boto3.client")
     def test_chat_cache_not_ready_503(self, mock_boto, monkeypatch):
         """Return 503 when cache is not ready."""
-        monkeypatch.setenv("BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20241022-v2:0")
+        monkeypatch.setenv("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0")
         monkeypatch.setattr("src.api.main._cache_ready", False)
         client = TestClient(app)
 
@@ -126,7 +126,7 @@ class TestChatApi:
     @patch("src.api.main.boto3.client")
     def test_chat_rate_limit(self, mock_boto, monkeypatch, setup_cache):
         """Rate limit 10/minute: 11th request returns 429."""
-        monkeypatch.setenv("BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20241022-v2:0")
+        monkeypatch.setenv("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0")
         client = TestClient(app)
 
         mock_bedrock_client = MagicMock()
@@ -153,7 +153,7 @@ class TestChatApi:
     @patch("src.api.main.boto3.client")
     def test_chat_system_field_in_body(self, mock_boto, monkeypatch, setup_cache):
         """Verify 'system' field is in invoke_model body (bug 4B fix)."""
-        monkeypatch.setenv("BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20241022-v2:0")
+        monkeypatch.setenv("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0")
         client = TestClient(app)
 
         mock_bedrock_client = MagicMock()

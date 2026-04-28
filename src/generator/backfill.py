@@ -33,6 +33,25 @@ from typing import Iterable, Iterator
 
 import boto3
 
+
+def _load_dotenv(path: str = ".env") -> None:
+    """.env 파일을 stdlib로 로드 (python-dotenv 의존성 없이). 이미 export된 변수는 덮어쓰지 않음."""
+    if not os.path.exists(path):
+        return
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key, val = key.strip(), val.strip().strip('"').strip("'")
+            os.environ.setdefault(key, val)
+
+
+# 프로젝트 루트의 .env 자동 로드 (cwd 기준 + 모듈 위치 기준 둘 다 시도)
+_load_dotenv(".env")
+_load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".env"))
+
 # 같은 패키지의 load_profiles 재사용 (CSV → robot 프로필 변환 로직 동일)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from src.generator.app import load_profiles  # noqa: E402

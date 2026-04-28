@@ -28,7 +28,7 @@
 | # | 케이스 | 검증 |
 |---|---|---|
 | 1 | `POST /api/chat` 정상 응답 | mock Bedrock 응답 → 200 + `answer`/`cached_at`/`data_date`/`links` 키 모두 존재 |
-| 2 | Bedrock invoke_model 호출 파라미터 | `modelId="anthropic.claude-3-5-sonnet-20241022-v2:0"`, body에 `"system":` 키 + `messages[0].role=="user"` + `max_tokens==512` |
+| 2 | Bedrock invoke_model 호출 파라미터 | `modelId="eu.anthropic.claude-sonnet-4-5-20250929-v1:0"`, body에 `"system":` 키 + `messages[0].role=="user"` + `max_tokens==512` |
 | 3 | `links[]` 추출 | mock 응답 `"점검 시급: [ROBOT-00123], [ROBOT-00456]"` → `links` 길이 2 + 각 url이 `/?robot_id=ROBOT-XXXXX` 형태 |
 | 4 | 캐시 미준비 시 503 | `_cache_ready=False` 상태에서 → 503 |
 | 5 | Rate Limit (slowapi) | 10회 요청 후 11번째 → 429 |

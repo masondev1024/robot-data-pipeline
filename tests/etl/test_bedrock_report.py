@@ -223,7 +223,7 @@ class TestBedrockReportInvoke:
 
         # Verify Bedrock invoke_model call
         call_args = mock_bedrock_client.invoke_model.call_args
-        assert call_args.kwargs["modelId"] == "anthropic.claude-3-5-sonnet-20241022-v2:0"
+        assert call_args.kwargs["modelId"] == "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
         assert call_args.kwargs["contentType"] == "application/json"
         assert call_args.kwargs["accept"] == "application/json"
 

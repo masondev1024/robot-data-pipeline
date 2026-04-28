@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: monitoring
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: CloudWatch
+        uid: cloudwatch
+        type: cloudwatch
+        access: proxy
+        isDefault: true
+        jsonData:
+          authType: default
+          defaultRegion: eu-west-1
+      - name: Athena
+        uid: athena
+        type: grafana-athena-datasource
+        access: proxy
+        jsonData:
+          authType: default
+          defaultRegion: eu-west-1
+          catalog: AwsDataCatalog
+          database: robot_telemetry_db
+          workgroup: robot-telemetry-workgroup

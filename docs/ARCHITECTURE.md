@@ -36,11 +36,18 @@ terraform/
 ├── cicd_gitops.tf         # ECR + GitHub Actions OIDC
 └── modules/
     └── data_pipeline/
-        ├── iam.tf         # IRSA(Generator+API) + Firehose Delivery Role + Bedrock Policy
-        ├── kinesis.tf     # KDS(메인 10Shard + Alert 전용) + KDF (Format Conversion, Dynamic Partitioning)
-        ├── glue.tf        # Glue DB + bronze_robot_telemetry 스키마 (KDF Parquet 변환 의존성)
-        ├── sns.tf         # SNS Topic + Slack Webhook 구독
-        └── lambda.tf      # robot-anomaly-alert-lambda (Alert KDS → SNS 브리지)
+        ├── iam_eks_irsa_full.tf  # IRSA 4종(Generator/API/Airflow/Grafana) + Firehose Delivery Role + Lambda Alert Role + Bedrock/Athena/Bedrock/SageMaker/SSM/X-Ray 정책 통합
+        ├── kinesis.tf            # KDS(메인 N Shard + Alert 전용) + KDF (Format Conversion, Parquet)
+        ├── glue.tf               # Glue DB + bronze_robot_telemetry 스키마 (Partition Projection)
+        ├── sns.tf                # SNS Topic + Slack Webhook 구독
+        ├── lambda.tf             # robot-anomaly-alert-lambda (Alert KDS → SNS 브리지)
+        ├── flink.tf              # Managed Flink Application + 전용 IAM Role
+        ├── sagemaker.tf          # SageMaker Endpoint 리소스
+        ├── ssm.tf                # SSM Parameter (portal-url / grafana-url 등)
+        ├── xray.tf               # X-Ray sampling rule
+        ├── cloudwatch.tf         # Firehose 성공률 알람
+        ├── s3.tf                 # Data Lake 버킷
+        └── outputs.tf            # IRSA Role ARN 등 root 노출용
 
 k8s/
 ├── generator/

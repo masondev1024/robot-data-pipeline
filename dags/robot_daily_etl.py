@@ -239,7 +239,7 @@ LIMIT 20
     })
     model_id = os.environ.get(
         "BEDROCK_MODEL_ID",
-        "anthropic.claude-3-5-sonnet-20241022-v2:0",
+        "eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
     )
     response = bedrock.invoke_model(
         modelId=model_id,

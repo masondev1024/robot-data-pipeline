@@ -1,0 +1,110 @@
+# Apache Airflow Helm chart values — robot-telemetry 시연용
+# chart: apache-airflow/airflow ~1.16.x (Airflow 2.10.x)
+#
+# 주요 결정:
+# - KubernetesExecutor: task마다 worker pod 동적 생성. Helm chart가 만드는
+#   `airflow-worker` SA가 IRSA(robot-telemetry-airflow-irsa)를 assume.
+# - DAG는 ConfigMap(`airflow-dags`)로 마운트. gitSync/PVC 미사용.
+# - boto3는 _PIP_ADDITIONAL_REQUIREMENTS로 worker 시작 시 자동 설치.
+
+executor: KubernetesExecutor
+
+# 시연용 — 콘솔에서 패스워드 모르면 진입 불가하므로 명시 설정
+webserver:
+  defaultUser:
+    enabled: true
+    role: Admin
+    username: admin
+    password: changeme123
+    email: admin@admin.com
+    firstName: admin
+    lastName: admin
+
+  extraVolumes:
+    - name: dags-cm
+      configMap:
+        name: airflow-dags
+  extraVolumeMounts:
+    - name: dags-cm
+      mountPath: /opt/airflow/dags
+
+# Scheduler가 DAG를 파싱하므로 동일 ConfigMap 마운트
+scheduler:
+  extraVolumes:
+    - name: dags-cm
+      configMap:
+        name: airflow-dags
+  extraVolumeMounts:
+    - name: dags-cm
+      mountPath: /opt/airflow/dags
+
+# KubernetesExecutor가 만드는 worker pod에도 동일 마운트
+workers:
+  serviceAccount:
+    create: true
+    name: airflow-worker
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::827913617635:role/robot-telemetry-airflow-irsa
+  extraVolumes:
+    - name: dags-cm
+      configMap:
+        name: airflow-dags
+  extraVolumeMounts:
+    - name: dags-cm
+      mountPath: /opt/airflow/dags
+
+# DAG persistence/gitSync 모두 끔 — ConfigMap 마운트로 대체
+dags:
+  persistence:
+    enabled: false
+  gitSync:
+    enabled: false
+
+# Bundled Postgres metadata DB (8Gi gp2 EBS PVC, 시연용)
+postgresql:
+  enabled: true
+  primary:
+    persistence:
+      enabled: true
+      size: 8Gi
+      storageClass: gp2
+
+# KubernetesExecutor에서는 redis/PgBouncer 불필요
+redis:
+  enabled: false
+pgbouncer:
+  enabled: false
+
+# Airflow 환경변수 — boto3 자동 설치, AWS region 주입
+env:
+  - name: _PIP_ADDITIONAL_REQUIREMENTS
+    value: "boto3==1.35.0"
+  - name: AWS_DEFAULT_REGION
+    value: "eu-west-1"
+  - name: S3_BUCKET_NAME
+    value: "de-ai-06-smartfactory-bucket"
+  - name: ATHENA_DATABASE
+    value: "robot_telemetry_db"
+  - name: ATHENA_WORKGROUP
+    value: "robot-telemetry-workgroup"
+  - name: ATHENA_OUTPUT_LOCATION
+    value: "s3://de-ai-06-smartfactory-bucket/project-athena-results/"
+  - name: BEDROCK_MODEL_ID
+    value: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+  - name: DQ_SNS_TOPIC_ARN
+    value: "arn:aws:sns:eu-west-1:827913617635:robot-anomaly-alerts"
+
+# ALB Ingress — 외부 접근
+ingress:
+  web:
+    enabled: true
+    ingressClassName: alb
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    path: "/"
+    pathType: "Prefix"
+
+# 세션 쿠키 서명 (dummy, 시연용 — 운영 시 Secret 분리)
+webserverSecretKey: "demo-only-secret-key-change-in-prod-32"

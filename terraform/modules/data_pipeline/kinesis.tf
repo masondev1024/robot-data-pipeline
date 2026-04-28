@@ -72,4 +72,7 @@ resource "aws_kinesis_firehose_delivery_stream" "main" {
     kinesis_stream_arn = aws_kinesis_stream.main.arn
     role_arn           = aws_iam_role.firehose_delivery_role.arn
   }
+
+  # IAM 정책 전파 지연(eventual consistency) 대응
+  depends_on = [aws_iam_role_policy.firehose_delivery]
 }

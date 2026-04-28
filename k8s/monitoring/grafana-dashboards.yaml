@@ -1,0 +1,303 @@
+apiVersion: v1
+data:
+  anomaly_timeline.json: "{\r\n  \"annotations\": {\r\n    \"list\": [\r\n      {\r\n
+    \       \"builtIn\": 1,\r\n        \"datasource\": \"-- Grafana --\",\r\n        \"enable\":
+    true,\r\n        \"hide\": true,\r\n        \"iconColor\": \"rgba(0, 211, 255,
+    1)\",\r\n        \"name\": \"Annotations & Alerts\",\r\n        \"type\": \"dashboard\"\r\n
+    \     }\r\n    ]\r\n  },\r\n  \"editable\": true,\r\n  \"gnetId\": null,\r\n  \"graphTooltip\":
+    0,\r\n  \"id\": null,\r\n  \"links\": [],\r\n  \"panels\": [\r\n    {\r\n      \"datasource\":
+    \"${DS_ATHENA}\",\r\n      \"fieldConfig\": {\r\n        \"defaults\": {\r\n          \"color\":
+    {\r\n            \"mode\": \"palette-classic\"\r\n          },\r\n          \"custom\":
+    {\r\n            \"axisLabel\": \"Anomaly Count\",\r\n            \"axisPlacement\":
+    \"auto\",\r\n            \"barAlignment\": 0,\r\n            \"drawStyle\": \"line\",\r\n
+    \           \"fillOpacity\": 10,\r\n            \"gradientMode\": \"none\",\r\n
+    \           \"hideFrom\": {\r\n              \"tooltip\": false,\r\n              \"viz\":
+    false,\r\n              \"legend\": false\r\n            },\r\n            \"lineInterpolation\":
+    \"linear\",\r\n            \"lineWidth\": 2,\r\n            \"pointSize\": 5,\r\n
+    \           \"scaleDistribution\": {\r\n              \"type\": \"linear\"\r\n
+    \           },\r\n            \"showPoints\": \"auto\",\r\n            \"spanNulls\":
+    false,\r\n            \"stacking\": {\r\n              \"group\": \"A\",\r\n              \"mode\":
+    \"none\"\r\n            },\r\n            \"thresholdsStyle\": {\r\n              \"mode\":
+    \"off\"\r\n            }\r\n          },\r\n          \"mappings\": [],\r\n          \"thresholds\":
+    {\r\n            \"mode\": \"absolute\",\r\n            \"steps\": [\r\n              {\r\n
+    \               \"color\": \"green\",\r\n                \"value\": null\r\n              },\r\n
+    \             {\r\n                \"color\": \"yellow\",\r\n                \"value\":
+    5\r\n              },\r\n              {\r\n                \"color\": \"red\",\r\n
+    \               \"value\": 10\r\n              }\r\n            ]\r\n          }\r\n
+    \       },\r\n        \"overrides\": []\r\n      },\r\n      \"gridPos\": {\r\n
+    \       \"h\": 8,\r\n        \"w\": 24,\r\n        \"x\": 0,\r\n        \"y\":
+    0\r\n      },\r\n      \"id\": 2,\r\n      \"options\": {\r\n        \"legend\":
+    {\r\n          \"calcs\": [\r\n            \"mean\",\r\n            \"max\",\r\n
+    \           \"min\"\r\n          ],\r\n          \"displayMode\": \"table\",\r\n
+    \         \"placement\": \"bottom\"\r\n        },\r\n        \"tooltip\": {\r\n
+    \         \"mode\": \"multi\"\r\n        }\r\n      },\r\n      \"pluginVersion\":
+    \"7.0.0\",\r\n      \"targets\": [\r\n        {\r\n          \"rawSql\": \"SELECT
+    DATE_TRUNC('hour', CAST(timestamp AS TIMESTAMP)) AS event_hour, COUNT(*) AS anomaly_count
+    FROM robot_telemetry_db.bronze_robot_telemetry WHERE motor_temp > 90.0 AND CAST(timestamp
+    AS TIMESTAMP) > CAST(CURRENT_TIMESTAMP - INTERVAL '24' HOUR AS TIMESTAMP) GROUP
+    BY DATE_TRUNC('hour', CAST(timestamp AS TIMESTAMP)) ORDER BY event_hour ASC\",\r\n
+    \         \"refId\": \"A\"\r\n        }\r\n      ],\r\n      \"title\": \"Anomaly
+    Detection Timeline (24h)\",\r\n      \"type\": \"timeseries\"\r\n    }\r\n  ],\r\n
+    \ \"refresh\": \"5m\",\r\n  \"schemaVersion\": 27,\r\n  \"style\": \"dark\",\r\n
+    \ \"tags\": [\r\n    \"robot-telemetry\",\r\n    \"anomaly\"\r\n  ],\r\n  \"templating\":
+    {\r\n    \"list\": []\r\n  },\r\n  \"time\": {\r\n    \"from\": \"now-24h\",\r\n
+    \   \"to\": \"now\"\r\n  },\r\n  \"timepicker\": {},\r\n  \"timezone\": \"UTC\",\r\n
+    \ \"title\": \"Anomaly Detection Timeline\",\r\n  \"uid\": \"anomaly-timeline-001\",\r\n
+    \ \"version\": 0\r\n}\r\n"
+  observability.json: "{\r\n  \"title\": \"Robot Telemetry — Observability\",\r\n
+    \ \"uid\": \"robot-observability\",\r\n  \"schemaVersion\": 36,\r\n  \"version\":
+    1,\r\n  \"refresh\": \"30s\",\r\n  \"time\": { \"from\": \"now-1h\", \"to\": \"now\"
+    },\r\n  \"panels\": [\r\n    {\r\n      \"id\": 1,\r\n      \"title\": \"Endpoint
+    Latency — /api/chat & /api/predict (P50/P95/P99)\",\r\n      \"type\": \"timeseries\",\r\n
+    \     \"gridPos\": { \"x\": 0, \"y\": 0, \"w\": 12, \"h\": 8 },\r\n      \"datasource\":
+    { \"type\": \"cloudwatch\", \"uid\": \"cloudwatch\" },\r\n      \"targets\": [\r\n
+    \       {\r\n          \"refId\": \"A\",\r\n          \"namespace\": \"AWS/ApplicationELB\",\r\n
+    \         \"metricName\": \"TargetResponseTime\",\r\n          \"statistics\":
+    [\"p50\"],\r\n          \"dimensions\": { \"TargetGroup\": \"robot-telemetry-api\"
+    },\r\n          \"alias\": \"/api/chat P50\"\r\n        },\r\n        {\r\n          \"refId\":
+    \"B\",\r\n          \"namespace\": \"AWS/ApplicationELB\",\r\n          \"metricName\":
+    \"TargetResponseTime\",\r\n          \"statistics\": [\"p95\"],\r\n          \"dimensions\":
+    { \"TargetGroup\": \"robot-telemetry-api\" },\r\n          \"alias\": \"/api/chat
+    P95\"\r\n        },\r\n        {\r\n          \"refId\": \"C\",\r\n          \"namespace\":
+    \"AWS/ApplicationELB\",\r\n          \"metricName\": \"TargetResponseTime\",\r\n
+    \         \"statistics\": [\"p99\"],\r\n          \"dimensions\": { \"TargetGroup\":
+    \"robot-telemetry-api\" },\r\n          \"alias\": \"/api/chat P99\"\r\n        }\r\n
+    \     ],\r\n      \"fieldConfig\": {\r\n        \"defaults\": {\r\n          \"unit\":
+    \"s\",\r\n          \"custom\": { \"lineWidth\": 2 }\r\n        }\r\n      }\r\n
+    \   },\r\n    {\r\n      \"id\": 2,\r\n      \"title\": \"Error Rate — 5xx Responses
+    (%)\",\r\n      \"type\": \"timeseries\",\r\n      \"gridPos\": { \"x\": 12, \"y\":
+    0, \"w\": 12, \"h\": 8 },\r\n      \"datasource\": { \"type\": \"cloudwatch\",
+    \"uid\": \"cloudwatch\" },\r\n      \"targets\": [\r\n        {\r\n          \"refId\":
+    \"A\",\r\n          \"namespace\": \"AWS/ApplicationELB\",\r\n          \"metricName\":
+    \"HTTPCode_Target_5XX_Count\",\r\n          \"statistics\": [\"Sum\"],\r\n          \"dimensions\":
+    { \"TargetGroup\": \"robot-telemetry-api\" },\r\n          \"alias\": \"5xx Count\"\r\n
+    \       },\r\n        {\r\n          \"refId\": \"B\",\r\n          \"namespace\":
+    \"AWS/ApplicationELB\",\r\n          \"metricName\": \"RequestCount\",\r\n          \"statistics\":
+    [\"Sum\"],\r\n          \"dimensions\": { \"TargetGroup\": \"robot-telemetry-api\"
+    },\r\n          \"alias\": \"Total Requests\"\r\n        }\r\n      ],\r\n      \"transformations\":
+    [\r\n        {\r\n          \"id\": \"calculateField\",\r\n          \"options\":
+    {\r\n            \"alias\": \"5xx Rate (%)\",\r\n            \"mode\": \"reduceRow\",\r\n
+    \           \"reduce\": { \"reducer\": \"sum\" },\r\n            \"binary\": {\r\n
+    \             \"left\": \"5xx Count\",\r\n              \"right\": \"Total Requests\",\r\n
+    \             \"operator\": \"/\"\r\n            }\r\n          }\r\n        }\r\n
+    \     ],\r\n      \"fieldConfig\": {\r\n        \"defaults\": {\r\n          \"unit\":
+    \"percent\",\r\n          \"custom\": { \"lineWidth\": 2 },\r\n          \"thresholds\":
+    {\r\n            \"mode\": \"absolute\",\r\n            \"steps\": [\r\n              {
+    \"color\": \"green\", \"value\": null },\r\n              { \"color\": \"yellow\",
+    \"value\": 1 },\r\n              { \"color\": \"red\", \"value\": 5 }\r\n            ]\r\n
+    \         }\r\n        }\r\n      }\r\n    },\r\n    {\r\n      \"id\": 3,\r\n
+    \     \"title\": \"Generator → Kinesis PutRecords Latency (avg ms)\",\r\n      \"type\":
+    \"timeseries\",\r\n      \"gridPos\": { \"x\": 0, \"y\": 8, \"w\": 12, \"h\":
+    8 },\r\n      \"datasource\": { \"type\": \"cloudwatch\", \"uid\": \"cloudwatch\"
+    },\r\n      \"targets\": [\r\n        {\r\n          \"refId\": \"A\",\r\n          \"namespace\":
+    \"AWS/Kinesis\",\r\n          \"metricName\": \"PutRecords.Latency\",\r\n          \"statistics\":
+    [\"Average\"],\r\n          \"dimensions\": { \"StreamName\": \"robot-telemetry-stream\"
+    },\r\n          \"alias\": \"PutRecords Avg Latency\"\r\n        },\r\n        {\r\n
+    \         \"refId\": \"B\",\r\n          \"namespace\": \"AWS/Kinesis\",\r\n          \"metricName\":
+    \"PutRecords.SuccessfulRecords\",\r\n          \"statistics\": [\"Sum\"],\r\n
+    \         \"dimensions\": { \"StreamName\": \"robot-telemetry-stream\" },\r\n
+    \         \"alias\": \"Successful Records\"\r\n        }\r\n      ],\r\n      \"fieldConfig\":
+    {\r\n        \"defaults\": {\r\n          \"unit\": \"ms\",\r\n          \"custom\":
+    { \"lineWidth\": 2 }\r\n        }\r\n      }\r\n    },\r\n    {\r\n      \"id\":
+    4,\r\n      \"title\": \"X-Ray Service Map\",\r\n      \"type\": \"text\",\r\n
+    \     \"gridPos\": { \"x\": 12, \"y\": 8, \"w\": 12, \"h\": 8 },\r\n      \"options\":
+    {\r\n        \"mode\": \"html\",\r\n        \"content\": \"<div style=\\\"display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column\\\"><p
+    style=\\\"font-size:14px;color:#aaa\\\">X-Ray Service Map</p><p style=\\\"font-size:12px;color:#666\\\">Open
+    AWS Console → X-Ray → Service Map<br/>Filter: robot-telemetry namespace</p><a
+    href=\\\"https://eu-west-1.console.aws.amazon.com/xray/home?region=eu-west-1#/service-map\\\"
+    target=\\\"_blank\\\" style=\\\"color:#5794f2\\\">View in AWS Console →</a></div>\"\r\n
+    \     }\r\n    }\r\n  ],\r\n  \"templating\": { \"list\": [] },\r\n  \"annotations\":
+    { \"list\": [] },\r\n  \"links\": []\r\n}\r\n"
+  pipeline_health.json: "{\r\n  \"annotations\": {\r\n    \"list\": [\r\n      {\r\n
+    \       \"builtIn\": 1,\r\n        \"datasource\": \"-- Grafana --\",\r\n        \"enable\":
+    true,\r\n        \"hide\": true,\r\n        \"iconColor\": \"rgba(0, 211, 255,
+    1)\",\r\n        \"name\": \"Annotations & Alerts\",\r\n        \"type\": \"dashboard\"\r\n
+    \     }\r\n    ]\r\n  },\r\n  \"editable\": true,\r\n  \"gnetId\": null,\r\n  \"graphTooltip\":
+    0,\r\n  \"id\": null,\r\n  \"links\": [],\r\n  \"panels\": [\r\n    {\r\n      \"datasource\":
+    \"${DS_CLOUDWATCH}\",\r\n      \"fieldConfig\": {\r\n        \"defaults\": {\r\n
+    \         \"color\": {\r\n            \"mode\": \"palette-classic\"\r\n          },\r\n
+    \         \"custom\": {\r\n            \"axisLabel\": \"Records/sec\",\r\n            \"axisPlacement\":
+    \"auto\",\r\n            \"barAlignment\": 0,\r\n            \"drawStyle\": \"line\",\r\n
+    \           \"fillOpacity\": 10,\r\n            \"gradientMode\": \"none\",\r\n
+    \           \"hideFrom\": {\r\n              \"tooltip\": false,\r\n              \"viz\":
+    false,\r\n              \"legend\": false\r\n            },\r\n            \"lineInterpolation\":
+    \"linear\",\r\n            \"lineWidth\": 2,\r\n            \"pointSize\": 5,\r\n
+    \           \"scaleDistribution\": {\r\n              \"type\": \"linear\"\r\n
+    \           },\r\n            \"showPoints\": \"auto\",\r\n            \"spanNulls\":
+    false,\r\n            \"stacking\": {\r\n              \"group\": \"A\",\r\n              \"mode\":
+    \"none\"\r\n            },\r\n            \"thresholdsStyle\": {\r\n              \"mode\":
+    \"off\"\r\n            }\r\n          },\r\n          \"mappings\": [],\r\n          \"thresholds\":
+    {\r\n            \"mode\": \"absolute\",\r\n            \"steps\": [\r\n              {\r\n
+    \               \"color\": \"green\",\r\n                \"value\": null\r\n              }\r\n
+    \           ]\r\n          }\r\n        },\r\n        \"overrides\": []\r\n      },\r\n
+    \     \"gridPos\": {\r\n        \"h\": 8,\r\n        \"w\": 12,\r\n        \"x\":
+    0,\r\n        \"y\": 0\r\n      },\r\n      \"id\": 2,\r\n      \"options\": {\r\n
+    \       \"legend\": {\r\n          \"calcs\": [\r\n            \"mean\",\r\n            \"max\"\r\n
+    \         ],\r\n          \"displayMode\": \"list\",\r\n          \"placement\":
+    \"bottom\"\r\n        },\r\n        \"tooltip\": {\r\n          \"mode\": \"single\"\r\n
+    \       }\r\n      },\r\n      \"pluginVersion\": \"7.0.0\",\r\n      \"targets\":
+    [\r\n        {\r\n          \"alias\": \"IncomingRecords\",\r\n          \"dimensions\":
+    {\r\n            \"StreamName\": \"robot-telemetry-stream\"\r\n          },\r\n
+    \         \"expression\": \"\",\r\n          \"id\": \"\",\r\n          \"matchExact\":
+    true,\r\n          \"metricName\": \"IncomingRecords\",\r\n          \"namespace\":
+    \"AWS/Kinesis\",\r\n          \"period\": \"60\",\r\n          \"refId\": \"A\",\r\n
+    \         \"statistics\": [\r\n            \"Average\"\r\n          ]\r\n        }\r\n
+    \     ],\r\n      \"title\": \"Kinesis Data Stream - Incoming Records\",\r\n      \"type\":
+    \"timeseries\"\r\n    },\r\n    {\r\n      \"datasource\": \"${DS_CLOUDWATCH}\",\r\n
+    \     \"fieldConfig\": {\r\n        \"defaults\": {\r\n          \"color\": {\r\n
+    \           \"mode\": \"palette-classic\"\r\n          },\r\n          \"custom\":
+    {\r\n            \"axisLabel\": \"Records\",\r\n            \"axisPlacement\":
+    \"auto\",\r\n            \"barAlignment\": 0,\r\n            \"drawStyle\": \"line\",\r\n
+    \           \"fillOpacity\": 10,\r\n            \"gradientMode\": \"none\",\r\n
+    \           \"hideFrom\": {\r\n              \"tooltip\": false,\r\n              \"viz\":
+    false,\r\n              \"legend\": false\r\n            },\r\n            \"lineInterpolation\":
+    \"linear\",\r\n            \"lineWidth\": 2,\r\n            \"pointSize\": 5,\r\n
+    \           \"scaleDistribution\": {\r\n              \"type\": \"linear\"\r\n
+    \           },\r\n            \"showPoints\": \"auto\",\r\n            \"spanNulls\":
+    false,\r\n            \"stacking\": {\r\n              \"group\": \"A\",\r\n              \"mode\":
+    \"none\"\r\n            },\r\n            \"thresholdsStyle\": {\r\n              \"mode\":
+    \"off\"\r\n            }\r\n          },\r\n          \"mappings\": [],\r\n          \"thresholds\":
+    {\r\n            \"mode\": \"absolute\",\r\n            \"steps\": [\r\n              {\r\n
+    \               \"color\": \"green\",\r\n                \"value\": null\r\n              }\r\n
+    \           ]\r\n          }\r\n        },\r\n        \"overrides\": []\r\n      },\r\n
+    \     \"gridPos\": {\r\n        \"h\": 8,\r\n        \"w\": 12,\r\n        \"x\":
+    12,\r\n        \"y\": 0\r\n      },\r\n      \"id\": 3,\r\n      \"options\":
+    {\r\n        \"legend\": {\r\n          \"calcs\": [\r\n            \"mean\",\r\n
+    \           \"max\"\r\n          ],\r\n          \"displayMode\": \"list\",\r\n
+    \         \"placement\": \"bottom\"\r\n        },\r\n        \"tooltip\": {\r\n
+    \         \"mode\": \"single\"\r\n        }\r\n      },\r\n      \"pluginVersion\":
+    \"7.0.0\",\r\n      \"targets\": [\r\n        {\r\n          \"alias\": \"DeliveryToS3.Records\",\r\n
+    \         \"dimensions\": {\r\n            \"DeliveryStreamName\": \"robot-telemetry-firehose\"\r\n
+    \         },\r\n          \"expression\": \"\",\r\n          \"id\": \"\",\r\n
+    \         \"matchExact\": true,\r\n          \"metricName\": \"DeliveryToS3.Records\",\r\n
+    \         \"namespace\": \"AWS/Firehose\",\r\n          \"period\": \"60\",\r\n
+    \         \"refId\": \"A\",\r\n          \"statistics\": [\r\n            \"Sum\"\r\n
+    \         ]\r\n        }\r\n      ],\r\n      \"title\": \"Kinesis Firehose -
+    Delivery to S3\",\r\n      \"type\": \"timeseries\"\r\n    },\r\n    {\r\n      \"datasource\":
+    \"${DS_CLOUDWATCH}\",\r\n      \"fieldConfig\": {\r\n        \"defaults\": {\r\n
+    \         \"color\": {\r\n            \"mode\": \"palette-classic\"\r\n          },\r\n
+    \         \"custom\": {\r\n            \"axisLabel\": \"Percentage\",\r\n            \"axisPlacement\":
+    \"auto\",\r\n            \"barAlignment\": 0,\r\n            \"drawStyle\": \"line\",\r\n
+    \           \"fillOpacity\": 10,\r\n            \"gradientMode\": \"none\",\r\n
+    \           \"hideFrom\": {\r\n              \"tooltip\": false,\r\n              \"viz\":
+    false,\r\n              \"legend\": false\r\n            },\r\n            \"lineInterpolation\":
+    \"linear\",\r\n            \"lineWidth\": 2,\r\n            \"pointSize\": 5,\r\n
+    \           \"scaleDistribution\": {\r\n              \"type\": \"linear\"\r\n
+    \           },\r\n            \"showPoints\": \"auto\",\r\n            \"spanNulls\":
+    false,\r\n            \"stacking\": {\r\n              \"group\": \"A\",\r\n              \"mode\":
+    \"none\"\r\n            },\r\n            \"thresholdsStyle\": {\r\n              \"mode\":
+    \"off\"\r\n            }\r\n          },\r\n          \"mappings\": [],\r\n          \"thresholds\":
+    {\r\n            \"mode\": \"absolute\",\r\n            \"steps\": [\r\n              {\r\n
+    \               \"color\": \"green\",\r\n                \"value\": null\r\n              },\r\n
+    \             {\r\n                \"color\": \"yellow\",\r\n                \"value\":
+    70\r\n              },\r\n              {\r\n                \"color\": \"red\",\r\n
+    \               \"value\": 85\r\n              }\r\n            ]\r\n          }\r\n
+    \       },\r\n        \"overrides\": []\r\n      },\r\n      \"gridPos\": {\r\n
+    \       \"h\": 8,\r\n        \"w\": 12,\r\n        \"x\": 0,\r\n        \"y\":
+    8\r\n      },\r\n      \"id\": 4,\r\n      \"options\": {\r\n        \"legend\":
+    {\r\n          \"calcs\": [\r\n            \"mean\",\r\n            \"max\"\r\n
+    \         ],\r\n          \"displayMode\": \"list\",\r\n          \"placement\":
+    \"bottom\"\r\n        },\r\n        \"tooltip\": {\r\n          \"mode\": \"single\"\r\n
+    \       }\r\n      },\r\n      \"pluginVersion\": \"7.0.0\",\r\n      \"targets\":
+    [\r\n        {\r\n          \"alias\": \"CPU Utilization\",\r\n          \"dimensions\":
+    {\r\n            \"ClusterName\": \"robot-telemetry-cluster\",\r\n            \"NodeFromLabel\":
+    \"node\"\r\n          },\r\n          \"expression\": \"\",\r\n          \"id\":
+    \"\",\r\n          \"matchExact\": false,\r\n          \"metricName\": \"node_cpu_utilization\",\r\n
+    \         \"namespace\": \"ContainerInsights\",\r\n          \"period\": \"60\",\r\n
+    \         \"refId\": \"A\",\r\n          \"statistics\": [\r\n            \"Average\"\r\n
+    \         ]\r\n        }\r\n      ],\r\n      \"title\": \"EKS Node CPU Utilization\",\r\n
+    \     \"type\": \"timeseries\"\r\n    },\r\n    {\r\n      \"datasource\": \"${DS_CLOUDWATCH}\",\r\n
+    \     \"fieldConfig\": {\r\n        \"defaults\": {\r\n          \"color\": {\r\n
+    \           \"mode\": \"palette-classic\"\r\n          },\r\n          \"custom\":
+    {\r\n            \"axisLabel\": \"Bytes\",\r\n            \"axisPlacement\": \"auto\",\r\n
+    \           \"barAlignment\": 0,\r\n            \"drawStyle\": \"line\",\r\n            \"fillOpacity\":
+    10,\r\n            \"gradientMode\": \"none\",\r\n            \"hideFrom\": {\r\n
+    \             \"tooltip\": false,\r\n              \"viz\": false,\r\n              \"legend\":
+    false\r\n            },\r\n            \"lineInterpolation\": \"linear\",\r\n
+    \           \"lineWidth\": 2,\r\n            \"pointSize\": 5,\r\n            \"scaleDistribution\":
+    {\r\n              \"type\": \"linear\"\r\n            },\r\n            \"showPoints\":
+    \"auto\",\r\n            \"spanNulls\": false,\r\n            \"stacking\": {\r\n
+    \             \"group\": \"A\",\r\n              \"mode\": \"none\"\r\n            },\r\n
+    \           \"thresholdsStyle\": {\r\n              \"mode\": \"off\"\r\n            }\r\n
+    \         },\r\n          \"mappings\": [],\r\n          \"thresholds\": {\r\n
+    \           \"mode\": \"absolute\",\r\n            \"steps\": [\r\n              {\r\n
+    \               \"color\": \"green\",\r\n                \"value\": null\r\n              }\r\n
+    \           ]\r\n          }\r\n        },\r\n        \"overrides\": []\r\n      },\r\n
+    \     \"gridPos\": {\r\n        \"h\": 8,\r\n        \"w\": 12,\r\n        \"x\":
+    12,\r\n        \"y\": 8\r\n      },\r\n      \"id\": 5,\r\n      \"options\":
+    {\r\n        \"legend\": {\r\n          \"calcs\": [\r\n            \"mean\",\r\n
+    \           \"max\"\r\n          ],\r\n          \"displayMode\": \"list\",\r\n
+    \         \"placement\": \"bottom\"\r\n        },\r\n        \"tooltip\": {\r\n
+    \         \"mode\": \"single\"\r\n        }\r\n      },\r\n      \"pluginVersion\":
+    \"7.0.0\",\r\n      \"targets\": [\r\n        {\r\n          \"alias\": \"Memory
+    Usage\",\r\n          \"dimensions\": {\r\n            \"ClusterName\": \"robot-telemetry-cluster\",\r\n
+    \           \"NodeFromLabel\": \"node\"\r\n          },\r\n          \"expression\":
+    \"\",\r\n          \"id\": \"\",\r\n          \"matchExact\": false,\r\n          \"metricName\":
+    \"node_memory_utilization\",\r\n          \"namespace\": \"ContainerInsights\",\r\n
+    \         \"period\": \"60\",\r\n          \"refId\": \"A\",\r\n          \"statistics\":
+    [\r\n            \"Average\"\r\n          ]\r\n        }\r\n      ],\r\n      \"title\":
+    \"EKS Node Memory Utilization\",\r\n      \"type\": \"timeseries\"\r\n    }\r\n
+    \ ],\r\n  \"refresh\": \"5m\",\r\n  \"schemaVersion\": 27,\r\n  \"style\": \"dark\",\r\n
+    \ \"tags\": [\r\n    \"robot-telemetry\",\r\n    \"pipeline\",\r\n    \"health\"\r\n
+    \ ],\r\n  \"templating\": {\r\n    \"list\": []\r\n  },\r\n  \"time\": {\r\n    \"from\":
+    \"now-6h\",\r\n    \"to\": \"now\"\r\n  },\r\n  \"timepicker\": {},\r\n  \"timezone\":
+    \"UTC\",\r\n  \"title\": \"Pipeline Health\",\r\n  \"uid\": \"pipeline-health-001\",\r\n
+    \ \"version\": 0\r\n}\r\n"
+  robot_fleet.json: "{\r\n  \"annotations\": {\r\n    \"list\": [\r\n      {\r\n        \"builtIn\":
+    1,\r\n        \"datasource\": \"-- Grafana --\",\r\n        \"enable\": true,\r\n
+    \       \"hide\": true,\r\n        \"iconColor\": \"rgba(0, 211, 255, 1)\",\r\n
+    \       \"name\": \"Annotations & Alerts\",\r\n        \"type\": \"dashboard\"\r\n
+    \     }\r\n    ]\r\n  },\r\n  \"editable\": true,\r\n  \"gnetId\": null,\r\n  \"graphTooltip\":
+    0,\r\n  \"id\": null,\r\n  \"links\": [],\r\n  \"panels\": [\r\n    {\r\n      \"datasource\":
+    \"${DS_ATHENA}\",\r\n      \"fieldConfig\": {\r\n        \"defaults\": {\r\n          \"color\":
+    {\r\n            \"mode\": \"palette-classic\"\r\n          },\r\n          \"custom\":
+    {\r\n            \"axisLabel\": \"Avg Motor Temp (°C)\",\r\n            \"axisPlacement\":
+    \"auto\",\r\n            \"barAlignment\": 0,\r\n            \"drawStyle\": \"bars\",\r\n
+    \           \"fillOpacity\": 100,\r\n            \"gradientMode\": \"none\",\r\n
+    \           \"hideFrom\": {\r\n              \"tooltip\": false,\r\n              \"viz\":
+    false,\r\n              \"legend\": false\r\n            },\r\n            \"lineInterpolation\":
+    \"linear\",\r\n            \"lineWidth\": 1,\r\n            \"pointSize\": 5,\r\n
+    \           \"scaleDistribution\": {\r\n              \"type\": \"linear\"\r\n
+    \           },\r\n            \"showPoints\": \"auto\",\r\n            \"spanNulls\":
+    false,\r\n            \"stacking\": {\r\n              \"group\": \"A\",\r\n              \"mode\":
+    \"none\"\r\n            },\r\n            \"thresholdsStyle\": {\r\n              \"mode\":
+    \"off\"\r\n            }\r\n          },\r\n          \"mappings\": [],\r\n          \"thresholds\":
+    {\r\n            \"mode\": \"absolute\",\r\n            \"steps\": [\r\n              {\r\n
+    \               \"color\": \"green\",\r\n                \"value\": null\r\n              },\r\n
+    \             {\r\n                \"color\": \"yellow\",\r\n                \"value\":
+    80\r\n              },\r\n              {\r\n                \"color\": \"red\",\r\n
+    \               \"value\": 90\r\n              }\r\n            ]\r\n          }\r\n
+    \       },\r\n        \"overrides\": []\r\n      },\r\n      \"gridPos\": {\r\n
+    \       \"h\": 8,\r\n        \"w\": 12,\r\n        \"x\": 0,\r\n        \"y\":
+    0\r\n      },\r\n      \"id\": 2,\r\n      \"options\": {\r\n        \"legend\":
+    {\r\n          \"calcs\": [],\r\n          \"displayMode\": \"list\",\r\n          \"placement\":
+    \"bottom\"\r\n        },\r\n        \"tooltip\": {\r\n          \"mode\": \"single\"\r\n
+    \       }\r\n      },\r\n      \"pluginVersion\": \"7.0.0\",\r\n      \"targets\":
+    [\r\n        {\r\n          \"rawSql\": \"SELECT robot_id, avg_motor_temp FROM
+    robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CURRENT_DATE - INTERVAL
+    '1' DAY AS DATE) ORDER BY avg_motor_temp DESC LIMIT 10\",\r\n          \"refId\":
+    \"A\"\r\n        }\r\n      ],\r\n      \"title\": \"Top 10 Robots by Avg Motor
+    Temperature\",\r\n      \"type\": \"timeseries\"\r\n    },\r\n    {\r\n      \"datasource\":
+    \"${DS_ATHENA}\",\r\n      \"fieldConfig\": {\r\n        \"defaults\": {\r\n          \"custom\":
+    {\r\n            \"align\": \"auto\",\r\n            \"displayMode\": \"auto\"\r\n
+    \         },\r\n          \"mappings\": [],\r\n          \"thresholds\": {\r\n
+    \           \"mode\": \"absolute\",\r\n            \"steps\": [\r\n              {\r\n
+    \               \"color\": \"green\",\r\n                \"value\": null\r\n              }\r\n
+    \           ]\r\n          }\r\n        },\r\n        \"overrides\": []\r\n      },\r\n
+    \     \"gridPos\": {\r\n        \"h\": 8,\r\n        \"w\": 12,\r\n        \"x\":
+    12,\r\n        \"y\": 0\r\n      },\r\n      \"id\": 3,\r\n      \"options\":
+    {\r\n        \"showHeader\": true\r\n      },\r\n      \"pluginVersion\": \"7.0.0\",\r\n
+    \     \"targets\": [\r\n        {\r\n          \"rawSql\": \"SELECT robot_id,
+    battery_drain FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CURRENT_DATE
+    - INTERVAL '1' DAY AS DATE) ORDER BY battery_drain DESC LIMIT 10\",\r\n          \"refId\":
+    \"A\"\r\n        }\r\n      ],\r\n      \"title\": \"Top 10 Robots by Battery
+    Drain\",\r\n      \"type\": \"table\"\r\n    }\r\n  ],\r\n  \"refresh\": \"1h\",\r\n
+    \ \"schemaVersion\": 27,\r\n  \"style\": \"dark\",\r\n  \"tags\": [\r\n    \"robot-telemetry\",\r\n
+    \   \"fleet\"\r\n  ],\r\n  \"templating\": {\r\n    \"list\": []\r\n  },\r\n  \"time\":
+    {\r\n    \"from\": \"now-7d\",\r\n    \"to\": \"now\"\r\n  },\r\n  \"timepicker\":
+    {},\r\n  \"timezone\": \"UTC\",\r\n  \"title\": \"Robot Fleet Status\",\r\n  \"uid\":
+    \"robot-fleet-001\",\r\n  \"version\": 0\r\n}\r\n"
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
