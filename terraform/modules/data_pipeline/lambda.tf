@@ -12,10 +12,11 @@ resource "aws_lambda_function" "alert" {
   filename         = "${path.module}/lambda_alert.zip"
   source_code_hash = filebase64sha256("${path.module}/lambda_alert.zip")
   role             = aws_iam_role.lambda_alert_role.arn
+  timeout          = 10
 
   environment {
     variables = {
-      SNS_TOPIC_ARN = aws_sns_topic.alerts.arn
+      SLACK_WEBHOOK_URL = var.slack_webhook_url
     }
   }
 

@@ -1,12 +1,11 @@
 import base64
 import json
-import boto3
 import os
+import urllib.request
+import boto3
 
-sns = boto3.client("sns")
-
-# Module-level cache for portal_url (cold start optimization)
 _portal_url: str | None = None
+
 
 def _get_portal_url() -> str:
     """Get portal URL from SSM Parameter Store (cached at cold start)."""
@@ -20,21 +19,32 @@ def _get_portal_url() -> str:
             _portal_url = ""
     return _portal_url
 
+
+def _post_to_slack(webhook_url: str, text: str) -> None:
+    payload = json.dumps({"text": text}).encode("utf-8")
+    req = urllib.request.Request(
+        webhook_url,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        if resp.status >= 300:
+            raise RuntimeError(f"Slack POST failed: status={resp.status}")
+
+
 def handler(event, context):
-    sns_topic_arn = os.environ["SNS_TOPIC_ARN"]
+    webhook_url = os.environ["SLACK_WEBHOOK_URL"]
     portal_url = _get_portal_url()
 
     for record in event["Records"]:
         try:
-            # Decode Kinesis payload
             payload = json.loads(base64.b64decode(record["kinesis"]["data"]))
 
-            # Extract alert fields
             robot_id = payload.get("robot_id", "UNKNOWN")
             motor_temp = payload.get("max_motor_temp") or payload.get("motor_temp", "?")
             timestamp = payload.get("window_end") or payload.get("timestamp", "?")
 
-            # Format alert message with deeplink
             header = f"[⚠️ 이상 감지] robot_id: {robot_id} | motor_temp: {motor_temp}°C | 감지: {timestamp}"
             if portal_url:
                 footer = f"🔗 포털: {portal_url}/?robot_id={robot_id}"
@@ -42,15 +52,9 @@ def handler(event, context):
                 footer = "🔗 포털 URL 조회 실패"
             message = f"{header}\n{footer}"
 
-            # Publish to SNS
-            sns.publish(
-                TopicArn=sns_topic_arn,
-                Subject="로봇 이상 감지 알림",
-                Message=message
-            )
+            _post_to_slack(webhook_url, message)
         except Exception as e:
             print(f"Error processing record: {str(e)}")
-            # Continue processing other records instead of raising
 
     return {
         "statusCode": 200,
