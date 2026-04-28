@@ -167,7 +167,7 @@ async def chat(request: Request, req: ChatRequest):
 
     model_id = os.environ.get(
         "BEDROCK_MODEL_ID",
-        "anthropic.claude-3-5-sonnet-20241022-v2:0",
+        "eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
     )
 
     system_prompt = (
@@ -263,9 +263,9 @@ async def predict_failure(request: Request, body: PredictRequest):
 @app.get("/", response_class=HTMLResponse)
 async def portal(request: Request, robot_id: str = ""):
     return templates.TemplateResponse(
+        request,
         "portal.html",
         {
-            "request": request,
             "robot_id": robot_id,
             "GRAFANA_URL": _get_grafana_url(),
         },

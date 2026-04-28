@@ -35,7 +35,7 @@ spec:
             - containerPort: 8000
           env:
             - name: BEDROCK_MODEL_ID
-              value: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+              value: "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
             - name: ATHENA_DATABASE
               value: "robot_telemetry_db"
             - name: ATHENA_WORKGROUP

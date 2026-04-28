@@ -27,7 +27,7 @@
    ```python
    BEDROCK_MODEL_ID = os.environ.get(
        "BEDROCK_MODEL_ID",
-       "anthropic.claude-3-5-sonnet-20241022-v2:0",  # Claude 3.5 Sonnet v2
+       "eu.anthropic.claude-sonnet-4-5-20250929-v1:0",  # Claude Sonnet 4.5 (EU inference profile)
    )
    ```
    기존 `claude-3-haiku-20240307-v1:0` 기본값이 있으면 위로 교체.
@@ -153,7 +153,7 @@ python3 -m py_compile src/api/main.py && echo "OK: py compile"
 grep -q "^slowapi" requirements.txt && echo "OK: slowapi in requirements"
 
 # 2) 모델 ID 변경
-grep -q "claude-3-5-sonnet-20241022-v2:0" src/api/main.py && echo "OK: sonnet 3.5 default"
+grep -q "eu.anthropic.claude-sonnet-4-5-20250929-v1:0" src/api/main.py && echo "OK: sonnet 4.5 EU default"
 ! grep -q 'claude-3-haiku-20240307' src/api/main.py && echo "OK: no haiku default"
 
 # 3) Bedrock body 구조
@@ -184,7 +184,7 @@ grep -q "configMapKeyRef\|kind: ConfigMap" k8s/api/deployment.yaml || ls k8s/api
 
 1. 위 AC 커맨드 모두 OK.
 2. 아키텍처 체크리스트:
-   - Bedrock 모델 기본값이 `anthropic.claude-3-5-sonnet-20241022-v2:0` 인가?
+   - Bedrock 모델 기본값이 `eu.anthropic.claude-sonnet-4-5-20250929-v1:0` 인가?
    - `system` 필드가 messages 배열 밖에 분리됐는가?
    - timezone이 `Asia/Seoul`로 명시됐는가?
    - portal.html이 Jinja 또는 ConfigMap env로 GRAFANA_URL을 받는가? (HTML 안 하드코딩 금지)

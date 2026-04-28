@@ -37,9 +37,9 @@ data "aws_iam_policy_document" "generator_kinesis" {
   }
 
   statement {
-    sid       = "GlueSchemaRegistryRead"
-    effect    = "Allow"
-    actions   = [
+    sid    = "GlueSchemaRegistryRead"
+    effect = "Allow"
+    actions = [
       "glue:GetSchema",
       "glue:GetSchemaVersion",
       "glue:GetSchemaByDefinition",
@@ -98,6 +98,18 @@ data "aws_iam_policy_document" "firehose_delivery" {
       "glue:GetTableVersions",
     ]
     resources = ["*"]
+  }
+
+  # Firehose KDS source 읽기 권한 — kinesis_source_configuration에 필요
+  statement {
+    effect = "Allow"
+    actions = [
+      "kinesis:DescribeStream",
+      "kinesis:GetShardIterator",
+      "kinesis:GetRecords",
+      "kinesis:ListShards",
+    ]
+    resources = [aws_kinesis_stream.main.arn]
   }
 }
 
@@ -351,7 +363,7 @@ data "aws_iam_policy_document" "airflow_permissions" {
     actions = [
       "s3:GetObject",
       "s3:PutObject",
-      "s3:DeleteObject",      # 멱등성: silver/gold 파티션 삭제 후 INSERT
+      "s3:DeleteObject", # 멱등성: silver/gold 파티션 삭제 후 INSERT
       "s3:GetBucketLocation",
       "s3:ListBucket",
     ]

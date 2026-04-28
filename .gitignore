@@ -22,6 +22,11 @@ terraform/*.tfstate
 terraform/*.tfstate.backup
 terraform/*.tfvars
 terraform/.terraform.lock.hcl
+# tfvars 추가 패턴 (어느 위치든 보호)
+terraform.tfvars
+terraform.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
 
 # Lambda 빌드 아티팩트
 terraform/lambda_*.zip

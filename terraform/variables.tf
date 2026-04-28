@@ -6,6 +6,12 @@ variable "project_name" {
   default = "robot-telemetry"
 }
 
+variable "s3_bucket_name" {
+  description = "Data Lake S3 bucket name (Bronze/Silver/Gold layers)"
+  type        = string
+  default     = "de-ai-06-smartfactory-bucket"
+}
+
 variable "eks_cluster_name" {
   default = "robot-telemetry-cluster"
 }

@@ -6,15 +6,19 @@ variable "aws_region" {
   type = string
 }
 
-# ⚠️ DATA-ONLY DEPLOY: EKS OIDC 변수는 더미값. 복구 시 default 제거하고 main.tf에서 다시 주입.
+variable "datalake_bucket_name" {
+  description = "Data Lake S3 bucket name passed from root"
+  type        = string
+}
+
 variable "eks_oidc_provider_arn" {
-  type    = string
-  default = "arn:aws:iam::000000000000:oidc-provider/DUMMY"
+  description = "EKS OIDC provider ARN (root에서 aws_iam_openid_connect_provider.eks.arn 전달)"
+  type        = string
 }
 
 variable "eks_oidc_issuer_url" {
-  type    = string
-  default = "https://oidc.eks.eu-west-1.amazonaws.com/id/DUMMY"
+  description = "EKS OIDC issuer URL (root에서 aws_iam_openid_connect_provider.eks.url 전달)"
+  type        = string
 }
 
 variable "environment" {
@@ -26,15 +30,12 @@ variable "slack_webhook_url" {
   description = "Slack Webhook URL for alert notifications (injected from .env)"
   type        = string
   sensitive   = true
-  default     = "DUMMY" # ⚠️ DATA-ONLY DEPLOY: SNS 비활성화 상태이므로 미사용
 }
 
-# ⚠️ DATA-ONLY DEPLOY: Grafana 비활성화 상태이므로 default 더미. 복구 시 default 제거.
 variable "grafana_admin_password" {
-  description = "Grafana admin password (managed by AWS Secrets Manager)"
+  description = "Grafana admin password (Helm 수동 설치 후 사용. 현재 모듈 내 미참조)"
   type        = string
   sensitive   = true
-  default     = "DUMMY"
 }
 
 variable "kds_main_shard_count" {
