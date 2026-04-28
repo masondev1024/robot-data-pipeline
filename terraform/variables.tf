@@ -47,3 +47,15 @@ variable "grafana_admin_password" {
   sensitive   = true
   default     = "changeme123"
 }
+
+variable "kds_main_shard_count" {
+  description = "Telemetry KDS shard count. 운영 기본 10. 시연/비용 절감 시 1로 축소."
+  type        = number
+  default     = 10
+}
+
+variable "kds_alert_shard_count" {
+  description = "Anomaly alert KDS shard count. 운영 기본 2. 시연 시 1로 축소."
+  type        = number
+  default     = 2
+}

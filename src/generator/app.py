@@ -3,12 +3,12 @@ import csv
 import json
 import os
 import random
+import signal
 from datetime import datetime, timezone
-from pathlib import Path
 
 import boto3
 
-from src.generator.schema_validator import validate_record
+from src.generator.schema_validator import get_failure_count, validate_record
 
 
 # ── 1. Seed CSV 로딩 ──────────────────────────────────────────
@@ -58,18 +58,22 @@ def load_profiles(csv_path: str, robot_count: int) -> list[dict]:
 
 # ── 2. 로봇 시뮬레이터 (1 coroutine = 1 로봇) ──────────────────
 
-async def simulate_robot(profile: dict, queue: asyncio.Queue) -> None:
-    """초당 1건 센서 레코드를 생성하여 queue에 넣는다. 무한 루프."""
+async def simulate_robot(profile: dict,
+                          queue: asyncio.Queue,
+                          tick_interval: float,
+                          shutdown: asyncio.Event) -> None:
+    """tick_interval초마다 센서 레코드 1건 생성하여 queue에 넣는다.
+    shutdown 이벤트가 set되면 즉시 종료."""
     battery = profile["battery"]
     drift   = 0.0  # 점진적 온도 드리프트
 
-    while True:
+    while not shutdown.is_set():
         # motor_temp: 베이스 ± 가우시안 노이즈 + 드리프트
         noise = random.gauss(0, 2)
         spike = 0.0
         if profile["is_faulty"] and random.random() < 0.05:
             spike = random.uniform(91, 99) - profile["motor_temp_base"]
-        drift = drift * 0.99 + random.gauss(0, 0.1)  # 천천히 변화
+        drift = drift * 0.99 + random.gauss(0, 0.1)
         motor_temp = round(
             min(110.0, max(55.0,
                 profile["motor_temp_base"] + noise + drift + spike)), 2)
@@ -93,26 +97,101 @@ async def simulate_robot(profile: dict, queue: asyncio.Queue) -> None:
             "timestamp":     datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
         await queue.put(record)
-        await asyncio.sleep(1.0)
+        try:
+            await asyncio.wait_for(shutdown.wait(), timeout=tick_interval)
+            return  # shutdown 신호 도착 → 종료
+        except asyncio.TimeoutError:
+            continue  # 다음 tick
 
 
-# ── 3. 배치 전송 (put_records 500건) ───────────────────────────
+# ── 3. 배치 전송 (put_records 500건 + 재시도) ──────────────────
+
+# 누적 카운터 (graceful shutdown 시 stdout에 보고)
+sent_count: int = 0
+failed_count: int = 0
+
+
+async def _send_with_retry(records: list[dict],
+                            stream_name: str,
+                            kinesis_client,
+                            max_attempts: int = 3) -> int:
+    """put_records 호출 + FailedRecordCount 검사 + 지수 백오프 재시도.
+
+    실패 인덱스만 추려서 재시도. 최종 실패 건은 stdout에 JSON으로 로깅하고
+    실패 건수를 반환한다 (호출자가 카운터에 누적).
+    """
+    loop = asyncio.get_event_loop()
+    attempt = 0
+    pending = records
+
+    while pending and attempt < max_attempts:
+        try:
+            response = await loop.run_in_executor(
+                None,
+                lambda b=pending: kinesis_client.put_records(
+                    StreamName=stream_name, Records=b),
+            )
+        except Exception as e:
+            # 전체 호출 실패 (네트워크/throttling 등) → 백오프 후 전체 재시도
+            backoff = (2 ** attempt) * 0.1 + random.uniform(0, 0.05)
+            print(json.dumps({
+                "event": "put_records_call_failed",
+                "attempt": attempt + 1,
+                "error": str(e),
+                "retry_in_s": round(backoff, 3),
+                "batch_size": len(pending),
+            }))
+            await asyncio.sleep(backoff)
+            attempt += 1
+            continue
+
+        failed_count_in_response = response.get("FailedRecordCount", 0)
+        if failed_count_in_response == 0:
+            return 0
+
+        # 실패한 인덱스만 추출 (응답의 Records 배열은 요청과 동일 순서)
+        next_pending = []
+        for i, result in enumerate(response.get("Records", [])):
+            if "ErrorCode" in result:
+                next_pending.append(pending[i])
+
+        backoff = (2 ** attempt) * 0.1 + random.uniform(0, 0.05)
+        print(json.dumps({
+            "event": "put_records_partial_failure",
+            "attempt": attempt + 1,
+            "failed": len(next_pending),
+            "total": len(pending),
+            "retry_in_s": round(backoff, 3),
+        }))
+        await asyncio.sleep(backoff)
+        pending = next_pending
+        attempt += 1
+
+    # max_attempts 후에도 남은 건은 최종 실패
+    if pending:
+        print(json.dumps({
+            "event": "put_records_giving_up",
+            "dropped": len(pending),
+            "sample_partition_keys": [r["PartitionKey"] for r in pending[:3]],
+        }))
+    return len(pending)
+
 
 async def batch_sender(queue: asyncio.Queue,
                         stream_name: str,
-                        kinesis_client) -> None:
-    """
-    queue에서 최대 500건씩 꺼내 put_records 호출.
-    50ms 간격 = 초당 최대 20회 배치 → 10,000 rec/sec 처리 가능.
-    """
-    loop = asyncio.get_event_loop()
+                        kinesis_client,
+                        shutdown: asyncio.Event) -> None:
+    """queue에서 최대 500건씩 꺼내 put_records.
+    shutdown 신호 후에도 큐가 빌 때까지 계속 flush."""
+    global sent_count, failed_count
+
     while True:
         batch = []
         while len(batch) < 500:
             try:
                 record = queue.get_nowait()
                 if not validate_record(record):
-                    continue  # schema 불일치 → drop (carrier로 들어가지 않음)
+                    continue
                 batch.append({
                     "Data":         json.dumps(record).encode(),
                     "PartitionKey": record["robot_id"],
@@ -121,34 +200,71 @@ async def batch_sender(queue: asyncio.Queue,
                 break
 
         if batch:
-            await loop.run_in_executor(
-                None,
-                lambda b=batch: kinesis_client.put_records(
-                    StreamName=stream_name, Records=b),
-            )
-
-        await asyncio.sleep(0.05)
+            failed = await _send_with_retry(batch, stream_name, kinesis_client)
+            sent_count += len(batch) - failed
+            failed_count += failed
+        else:
+            # 큐가 비었음. shutdown 중이면 종료, 아니면 잠시 대기.
+            if shutdown.is_set():
+                return
+            await asyncio.sleep(0.05)
 
 
 # ── 4. 진입점 ───────────────────────────────────────────────────
 
 async def main() -> None:
-    robot_count = int(os.environ.get("ROBOT_COUNT", "10000"))
-    stream_name = os.environ["KINESIS_STREAM_NAME"]
-    csv_path    = os.environ.get("SEED_CSV_PATH", "data/seed_data_sample.csv")
+    robot_count   = int(os.environ.get("ROBOT_COUNT", "10000"))
+    tick_interval = float(os.environ.get("TICK_INTERVAL_SECONDS", "1.0"))
+    stream_name   = os.environ["KINESIS_STREAM_NAME"]
+    csv_path      = os.environ.get("SEED_CSV_PATH", "data/seed_data_sample.csv")
 
-    print(f"Loading profiles from {csv_path} for {robot_count} robots...")
+    print(f"Loading profiles from {csv_path} for {robot_count} robots (tick={tick_interval}s)...")
     profiles = load_profiles(csv_path, robot_count)
 
     kinesis = boto3.client("kinesis", region_name=os.environ.get("AWS_DEFAULT_REGION", "eu-west-1"))
     queue   = asyncio.Queue(maxsize=robot_count * 2)
+    shutdown = asyncio.Event()
 
-    tasks = [asyncio.create_task(simulate_robot(p, queue)) for p in profiles]
-    tasks += [asyncio.create_task(batch_sender(queue, stream_name, kinesis))]
+    # SIGINT/SIGTERM 핸들러: shutdown 이벤트 set
+    loop = asyncio.get_running_loop()
+    def _request_shutdown():
+        if not shutdown.is_set():
+            print("\n[shutdown] signal received, draining queue...")
+            shutdown.set()
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, _request_shutdown)
+        except NotImplementedError:
+            # Windows에서 add_signal_handler 미지원 → KeyboardInterrupt로 처리됨
+            pass
+
+    sim_tasks = [asyncio.create_task(simulate_robot(p, queue, tick_interval, shutdown))
+                 for p in profiles]
+    sender_task = asyncio.create_task(batch_sender(queue, stream_name, kinesis, shutdown))
 
     print(f"Started {len(profiles)} robot simulators. Streaming to {stream_name}...")
-    await asyncio.gather(*tasks)
+
+    try:
+        await asyncio.gather(*sim_tasks, return_exceptions=True)
+    except KeyboardInterrupt:
+        # Windows fallback
+        _request_shutdown()
+
+    # simulator 모두 종료 → batch_sender가 큐 마지막까지 flush 후 자체 종료
+    await sender_task
+
+    drop = get_failure_count()
+    print(json.dumps({
+        "event": "shutdown_complete",
+        "sent": sent_count,
+        "failed": failed_count,
+        "schema_dropped": drop,
+    }))
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n[shutdown] forced exit")
