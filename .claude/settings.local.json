@@ -52,7 +52,15 @@
       "Bash(aws logs *)",
       "Bash(ROBOT_COUNT=100 KINESIS_STREAM_NAME=robot-telemetry-stream SEED_CSV_PATH=data/seed_data_sample.csv AWS_DEFAULT_REGION=eu-west-1 timeout 30 python3 -m src.generator.app)",
       "Bash(xargs -I {} aws kinesis get-records --shard-iterator {} --region eu-west-1)",
-      "Bash(aws kinesisanalyticsv2 *)"
+      "Bash(aws kinesisanalyticsv2 *)",
+      "Bash(xargs grep *)",
+      "Bash(xargs cat *)",
+      "Bash(unzip -l /c/Users/Dell3571/Desktop/robot-data-pipeline/terraform/modules/data_pipeline/lambda_alert.zip)",
+      "Bash(xargs ls *)",
+      "Bash(unzip -l /c/Users/Dell3571/Desktop/robot-data-pipeline/flink/anomaly_detection.zip)",
+      "Bash(terraform fmt *)",
+      "Bash(echo \"---FMT_EXIT_$?---\")",
+      "Bash(echo \"---VALIDATE_EXIT_$?---\")"
     ]
   }
 }

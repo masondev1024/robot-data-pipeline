@@ -22,7 +22,7 @@ spec:
   scaleTargetRef:
     name: robot-telemetry-generator
   minReplicaCount: 1
-  maxReplicaCount: 10
+  maxReplicaCount: 1
   pollingInterval: 30     # 30초마다 KDS 샤드 상태 폴링
   cooldownPeriod:  120    # 스케일 다운 대기 2분
   triggers:
@@ -30,7 +30,7 @@ spec:
       metadata:
         streamName: robot-telemetry-stream
         shardCount: "1"            # 샤드 1개당 Generator 레플리카 1개
-        awsRegion: ap-northeast-2
+        awsRegion: eu-west-1
         activationShardCount: "2"  # 2샤드 초과 시 스케일 시작 (평상시 트래픽 무시)
       authenticationRef:
         name: keda-aws-kds-auth

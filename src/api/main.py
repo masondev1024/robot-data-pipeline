@@ -221,8 +221,11 @@ async def chat(request: Request, req: ChatRequest):
     }
 
 
-sagemaker_runtime = boto3.client("sagemaker-runtime", region_name="eu-west-1")
-ENDPOINT_NAME = "robot-failure-predictor"
+sagemaker_runtime = boto3.client(
+    "sagemaker-runtime",
+    region_name=os.environ.get("AWS_DEFAULT_REGION", "eu-west-1"),
+)
+ENDPOINT_NAME = os.environ.get("SAGEMAKER_ENDPOINT_NAME", "robot-failure-predictor")
 
 
 class PredictRequest(BaseModel):

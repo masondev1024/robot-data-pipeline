@@ -2,8 +2,8 @@ CREATE EXTERNAL TABLE IF NOT EXISTS robot_telemetry_db.bronze_robot_telemetry (
     robot_id      STRING,
     pos_x         DOUBLE,
     pos_y         DOUBLE,
-    battery_level INT,
-    current_load  INT,
+    battery_level DOUBLE,
+    current_load  DOUBLE,
     motor_temp    DOUBLE,
     `timestamp`   STRING
 )

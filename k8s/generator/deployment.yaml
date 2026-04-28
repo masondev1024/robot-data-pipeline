@@ -23,13 +23,15 @@ spec:
           image: <ECR_URL>/robot-telemetry-generator:latest
           env:
             - name: ROBOT_COUNT
-              value: "10000"
+              value: "50"
+            - name: TICK_INTERVAL_SECONDS
+              value: "0.5"
             - name: KINESIS_STREAM_NAME
               value: "robot-telemetry-stream"
             - name: KINESIS_ALERT_STREAM_NAME
               value: "robot-anomaly-alert-stream"
             - name: AWS_DEFAULT_REGION
-              value: "ap-northeast-2"
+              value: "eu-west-1"
             - name: SEED_CSV_PATH
               value: "/data/seed_data_sample.csv"
           volumeMounts:
@@ -38,11 +40,11 @@ spec:
               readOnly: true
           resources:
             requests:
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
               cpu: "500m"
               memory: "1Gi"
-            limits:
-              cpu: "2"
-              memory: "2Gi"
       volumes:
         - name: seed-data
           configMap:

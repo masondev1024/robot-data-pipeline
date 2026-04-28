@@ -35,11 +35,12 @@ def handler(event, context):
             timestamp = payload.get("window_end") or payload.get("timestamp", "?")
 
             # Format alert message with deeplink
-            message = (
-                f"[⚠️ 이상 감지] robot_id: {robot_id} | motor_temp: {motor_temp}°C | 감지: {timestamp}\n"
-                f"🔗 포털: {portal_url}/?robot_id={robot_id}" if portal_url
-                else f"[⚠️ 이상 감지] robot_id: {robot_id} | motor_temp: {motor_temp}°C | 감지: {timestamp}\n🔗 포털 URL 조회 실패"
-            )
+            header = f"[⚠️ 이상 감지] robot_id: {robot_id} | motor_temp: {motor_temp}°C | 감지: {timestamp}"
+            if portal_url:
+                footer = f"🔗 포털: {portal_url}/?robot_id={robot_id}"
+            else:
+                footer = "🔗 포털 URL 조회 실패"
+            message = f"{header}\n{footer}"
 
             # Publish to SNS
             sns.publish(

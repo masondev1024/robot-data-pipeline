@@ -137,7 +137,7 @@
       "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
       "options": {
         "mode": "html",
-        "content": "<div style=\"display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column\"><p style=\"font-size:14px;color:#aaa\">X-Ray Service Map</p><p style=\"font-size:12px;color:#666\">Open AWS Console → X-Ray → Service Map<br/>Filter: robot-telemetry namespace</p><a href=\"https://ap-northeast-2.console.aws.amazon.com/xray/home#/service-map\" target=\"_blank\" style=\"color:#5794f2\">View in AWS Console →</a></div>"
+        "content": "<div style=\"display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column\"><p style=\"font-size:14px;color:#aaa\">X-Ray Service Map</p><p style=\"font-size:12px;color:#666\">Open AWS Console → X-Ray → Service Map<br/>Filter: robot-telemetry namespace</p><a href=\"https://eu-west-1.console.aws.amazon.com/xray/home?region=eu-west-1#/service-map\" target=\"_blank\" style=\"color:#5794f2\">View in AWS Console →</a></div>"
       }
     }
   ],

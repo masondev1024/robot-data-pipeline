@@ -74,7 +74,7 @@ def main():
     props = load_application_properties("robot-app-config")
     main_stream = props.get("kinesis.main.stream", "robot-telemetry-stream")
     alert_stream = props.get("kinesis.alert.stream", "robot-anomaly-alert-stream")
-    s3_alerts_path = props.get("s3.alerts.path", "s3://robot-telemetry-bucket/alerts/")
+    s3_alerts_path = props.get("s3.alerts.path", "s3://de-ai-06-smartfactory-bucket/alerts/")
     region = props.get("aws.region", "eu-west-1")
     zscore_thr = float(props.get("zscore.threshold", "3.0"))
     sigma_floor = float(props.get("zscore.sigma.floor", "0.5"))

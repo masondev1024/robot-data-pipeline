@@ -5,10 +5,10 @@ import boto3
 from airflow import DAG
 from airflow.operators.python import PythonOperator, ShortCircuitOperator
 
-S3_BUCKET = "de-ai-06-smartfactory-bucket"
-ATHENA_DATABASE = "robot_telemetry_db"
-ATHENA_WORKGROUP = "robot-telemetry-workgroup"
-ATHENA_OUTPUT = f"s3://{S3_BUCKET}/project-athena-results/"
+S3_BUCKET = os.environ.get("S3_BUCKET_NAME", "de-ai-06-smartfactory-bucket")
+ATHENA_DATABASE = os.environ.get("ATHENA_DATABASE", "robot_telemetry_db")
+ATHENA_WORKGROUP = os.environ.get("ATHENA_WORKGROUP", "robot-telemetry-workgroup")
+ATHENA_OUTPUT = os.environ.get("ATHENA_OUTPUT_LOCATION", f"s3://{S3_BUCKET}/project-athena-results/")
 
 default_args = {
     "owner": "robot-telemetry",
@@ -237,8 +237,12 @@ LIMIT 20
         "max_tokens": 512,
         "messages": [{"role": "user", "content": prompt}],
     })
+    model_id = os.environ.get(
+        "BEDROCK_MODEL_ID",
+        "anthropic.claude-3-5-sonnet-20241022-v2:0",
+    )
     response = bedrock.invoke_model(
-        modelId="anthropic.claude-3-haiku-20240307-v1:0",
+        modelId=model_id,
         contentType="application/json",
         accept="application/json",
         body=body,

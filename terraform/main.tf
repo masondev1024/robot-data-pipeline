@@ -4,7 +4,9 @@
 module "data_pipeline" {
   source = "./modules/data_pipeline"
 
-  project_name = var.project_name
-  aws_region   = var.aws_region
-  environment  = var.environment
+  project_name          = var.project_name
+  aws_region            = var.aws_region
+  environment           = var.environment
+  kds_main_shard_count  = var.kds_main_shard_count
+  kds_alert_shard_count = var.kds_alert_shard_count
 }

@@ -1,7 +1,7 @@
 # Kinesis Data Streams
 resource "aws_kinesis_stream" "main" {
   name             = "${var.project_name}-stream"
-  shard_count      = 10
+  shard_count      = var.kds_main_shard_count
   retention_period = 24
 
   tags = {
@@ -11,7 +11,7 @@ resource "aws_kinesis_stream" "main" {
 
 resource "aws_kinesis_stream" "alert" {
   name             = "robot-anomaly-alert-stream"
-  shard_count      = 2
+  shard_count      = var.kds_alert_shard_count
   retention_period = 24
 
   tags = {
@@ -31,12 +31,15 @@ resource "aws_kinesis_firehose_delivery_stream" "main" {
     prefix              = "bronze/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
     error_output_prefix = "bronze-dlq/!{firehose:error-output-type}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
 
-    buffer_size        = 64 # 최소값 (format conversion 필수)
-    buffer_interval    = 60 # 테스트용: 1분마다 플러시
+    buffering_size     = 64 # 최소값 (Parquet format conversion 필수)
+    buffering_interval = 60 # 테스트용: 1분마다 플러시 (시연 사각지대 최소화)
     compression_format = "UNCOMPRESSED"
 
+    # 시연용: timestamp 네임스페이스만 사용하므로 dynamic partitioning 비활성화.
+    # `!{timestamp:...}` 파티셔닝은 dynamic partitioning과 무관하게 동작함.
+    # (활성화하려면 processing_configuration의 JQ MetadataExtraction processor 필요)
     dynamic_partitioning_configuration {
-      enabled = true
+      enabled = false
     }
 
     data_format_conversion_configuration {
@@ -61,7 +64,8 @@ resource "aws_kinesis_firehose_delivery_stream" "main" {
       }
     }
 
-    s3_backup_mode = "Enabled"
+    # 시연용: 별도 백업 불필요. "Enabled" 시 s3_backup_configuration 블록 필수.
+    s3_backup_mode = "Disabled"
   }
 
   kinesis_source_configuration {

@@ -1,11 +1,13 @@
+import os
+
 import boto3
 import pandas as pd
 import sagemaker
 from sagemaker.xgboost import XGBoost
 
-ATHENA_DATABASE = "robot_telemetry_db"
-ATHENA_OUTPUT = "s3://de-ai-06-smartfactory-bucket/project-athena-results/"
-S3_BUCKET = "de-ai-06-smartfactory-bucket"
+S3_BUCKET = os.environ.get("S3_BUCKET_NAME", "de-ai-06-smartfactory-bucket")
+ATHENA_DATABASE = os.environ.get("ATHENA_DATABASE", "robot_telemetry_db")
+ATHENA_OUTPUT = os.environ.get("ATHENA_OUTPUT_LOCATION", f"s3://{S3_BUCKET}/project-athena-results/")
 MODEL_PREFIX = "ml-models/robot-failure-predictor"
 
 QUERY = """
@@ -55,7 +57,6 @@ def run_training_job(data_s3_uri: str, role_arn: str):
 
 
 if __name__ == "__main__":
-    import os
     data_uri = fetch_training_data()
     estimator = run_training_job(data_uri, os.environ["SAGEMAKER_ROLE_ARN"])
     estimator.deploy(
