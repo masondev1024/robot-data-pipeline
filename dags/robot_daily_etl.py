@@ -93,7 +93,7 @@ SELECT
     SUM(CASE WHEN motor_temp NOT BETWEEN 0 AND 500 THEN 1 ELSE 0 END)   AS bad_temp,
     SUM(CASE WHEN battery_level NOT BETWEEN 0 AND 100 THEN 1 ELSE 0 END) AS bad_battery
 FROM bronze_robot_telemetry
-WHERE year = {year} AND month = {month} AND day = {day}
+WHERE year = '{year:04d}' AND month = '{month:02d}' AND day = '{day:02d}'
 """
     execution_id = _run_athena_query(query)
 
@@ -157,7 +157,7 @@ FROM (
     SELECT *,
            ROW_NUMBER() OVER (PARTITION BY robot_id, timestamp ORDER BY timestamp) AS rn
     FROM bronze_robot_telemetry
-    WHERE year = {year} AND month = {month} AND day = {day}
+    WHERE year = '{year:04d}' AND month = '{month:02d}' AND day = '{day:02d}'
       AND robot_id IS NOT NULL
       AND battery_level BETWEEN 0 AND 100
       AND motor_temp BETWEEN 0 AND 500
