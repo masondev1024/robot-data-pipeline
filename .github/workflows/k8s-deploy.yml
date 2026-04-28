@@ -33,7 +33,7 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           if [ -f src/generator/Dockerfile ]; then
-            docker build -t $ECR_REGISTRY/robot-telemetry-generator:$IMAGE_TAG src/generator/
+            docker build -t $ECR_REGISTRY/robot-telemetry-generator:$IMAGE_TAG -f src/generator/Dockerfile .
             docker push $ECR_REGISTRY/robot-telemetry-generator:$IMAGE_TAG
             docker tag $ECR_REGISTRY/robot-telemetry-generator:$IMAGE_TAG $ECR_REGISTRY/robot-telemetry-generator:latest
             docker push $ECR_REGISTRY/robot-telemetry-generator:latest
