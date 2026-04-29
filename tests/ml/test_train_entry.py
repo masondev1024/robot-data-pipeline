@@ -66,13 +66,13 @@ class TestFeatureColumns:
 
             # Create CSV with expected columns
             df = pd.DataFrame({
+                "label": [0, 1, 1, 0],
                 "avg_motor_temp": [70, 88, 92, 60],
                 "max_motor_temp": [85, 95, 110, 70],
                 "battery_drain": [10, 20, 30, 5],
                 "active_hours": [8, 8, 12, 4],
-                "label": [0, 1, 1, 0],
             })
-            df.to_csv(train_dir / "train.csv", index=False)
+            df.to_csv(train_dir / "train.csv", index=False, header=False)
 
             # Mock XGBoost to capture feature handling
             with patch("xgboost.train") as mock_xgb_train:
@@ -107,13 +107,13 @@ class TestDataFrameProcessing:
 
             # Create test data
             test_data = pd.DataFrame({
+                "label": [0, 1, 1, 0],
                 "avg_motor_temp": [70.0, 88.0, 92.0, 60.0],
                 "max_motor_temp": [85.0, 95.0, 110.0, 70.0],
                 "battery_drain": [10, 20, 30, 5],
                 "active_hours": [8, 8, 12, 4],
-                "label": [0, 1, 1, 0],
             })
-            test_data.to_csv(train_dir / "train.csv", index=False)
+            test_data.to_csv(train_dir / "train.csv", index=False, header=False)
 
             # Mock xgboost methods
             with patch("xgboost.train") as mock_xgb_train:
@@ -154,12 +154,12 @@ class TestModelOutput:
 
             # Create test CSV
             pd.DataFrame({
+                "label": [0, 1],
                 "avg_motor_temp": [70, 88],
                 "max_motor_temp": [85, 95],
                 "battery_drain": [10, 20],
                 "active_hours": [8, 8],
-                "label": [0, 1],
-            }).to_csv(train_dir / "train.csv", index=False)
+            }).to_csv(train_dir / "train.csv", index=False, header=False)
 
             # Mock xgboost and capture save_model call
             with patch("xgboost.train") as mock_xgb_train:
