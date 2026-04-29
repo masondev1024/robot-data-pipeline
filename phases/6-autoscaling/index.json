@@ -10,7 +10,8 @@
       "depends_on": [],
       "description": "Generator 스케일링: KEDA ScaledObject 매니페스트를 표준 HorizontalPodAutoscaler로 교체. 사유: KEDA operator 미설치 + Generator는 producer라 KDS 샤드 트리거 패턴이 어색. API와 일관된 CPU/Mem 기반 HPA 채택.",
       "started_at": "2026-04-29T16:52:26+0900",
-      "summary": "k8s/generator/hpa.yaml KEDA → 표준 HPA 교체 (CPU 60/Mem 80, min 1/max 5, API HPA와 일관 behavior)"
+      "summary": "k8s/generator/hpa.yaml KEDA → 표준 HPA 교체 (CPU 60/Mem 80, min 1/max 5, API HPA와 일관 behavior)",
+      "completed_at": "2026-04-29T16:53:40+0900"
     },
     {
       "step": 1,
