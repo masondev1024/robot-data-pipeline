@@ -1,4 +1,9 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(aws cloudwatch *)"
+    ]
+  },
   "hooks": {
     "Stop": [
       {

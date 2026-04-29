@@ -7,9 +7,9 @@ graph TD
   classDef error fill:#f44336,stroke:#fff,color:#fff;
   classDef blocked fill:#FF9800,stroke:#fff,color:#fff;
   S0["0. generator-hpa-replace"]
-  class S0 pending;
+  class S0 completed;
   S1["1. karpenter-nodepool-enhance"]
-  class S1 pending;
+  class S1 completed;
   S2["2. load-demo-script"]
   class S2 pending;
   S0 --> S2

@@ -90,7 +90,8 @@
       "Read(//var/run/**)",
       "Bash(open -a Docker)",
       "Bash(docker version *)",
-      "Bash(break)"
+      "Bash(break)",
+      "Bash(aws cloudwatch *)"
     ]
   }
 }
