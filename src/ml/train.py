@@ -1,4 +1,5 @@
 import os
+import time
 
 import boto3
 import pandas as pd
@@ -12,12 +13,11 @@ MODEL_PREFIX = "ml-models/robot-failure-predictor"
 
 QUERY = """
 SELECT
-    robot_id,
+    CASE WHEN max_motor_temp > 90.0 THEN 1 ELSE 0 END AS label,
     avg_motor_temp,
     max_motor_temp,
     battery_drain,
-    active_hours,
-    CASE WHEN max_motor_temp > 90.0 THEN 1 ELSE 0 END AS label
+    active_hours
 FROM gold_robot_daily_stats
 WHERE dt >= date_format(current_date - interval '30' day, '%Y-%m-%d')
 """
@@ -31,8 +31,28 @@ def fetch_training_data():
         ResultConfiguration={"OutputLocation": ATHENA_OUTPUT},
     )
     execution_id = response["QueryExecutionId"]
-    # ... (폴링 로직)
-    return f"{ATHENA_OUTPUT}{execution_id}.csv"
+
+    for _ in range(150):
+        status = athena.get_query_execution(QueryExecutionId=execution_id)
+        state = status["QueryExecution"]["Status"]["State"]
+        if state == "SUCCEEDED":
+            break
+        if state in ("FAILED", "CANCELLED"):
+            reason = status["QueryExecution"]["Status"].get("StateChangeReason", "unknown")
+            raise RuntimeError(f"Athena query {state}: {reason}")
+        time.sleep(2)
+    else:
+        raise TimeoutError("Athena query timed out after 300s")
+
+    raw_uri = f"{ATHENA_OUTPUT}{execution_id}.csv"
+    s3 = boto3.client("s3", region_name="eu-west-1")
+    bucket, key = raw_uri.replace("s3://", "").split("/", 1)
+    body = s3.get_object(Bucket=bucket, Key=key)["Body"].read().decode("utf-8")
+    headerless = "\n".join(body.splitlines()[1:])
+
+    train_key = f"{MODEL_PREFIX}/train/{execution_id}.csv"
+    s3.put_object(Bucket=S3_BUCKET, Key=train_key, Body=headerless.encode("utf-8"))
+    return f"s3://{S3_BUCKET}/{train_key}"
 
 
 def run_training_job(data_s3_uri: str, role_arn: str):
