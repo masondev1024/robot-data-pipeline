@@ -18,7 +18,7 @@ set -euo pipefail
 NAMESPACE="${NAMESPACE:-robot-telemetry}"
 API_DEPLOY="${API_DEPLOY:-robot-telemetry-api}"
 GEN_DEPLOY="${GEN_DEPLOY:-robot-telemetry-generator}"
-API_INGRESS="${API_INGRESS:-robot-telemetry-api}"
+API_INGRESS="${API_INGRESS:-robot-telemetry-api-ingress}"
 LOAD_DURATION="${LOAD_DURATION:-5m}"
 LOAD_CONCURRENCY="${LOAD_CONCURRENCY:-50}"
 

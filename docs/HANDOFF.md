@@ -341,7 +341,7 @@ Flink Studio Notebook 동작 중, alert KDS → Lambda → Slack 흐름 살아�
 | `kubernetes.io/ingress.class` annotation deprecated | low | 동작은 함. `spec.ingressClassName: alb`로 마이그레이션 권장 |
 | Firehose `Compression: UNCOMPRESSED` | low | Parquet 자체에 SNAPPY 내장. 비용 최적화 시 추가 SNAPPY |
 | API ECR 이미지 tagging이 `latest`만 | medium | 발표 후 SHA 태그로 deploy 추적성 확보 권장 |
-| Karpenter `general` NodePool spot/on-demand 혼합 운영 중 | low | 시연 스크립트 `scripts/load_demo.sh`로 부하 시 신규 노드 자동 프로비저닝, 종료 시 5분 내 회수 검증됨 |
+| Karpenter v1.0.8 (helm) + 두 NodePool(default batch / general taintless) 운영 중 | low | 2026-04-29 풀 사이클 시연 검증: 30 stress pod → 4 spot 노드 자동 launch (t3.xlarge, eu-west-1b 집중) → 부하 제거 → consolidation으로 자동 회수 (4→1→0). IAM은 `scripts/setup_karpenter_iam.sh`로 별도 생성(terraform state 정합 추후 import). NodePool/EC2NodeClass는 Karpenter v1 spec(`karpenter.sh/v1`) — v1beta1은 strict decoding 거부. |
 | 현재 IAM `de-ai-06`에 `sagemaker:ListEndpoints` 없음 | medium | P2 SageMaker 데모 시 정책 추가 필요 |
 
 ---
