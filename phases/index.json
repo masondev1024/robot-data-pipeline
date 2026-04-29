@@ -41,6 +41,13 @@
       "pre_gate_check": "verify_serving_layer",
       "description": "Observability (X-Ray/OTEL) 및 ML 예측정비 (SageMaker) 구현",
       "completed_at": "2026-04-27T01:34:39+0900"
+    },
+    {
+      "dir": "6-autoscaling",
+      "status": "completed",
+      "gate_files": [],
+      "description": "Compute Layer 오토스케일링 완성 (Generator HPA 표준 채택 + Karpenter NodePool 강화 + 부하 시연 E2E)",
+      "completed_at": "2026-04-29T16:58:02+0900"
     }
   ]
 }

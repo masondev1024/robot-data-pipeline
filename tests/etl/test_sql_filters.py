@@ -64,9 +64,9 @@ def test_bronze_to_silver_uses_partition_keys(mock_run, mock_delete):
     """bronze WHERE 절은 year/month/day 파티션 키를 사용해야 한다 (dt 컬럼 X)."""
     _bronze_to_silver(**_ctx(2026, 4, 27))
     sql = mock_run.call_args[0][0]
-    assert "year = 2026" in sql
-    assert "month = 4" in sql
-    assert "day = 27" in sql
+    assert "year = '2026'" in sql
+    assert "month = '04'" in sql
+    assert "day = '27'" in sql
 
 
 # ── Silver → Gold SQL 검증 ────────────────────────────────────────

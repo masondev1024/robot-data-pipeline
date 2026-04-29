@@ -1,0 +1,42 @@
+{
+  "project": "Robot Telemetry Pipeline",
+  "phase": "6-autoscaling",
+  "domain": "k8s",
+  "steps": [
+    {
+      "step": 0,
+      "name": "generator-hpa-replace",
+      "status": "completed",
+      "depends_on": [],
+      "description": "Generator 스케일링: KEDA ScaledObject 매니페스트를 표준 HorizontalPodAutoscaler로 교체. 사유: KEDA operator 미설치 + Generator는 producer라 KDS 샤드 트리거 패턴이 어색. API와 일관된 CPU/Mem 기반 HPA 채택.",
+      "started_at": "2026-04-29T16:52:26+0900",
+      "summary": "k8s/generator/hpa.yaml KEDA → 표준 HPA 교체 (CPU 60/Mem 80, min 1/max 5, API HPA와 일관 behavior)",
+      "completed_at": "2026-04-29T16:53:40+0900"
+    },
+    {
+      "step": 1,
+      "name": "karpenter-nodepool-enhance",
+      "status": "completed",
+      "depends_on": [],
+      "description": "Karpenter NodePool 강화: 기존 default(batch taint) 보존 + 신규 general(taintless) 추가. consolidationPolicy/Drifted budget 명시 + instance-family/size/zone 다양화 + spot/on-demand 혼합.",
+      "started_at": "2026-04-29T16:52:26+0900",
+      "summary": "k8s/karpenter/nodepool.yaml: default NodePool 정책 보강(consolidationPolicy+Drifted budget) + 신규 general NodePool(taintless, instance-family/size/zone 다양화, spot/on-demand 혼합)",
+      "completed_at": "2026-04-29T16:54:50+0900"
+    },
+    {
+      "step": 2,
+      "name": "load-demo-script",
+      "status": "completed",
+      "depends_on": [
+        0,
+        1
+      ],
+      "description": "부하 시연 E2E: scripts/load_demo.sh (4단계 — hey API 부하, Generator ROBOT_COUNT 증가, Karpenter 신규 노드 프로비저닝, 노드 자동 회수) + docs/HANDOFF.md 알려진 이슈 항목 갱신.",
+      "started_at": "2026-04-29T16:54:50+0900",
+      "summary": "scripts/load_demo.sh 4단계 시연 자동화(hey API 부하/ROBOT_COUNT 300/Karpenter 가시화/자동 회수 폴링) + docs/HANDOFF.md 알려진 이슈 항목 갱신",
+      "completed_at": "2026-04-29T16:58:01+0900"
+    }
+  ],
+  "created_at": "2026-04-29T16:51:49+0900",
+  "completed_at": "2026-04-29T16:58:02+0900"
+}
