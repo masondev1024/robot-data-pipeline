@@ -44,9 +44,10 @@
     },
     {
       "dir": "6-autoscaling",
-      "status": "pending",
+      "status": "completed",
       "gate_files": [],
-      "description": "Compute Layer 오토스케일링 완성 (Generator HPA 표준 채택 + Karpenter NodePool 강화 + 부하 시연 E2E)"
+      "description": "Compute Layer 오토스케일링 완성 (Generator HPA 표준 채택 + Karpenter NodePool 강화 + 부하 시연 E2E)",
+      "completed_at": "2026-04-29T16:58:02+0900"
     }
   ]
 }
