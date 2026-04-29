@@ -26,12 +26,15 @@
     {
       "step": 2,
       "name": "load-demo-script",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [
         0,
         1
       ],
-      "description": "부하 시연 E2E: scripts/load_demo.sh (4단계 — hey API 부하, Generator ROBOT_COUNT 증가, Karpenter 신규 노드 프로비저닝, 노드 자동 회수) + docs/HANDOFF.md 알려진 이슈 항목 갱신."
+      "description": "부하 시연 E2E: scripts/load_demo.sh (4단계 — hey API 부하, Generator ROBOT_COUNT 증가, Karpenter 신규 노드 프로비저닝, 노드 자동 회수) + docs/HANDOFF.md 알려진 이슈 항목 갱신.",
+      "started_at": "2026-04-29T16:54:50+0900",
+      "summary": "scripts/load_demo.sh 4단계 시연 자동화(hey API 부하/ROBOT_COUNT 300/Karpenter 가시화/자동 회수 폴링) + docs/HANDOFF.md 알려진 이슈 항목 갱신",
+      "completed_at": "2026-04-29T16:55:30+0900"
     }
   ],
   "created_at": "2026-04-29T16:51:49+0900"
