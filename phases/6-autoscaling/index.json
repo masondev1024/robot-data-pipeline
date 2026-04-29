@@ -16,10 +16,11 @@
     {
       "step": 1,
       "name": "karpenter-nodepool-enhance",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [],
       "description": "Karpenter NodePool 강화: 기존 default(batch taint) 보존 + 신규 general(taintless) 추가. consolidationPolicy/Drifted budget 명시 + instance-family/size/zone 다양화 + spot/on-demand 혼합.",
-      "started_at": "2026-04-29T16:52:26+0900"
+      "started_at": "2026-04-29T16:52:26+0900",
+      "summary": "k8s/karpenter/nodepool.yaml: default NodePool 정책 보강(consolidationPolicy+Drifted budget) + 신규 general NodePool(taintless, instance-family/size/zone 다양화, spot/on-demand 혼합)"
     },
     {
       "step": 2,
