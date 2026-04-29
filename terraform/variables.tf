@@ -33,7 +33,7 @@ variable "github_owner" {
 }
 
 variable "github_repo" {
-  default = "robot-telemetry-platform"
+  default = "robot-data-pipeline"
 }
 
 variable "github_branch" {
@@ -55,13 +55,13 @@ variable "grafana_admin_password" {
 }
 
 variable "kds_main_shard_count" {
-  description = "Telemetry KDS shard count. 운영 기본 10. 시연/비용 절감 시 1로 축소."
+  description = "Telemetry KDS shard count. 학습/비용 절감 기본 1. 운영 시 10 권장."
   type        = number
-  default     = 10
+  default     = 1
 }
 
 variable "kds_alert_shard_count" {
-  description = "Anomaly alert KDS shard count. 운영 기본 2. 시연 시 1로 축소."
+  description = "Anomaly alert KDS shard count. 학습/비용 절감 기본 1. 운영 시 2 권장."
   type        = number
-  default     = 2
+  default     = 1
 }
