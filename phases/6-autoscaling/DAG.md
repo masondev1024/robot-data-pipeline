@@ -11,7 +11,7 @@ graph TD
   S1["1. karpenter-nodepool-enhance"]
   class S1 completed;
   S2["2. load-demo-script"]
-  class S2 pending;
+  class S2 completed;
   S0 --> S2
   S1 --> S2
 ```
