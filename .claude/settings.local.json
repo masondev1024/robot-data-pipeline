@@ -87,7 +87,10 @@
       "Bash(docker info *)",
       "Bash(docker context *)",
       "Bash(docker buildx *)",
-      "Read(//var/run/**)"
+      "Read(//var/run/**)",
+      "Bash(open -a Docker)",
+      "Bash(docker version *)",
+      "Bash(break)"
     ]
   }
 }
