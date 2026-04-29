@@ -2,13 +2,12 @@ apiVersion: karpenter.sh/v1beta1
 kind: NodePool
 metadata:
   name: default
-  namespace: karpenter
 spec:
-  # Template defines the nodes Karpenter will create
+  # Template defines the nodes Karpenter will create for batch workloads
   template:
     spec:
       requirements:
-        # On-demand instances (prefer cost-stability)
+        # On-demand instances (prefer cost-stability for batch jobs)
         - key: karpenter.sh/capacity-type
           operator: In
           values: ["on-demand"]
@@ -23,15 +22,10 @@ spec:
           operator: In
           values: ["amd64"]
 
-        # Target Kubernetes version
-        - key: kubernetes.io/version
-          operator: Gt
-          values: ["1.25"]
-
       nodeClassRef:
         name: default
 
-      # Taints: Allow scheduling only when explicitly tolerated
+      # Taints: Reserved for batch workloads (Airflow worker, etc.) — pods must tolerate
       taints:
         - key: workload
           value: batch
@@ -42,8 +36,9 @@ spec:
     cpu: 100
     memory: 100Gi
 
-  # Disruption budget: Allow controlled scale-down
+  # Disruption budget: Allow controlled scale-down + immediate Drifted replacement
   disruption:
+    consolidationPolicy: WhenEmptyOrUnderutilized
     consolidateAfter: 30s
     expireAfter: 720h
     budgets:
@@ -53,6 +48,65 @@ spec:
         reasons:
           - "Underutilized"
           - "Empty"
+      - nodes: "100%"
+        reasons:
+          - "Drifted"
+
+---
+apiVersion: karpenter.sh/v1beta1
+kind: NodePool
+metadata:
+  name: general
+spec:
+  # Template defines nodes for general (taintless) workloads — api, generator, etc.
+  template:
+    spec:
+      requirements:
+        # Spot preferred (cheapest); on-demand fallback when spot unavailable
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot", "on-demand"]
+
+        # Instance family diversity: compute (c5/c5a) + general (m5/m5a) + burstable (t3/t3a)
+        - key: karpenter.k8s.aws/instance-family
+          operator: In
+          values: ["c5", "c5a", "m5", "m5a", "t3", "t3a"]
+
+        # Instance size: medium ~ xlarge (right-sized for demo workloads)
+        - key: karpenter.k8s.aws/instance-size
+          operator: In
+          values: ["medium", "large", "xlarge"]
+
+        # AZ diversity: spread across all eu-west-1 zones for HA
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values: ["eu-west-1a", "eu-west-1b", "eu-west-1c"]
+
+        # Architecture: amd64 only
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+
+      nodeClassRef:
+        name: default
+      # No taints — general-purpose deployments (api, generator) schedule freely
+
+  # Limits define maximum resources Karpenter will provision
+  limits:
+    cpu: 200
+    memory: 200Gi
+
+  # Disruption budget: Consolidate aggressively + immediate Drifted replacement
+  disruption:
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 30s
+    expireAfter: 720h
+    budgets:
+      - nodes: "20%"
+        duration: 5m
+      - nodes: "100%"
+        reasons:
+          - "Drifted"
 
 ---
 apiVersion: karpenter.k8s.aws/v1beta1
