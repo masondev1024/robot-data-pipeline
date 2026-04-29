@@ -36,7 +36,7 @@ def setup_cache(monkeypatch):
 class TestChatApi:
     """POST /api/chat endpoint tests"""
 
-    @patch("src.api.main.boto3.client")
+    @patch("src.common.aws.boto3.client")
     def test_chat_normal_response(self, mock_boto, monkeypatch, mock_bedrock_response, setup_cache):
         """POST /api/chat returns 200 with answer, cached_at, data_date, links."""
         monkeypatch.setenv("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0")
@@ -60,7 +60,7 @@ class TestChatApi:
         assert "data_date" in data
         assert "links" in data
 
-    @patch("src.api.main.boto3.client")
+    @patch("src.common.aws.boto3.client")
     def test_chat_bedrock_invoke_params(self, mock_boto, monkeypatch, mock_bedrock_response, setup_cache):
         """Verify Bedrock invoke_model call params: modelId, system field, max_tokens."""
         monkeypatch.setenv("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0")
@@ -87,7 +87,7 @@ class TestChatApi:
         assert body["max_tokens"] == 512
         assert body["messages"][0]["role"] == "user"
 
-    @patch("src.api.main.boto3.client")
+    @patch("src.common.aws.boto3.client")
     def test_chat_links_extraction(self, mock_boto, monkeypatch, mock_bedrock_response, setup_cache):
         """Extract links from response text matching [ROBOT-XXXXX] pattern."""
         monkeypatch.setenv("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0")
@@ -113,7 +113,7 @@ class TestChatApi:
         assert data["links"][0]["url"] == "/?robot_id=ROBOT-00123"
         assert data["links"][1]["url"] == "/?robot_id=ROBOT-00456"
 
-    @patch("src.api.main.boto3.client")
+    @patch("src.common.aws.boto3.client")
     def test_chat_cache_not_ready_503(self, mock_boto, monkeypatch):
         """Return 503 when cache is not ready."""
         monkeypatch.setenv("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0")
@@ -123,7 +123,7 @@ class TestChatApi:
         response = client.post("/api/chat", json={"question": "test"})
         assert response.status_code == 503
 
-    @patch("src.api.main.boto3.client")
+    @patch("src.common.aws.boto3.client")
     def test_chat_rate_limit(self, mock_boto, monkeypatch, setup_cache):
         """Rate limit 10/minute: 11th request returns 429."""
         monkeypatch.setenv("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0")
@@ -150,7 +150,7 @@ class TestChatApi:
         resp11 = client.post("/api/chat", json={"question": "q10"})
         assert resp11.status_code == 429
 
-    @patch("src.api.main.boto3.client")
+    @patch("src.common.aws.boto3.client")
     def test_chat_system_field_in_body(self, mock_boto, monkeypatch, setup_cache):
         """Verify 'system' field is in invoke_model body (bug 4B fix)."""
         monkeypatch.setenv("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0")

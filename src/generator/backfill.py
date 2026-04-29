@@ -23,7 +23,6 @@ Usage:
     KDS 10 shards × 1MB/sec = 10MB/sec → ~7 분 소요 추정
 """
 
-import json
 import os
 import random
 import sys
@@ -32,6 +31,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Iterable, Iterator
 
 import boto3
+
+from src.common.aws import AWS_REGION
+from src.generator._record import ISO_Z_FMT, to_kinesis_record
+from src.generator.app import load_profiles
 
 
 def _load_dotenv(path: str = ".env") -> None:
@@ -52,12 +55,6 @@ def _load_dotenv(path: str = ".env") -> None:
 _load_dotenv(".env")
 _load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".env"))
 
-# 같은 패키지의 load_profiles 재사용 (CSV → robot 프로필 변환 로직 동일)
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from src.generator.app import load_profiles  # noqa: E402
-
-
-# ── 1. Timestamp 분산 생성 ───────────────────────────────────────
 
 def generate_timestamps(days: int, interval_min: int) -> list[datetime]:
     """[now - days, now) 범위에서 interval_min 간격으로 datetime list 생성."""
@@ -77,8 +74,6 @@ def generate_timestamps(days: int, interval_min: int) -> list[datetime]:
         t += interval
     return timestamps
 
-
-# ── 2. Record 생성 (단일 시점) ────────────────────────────────────
 
 def generate_record(profile: dict, t: datetime) -> dict:
     """Backfill용 단일 record. simulate_robot 알고리즘 단순화 — drift/battery 누적 없음.
@@ -104,11 +99,9 @@ def generate_record(profile: dict, t: datetime) -> dict:
         "battery_level": random.randint(20, 100),
         "current_load":  load,
         "motor_temp":    motor_temp,
-        "timestamp":     t.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "timestamp":     t.strftime(ISO_Z_FMT),
     }
 
-
-# ── 3. Record 스트림 (제너레이터 — 메모리 통제) ───────────────────
 
 def backfill_records(profiles: list[dict],
                       timestamps: list[datetime]) -> Iterator[dict]:
@@ -133,8 +126,6 @@ def chunked(iterable: Iterable[dict], size: int) -> Iterator[list[dict]]:
         yield chunk
 
 
-# ── 4. KDS Push ───────────────────────────────────────────────────
-
 KINESIS_BATCH_LIMIT = 500       # PutRecords 한도
 KINESIS_BATCH_SLEEP = 0.05      # batch 사이 sleep — KDS throughput throttle 회피
 
@@ -149,10 +140,7 @@ def push_to_kinesis(records: Iterable[dict],
     total = 0
     batch_idx = 0
     for batch in chunked(records, KINESIS_BATCH_LIMIT):
-        kinesis_records = [
-            {"Data": json.dumps(r).encode(), "PartitionKey": r["robot_id"]}
-            for r in batch
-        ]
+        kinesis_records = [to_kinesis_record(r) for r in batch]
         kinesis_client.put_records(StreamName=stream_name, Records=kinesis_records)
         total += len(batch)
         batch_idx += 1
@@ -162,15 +150,12 @@ def push_to_kinesis(records: Iterable[dict],
     return total
 
 
-# ── 5. 진입점 ─────────────────────────────────────────────────────
-
 def main() -> None:
     days         = int(os.environ.get("BACKFILL_DAYS", "7"))
     interval_min = int(os.environ.get("BACKFILL_INTERVAL_MIN", "5"))
     robot_count  = int(os.environ.get("ROBOT_COUNT", "10000"))
     stream_name  = os.environ["KINESIS_STREAM_NAME"]
     csv_path     = os.environ.get("SEED_CSV_PATH", "data/seed_data_sample.csv")
-    region       = os.environ.get("AWS_DEFAULT_REGION", "eu-west-1")
 
     if days <= 0:
         print(f"BACKFILL_DAYS={days} (≤0) — backfill mode disabled, exiting.")
@@ -185,9 +170,9 @@ def main() -> None:
         f"Backfill plan: {len(profiles):,} robots × {len(timestamps):,} timestamps "
         f"({days}d × {interval_min}min) = {total_expected:,} records"
     )
-    print(f"Target stream: {stream_name} ({region})")
+    print(f"Target stream: {stream_name} ({AWS_REGION})")
 
-    kinesis = boto3.client("kinesis", region_name=region)
+    kinesis = boto3.client("kinesis", region_name=AWS_REGION)
     t0 = time.monotonic()
     pushed = push_to_kinesis(
         backfill_records(profiles, timestamps),

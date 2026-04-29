@@ -43,7 +43,7 @@ class TestStatusApi:
         assert len(data["data_date"]) == 10
         assert data["data_date"].count("-") == 2
 
-    @patch("src.api.main.boto3.client")
+    @patch("src.common.aws.boto3.client")
     def test_status_timezone_kst(self, mock_boto, client, monkeypatch):
         """refresh_cache APScheduler add_job uses timezone='Asia/Seoul'."""
         # We need to check that refresh_cache would be scheduled with Asia/Seoul

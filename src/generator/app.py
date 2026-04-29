@@ -7,8 +7,8 @@ import signal
 import time
 from datetime import datetime, timezone
 
-import boto3
-
+from src.common.aws import get_client
+from src.generator._record import iso_z_now, jittered_load, jittered_pos, to_kinesis_record
 from src.generator.schema_validator import get_failure_count, validate_record
 
 
@@ -39,8 +39,6 @@ def _trigger_force_anomaly() -> None:
         "until_ts": _force_anomaly_until_ts,
     }))
 
-
-# ── 1. Seed CSV 로딩 ──────────────────────────────────────────
 
 def load_profiles(csv_path: str, robot_count: int) -> list[dict]:
     """
@@ -85,8 +83,6 @@ def load_profiles(csv_path: str, robot_count: int) -> list[dict]:
     return profiles
 
 
-# ── 2. 로봇 시뮬레이터 (1 coroutine = 1 로봇) ──────────────────
-
 async def simulate_robot(profile: dict,
                           queue: asyncio.Queue,
                           tick_interval: float,
@@ -112,18 +108,14 @@ async def simulate_robot(profile: dict,
         if battery <= 0:
             battery = round(random.uniform(80, 100), 1)
 
-        # current_load: RPM 베이스 ± 노이즈
-        load = int(min(100, max(0,
-            profile["load_base"] + random.gauss(0, 5))))
-
         record = {
             "robot_id":      profile["robot_id"],
-            "pos_x":         profile["pos_x"] + random.uniform(-0.0001, 0.0001),
-            "pos_y":         profile["pos_y"] + random.uniform(-0.0001, 0.0001),
+            "pos_x":         jittered_pos(profile["pos_x"]),
+            "pos_y":         jittered_pos(profile["pos_y"]),
             "battery_level": int(max(0, min(100, battery))),
-            "current_load":  load,
+            "current_load":  jittered_load(profile["load_base"]),
             "motor_temp":    motor_temp,
-            "timestamp":     datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "timestamp":     iso_z_now(),
         }
         await queue.put(record)
         try:
@@ -132,8 +124,6 @@ async def simulate_robot(profile: dict,
         except asyncio.TimeoutError:
             continue  # 다음 tick
 
-
-# ── 3. 배치 전송 (put_records 500건 + 재시도) ──────────────────
 
 # 누적 카운터 (graceful shutdown 시 stdout에 보고)
 sent_count: int = 0
@@ -196,7 +186,6 @@ async def _send_with_retry(records: list[dict],
         pending = next_pending
         attempt += 1
 
-    # max_attempts 후에도 남은 건은 최종 실패
     if pending:
         print(json.dumps({
             "event": "put_records_giving_up",
@@ -221,10 +210,7 @@ async def batch_sender(queue: asyncio.Queue,
                 record = queue.get_nowait()
                 if not validate_record(record):
                     continue
-                batch.append({
-                    "Data":         json.dumps(record).encode(),
-                    "PartitionKey": record["robot_id"],
-                })
+                batch.append(to_kinesis_record(record))
             except asyncio.QueueEmpty:
                 break
 
@@ -233,13 +219,10 @@ async def batch_sender(queue: asyncio.Queue,
             sent_count += len(batch) - failed
             failed_count += failed
         else:
-            # 큐가 비었음. shutdown 중이면 종료, 아니면 잠시 대기.
             if shutdown.is_set():
                 return
             await asyncio.sleep(0.05)
 
-
-# ── 4. 진입점 ───────────────────────────────────────────────────
 
 async def main() -> None:
     robot_count   = int(os.environ.get("ROBOT_COUNT", "10000"))
@@ -250,7 +233,7 @@ async def main() -> None:
     print(f"Loading profiles from {csv_path} for {robot_count} robots (tick={tick_interval}s)...")
     profiles = load_profiles(csv_path, robot_count)
 
-    kinesis = boto3.client("kinesis", region_name=os.environ.get("AWS_DEFAULT_REGION", "eu-west-1"))
+    kinesis = get_client("kinesis")
     queue   = asyncio.Queue(maxsize=robot_count * 2)
     shutdown = asyncio.Event()
 

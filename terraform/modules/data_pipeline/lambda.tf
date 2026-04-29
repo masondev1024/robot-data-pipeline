@@ -28,11 +28,14 @@ resource "aws_lambda_function" "alert" {
 }
 
 # Event Source Mapping: Kinesis Alert Stream → Lambda
+# function_response_types: 실패한 개별 record만 재시도 (전체 batch 재처리 회피).
+# Lambda handler가 {"batchItemFailures": [{"itemIdentifier": <seq>}, ...]} 반환.
 resource "aws_lambda_event_source_mapping" "alert_kds" {
-  event_source_arn  = aws_kinesis_stream.alert.arn
-  function_name     = aws_lambda_function.alert.arn
-  starting_position = "LATEST"
-  batch_size        = 10
+  event_source_arn        = aws_kinesis_stream.alert.arn
+  function_name           = aws_lambda_function.alert.arn
+  starting_position       = "LATEST"
+  batch_size              = 10
+  function_response_types = ["ReportBatchItemFailures"]
 
   depends_on = [aws_iam_role_policy.lambda_alert_policy]
 }

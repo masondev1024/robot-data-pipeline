@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import datetime, timedelta
 
@@ -5,10 +6,17 @@ import boto3
 from airflow import DAG
 from airflow.operators.python import PythonOperator, ShortCircuitOperator
 
+from src.common.athena import fetch_rows, start_query, wait_for_query
+from src.common.bedrock import invoke_claude
+
 S3_BUCKET = os.environ.get("S3_BUCKET_NAME", "de-ai-06-smartfactory-bucket")
 ATHENA_DATABASE = os.environ.get("ATHENA_DATABASE", "robot_telemetry_db")
 ATHENA_WORKGROUP = os.environ.get("ATHENA_WORKGROUP", "robot-telemetry-workgroup")
 ATHENA_OUTPUT = os.environ.get("ATHENA_OUTPUT_LOCATION", f"s3://{S3_BUCKET}/project-athena-results/")
+AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", "eu-west-1")
+
+DQ_FAILURE_RATIO_THRESHOLD = 0.01
+BEDROCK_REPORT_TOP_N = 20
 
 default_args = {
     "owner": "robot-telemetry",
@@ -30,7 +38,7 @@ dag = DAG(
 
 def _run_athena_query(query: str) -> str:
     """Athena 쿼리 실행 후 QueryExecutionId 반환."""
-    client = boto3.client("athena", region_name="eu-west-1")
+    client = boto3.client("athena", region_name=AWS_REGION)
     response = client.start_query_execution(
         QueryString=query,
         QueryExecutionContext={"Database": ATHENA_DATABASE},
@@ -38,39 +46,31 @@ def _run_athena_query(query: str) -> str:
         ResultConfiguration={"OutputLocation": ATHENA_OUTPUT},
     )
     execution_id = response["QueryExecutionId"]
-
-    import time
-    for _ in range(60):
-        result = client.get_query_execution(QueryExecutionId=execution_id)
-        state = result["QueryExecution"]["Status"]["State"]
-        if state == "SUCCEEDED":
-            return execution_id
-        if state in ("FAILED", "CANCELLED"):
-            reason = result["QueryExecution"]["Status"].get("StateChangeReason", "unknown")
-            raise RuntimeError(f"Athena query {state}: {reason}")
-        time.sleep(2)
-
-    raise TimeoutError("Athena query timed out after 120 seconds")
+    wait_for_query(execution_id)
+    return execution_id
 
 
 def evaluate_quality(total: int, null_id: int, bad_temp: int, bad_battery: int) -> list[str]:
-    """Bronze 품질 게이트 평가. 빈 리스트 = 통과. 임계값 1%."""
+    """Bronze 품질 게이트 평가. 빈 리스트 = 통과."""
     if total == 0:
         return ["레코드 0건"]
 
     failures = []
-    if null_id    / total >= 0.01: failures.append(f"robot_id null 비율 {null_id/total:.2%}")
-    if bad_temp   / total >= 0.01: failures.append(f"motor_temp 이상치 비율 {bad_temp/total:.2%}")
-    if bad_battery / total >= 0.01: failures.append(f"battery_level 이상치 비율 {bad_battery/total:.2%}")
+    if null_id / total >= DQ_FAILURE_RATIO_THRESHOLD:
+        failures.append(f"robot_id null 비율 {null_id/total:.2%}")
+    if bad_temp / total >= DQ_FAILURE_RATIO_THRESHOLD:
+        failures.append(f"motor_temp 이상치 비율 {bad_temp/total:.2%}")
+    if bad_battery / total >= DQ_FAILURE_RATIO_THRESHOLD:
+        failures.append(f"battery_level 이상치 비율 {bad_battery/total:.2%}")
     return failures
 
 
 def _publish_dq_failure(detail: str):
     """SNS robot-telemetry-anomaly-alerts 토픽으로 DQ 실패 알림 발송."""
-    sns = boto3.client("sns", region_name="eu-west-1")
+    sns = boto3.client("sns", region_name=AWS_REGION)
     topic_arn = os.environ.get(
         "DQ_SNS_TOPIC_ARN",
-        f"arn:aws:sns:eu-west-1:{os.environ.get('AWS_ACCOUNT_ID', '')}:robot-telemetry-anomaly-alerts",
+        f"arn:aws:sns:{AWS_REGION}:{os.environ.get('AWS_ACCOUNT_ID', '')}:robot-telemetry-anomaly-alerts",
     )
     sns.publish(
         TopicArn=topic_arn,
@@ -97,7 +97,7 @@ WHERE year = '{year:04d}' AND month = '{month:02d}' AND day = '{day:02d}'
 """
     execution_id = _run_athena_query(query)
 
-    athena = boto3.client("athena", region_name="eu-west-1")
+    athena = boto3.client("athena", region_name=AWS_REGION)
     rows = athena.get_query_results(QueryExecutionId=execution_id)["ResultSet"]["Rows"]
     values = [cell.get("VarCharValue", "0") for cell in rows[1]["Data"]]
     total, null_id, bad_temp, bad_battery = (int(v) for v in values)
@@ -111,14 +111,8 @@ WHERE year = '{year:04d}' AND month = '{month:02d}' AND day = '{day:02d}'
 
 def _delete_s3_partition(prefix: str) -> int:
     """[멱등성] S3 prefix 하위 모든 객체 삭제. Athena INSERT INTO 전 호출하여
-    재실행 시 동일 파티션 중복 누적을 방지한다 (INSERT OVERWRITE 대체).
-
-    Args:
-        prefix: 'silver/dt=2026-04-27/' 같은 S3 키 prefix.
-    Returns:
-        삭제된 객체 수.
-    """
-    s3 = boto3.client("s3", region_name="eu-west-1")
+    재실행 시 동일 파티션 중복 누적을 방지한다 (INSERT OVERWRITE 대체)."""
+    s3 = boto3.client("s3", region_name=AWS_REGION)
     paginator = s3.get_paginator("list_objects_v2")
     deleted = 0
     for page in paginator.paginate(Bucket=S3_BUCKET, Prefix=prefix):
@@ -139,7 +133,6 @@ def _bronze_to_silver(**ctx):
     dt = execution_date.strftime("%Y-%m-%d")
     year, month, day = execution_date.year, execution_date.month, execution_date.day
 
-    # 멱등성: 이미 존재하는 silver/dt={dt}/ 파티션을 삭제 후 INSERT
     _delete_s3_partition(f"silver/dt={dt}/")
 
     query = f"""
@@ -173,7 +166,6 @@ def _silver_to_gold(**ctx):
     execution_date = ctx["execution_date"]
     dt = execution_date.strftime("%Y-%m-%d")
 
-    # 멱등성: 이미 존재하는 gold/dt={dt}/ 파티션을 삭제 후 INSERT
     _delete_s3_partition(f"gold/dt={dt}/")
 
     query = f"""
@@ -196,30 +188,18 @@ GROUP BY robot_id
 
 def _bedrock_report(**ctx):
     """Gold 데이터 기반 Bedrock 정비 리포트 생성 후 S3에 저장."""
-    import json
     execution_date = ctx["execution_date"]
     dt = execution_date.strftime("%Y-%m-%d")
 
-    athena = boto3.client("athena", region_name="eu-west-1")
     query = f"""
 SELECT robot_id, avg_motor_temp, max_motor_temp, battery_drain, active_hours
 FROM gold_robot_daily_stats
 WHERE dt = DATE '{dt}'
 ORDER BY avg_motor_temp DESC
-LIMIT 20
+LIMIT {BEDROCK_REPORT_TOP_N}
 """
     execution_id = _run_athena_query(query)
-    paginator = athena.get_paginator("get_query_results")
-    rows = []
-    columns = None
-    for page in paginator.paginate(QueryExecutionId=execution_id):
-        result_rows = page["ResultSet"]["Rows"]
-        if columns is None:
-            columns = [col["VarCharValue"] for col in result_rows[0]["Data"]]
-            result_rows = result_rows[1:]
-        for row in result_rows:
-            values = [cell.get("VarCharValue", "") for cell in row["Data"]]
-            rows.append(dict(zip(columns, values)))
+    rows = fetch_rows(execution_id)
 
     data_summary = "\n".join(
         f"{r['robot_id']}: 평균온도={r['avg_motor_temp']}°C, 최고온도={r['max_motor_temp']}°C, "
@@ -231,7 +211,7 @@ LIMIT 20
         "이를 분석해서 가장 점검이 시급한 로봇 3대와 그 이유를 정비반장에게 보내는 형식으로 300자 이내로 요약해."
     )
 
-    bedrock = boto3.client("bedrock-runtime", region_name="eu-west-1")
+    bedrock = boto3.client("bedrock-runtime", region_name=AWS_REGION)
     body = json.dumps({
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": 512,
@@ -249,7 +229,7 @@ LIMIT 20
     )
     report_text = json.loads(response["body"].read())["content"][0]["text"]
 
-    s3 = boto3.client("s3", region_name="eu-west-1")
+    s3 = boto3.client("s3", region_name=AWS_REGION)
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=f"reports/{dt}.txt",
@@ -262,8 +242,8 @@ def _is_monday(**ctx):
 
 
 def _retrain_model(**ctx):
-    import subprocess
-    subprocess.run(["python", "src/ml/train.py"], check=True)
+    from src.ml.train import main
+    main()
 
 
 quality_check = PythonOperator(

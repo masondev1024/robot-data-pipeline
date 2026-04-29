@@ -1,10 +1,10 @@
 import os
-import time
 
-import boto3
-import pandas as pd
 import sagemaker
 from sagemaker.xgboost import XGBoost
+
+from src.common.athena import start_query, wait_for_query
+from src.common.aws import get_client
 
 S3_BUCKET = os.environ.get("S3_BUCKET_NAME", "de-ai-06-smartfactory-bucket")
 ATHENA_DATABASE = os.environ.get("ATHENA_DATABASE", "robot_telemetry_db")
@@ -24,28 +24,11 @@ WHERE dt >= date_format(current_date - interval '30' day, '%Y-%m-%d')
 
 
 def fetch_training_data():
-    athena = boto3.client("athena", region_name="eu-west-1")
-    response = athena.start_query_execution(
-        QueryString=QUERY,
-        QueryExecutionContext={"Database": ATHENA_DATABASE},
-        ResultConfiguration={"OutputLocation": ATHENA_OUTPUT},
-    )
-    execution_id = response["QueryExecutionId"]
-
-    for _ in range(150):
-        status = athena.get_query_execution(QueryExecutionId=execution_id)
-        state = status["QueryExecution"]["Status"]["State"]
-        if state == "SUCCEEDED":
-            break
-        if state in ("FAILED", "CANCELLED"):
-            reason = status["QueryExecution"]["Status"].get("StateChangeReason", "unknown")
-            raise RuntimeError(f"Athena query {state}: {reason}")
-        time.sleep(2)
-    else:
-        raise TimeoutError("Athena query timed out after 300s")
+    execution_id = start_query(QUERY, database=ATHENA_DATABASE, output_location=ATHENA_OUTPUT)
+    wait_for_query(execution_id)
 
     raw_uri = f"{ATHENA_OUTPUT}{execution_id}.csv"
-    s3 = boto3.client("s3", region_name="eu-west-1")
+    s3 = get_client("s3")
     bucket, key = raw_uri.replace("s3://", "").split("/", 1)
     body = s3.get_object(Bucket=bucket, Key=key)["Body"].read().decode("utf-8")
     headerless = "\n".join(body.splitlines()[1:])
@@ -76,7 +59,7 @@ def run_training_job(data_s3_uri: str, role_arn: str):
     return estimator
 
 
-if __name__ == "__main__":
+def main():
     data_uri = fetch_training_data()
     estimator = run_training_job(data_uri, os.environ["SAGEMAKER_ROLE_ARN"])
     estimator.deploy(
@@ -84,3 +67,7 @@ if __name__ == "__main__":
         instance_type="ml.t2.medium",
         endpoint_name="robot-failure-predictor",
     )
+
+
+if __name__ == "__main__":
+    main()

@@ -10,7 +10,7 @@ import json
 import os
 from typing import Optional
 
-import boto3
+from src.common.aws import get_client
 
 
 _required_fields: Optional[frozenset[str]] = None
@@ -19,12 +19,10 @@ _validation_failures: int = 0
 
 def _fetch_required_fields() -> frozenset[str]:
     """Glue Schema Registry에서 robot-telemetry-schema의 required 필드 set 반환."""
-    region = os.environ.get("AWS_DEFAULT_REGION", "eu-west-1")
     registry = os.environ.get("GLUE_SCHEMA_REGISTRY_NAME", "robot-telemetry-registry")
     schema = os.environ.get("GLUE_SCHEMA_NAME", "robot-telemetry-schema")
 
-    client = boto3.client("glue", region_name=region)
-    response = client.get_schema_version(
+    response = get_client("glue").get_schema_version(
         SchemaId={"RegistryName": registry, "SchemaName": schema},
         SchemaVersionNumber={"LatestVersion": True},
     )

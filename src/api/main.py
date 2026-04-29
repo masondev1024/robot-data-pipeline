@@ -1,12 +1,8 @@
 import asyncio
-import json
 import os
 import re
-import time
 from datetime import datetime, timedelta, timezone
 
-import boto3
-import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -15,6 +11,10 @@ from pydantic import BaseModel
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+
+from src.common.athena import run_query
+from src.common.aws import get_client
+from src.common.bedrock import invoke_claude
 
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="Robot Telemetry AI Query API")
@@ -35,50 +35,13 @@ def _get_grafana_url() -> str:
     global _grafana_url
     if _grafana_url is None:
         try:
-            ssm = boto3.client("ssm", region_name=os.environ.get("AWS_DEFAULT_REGION", "eu-west-1"))
-            _grafana_url = ssm.get_parameter(Name="/robot-telemetry/grafana-url")["Parameter"]["Value"]
+            _grafana_url = get_client("ssm").get_parameter(
+                Name="/robot-telemetry/grafana-url"
+            )["Parameter"]["Value"]
         except Exception as e:
             print(f"SSM get_parameter /robot-telemetry/grafana-url failed: {str(e)}")
             _grafana_url = os.environ.get("GRAFANA_URL", "http://localhost:3000")
     return _grafana_url
-
-
-def _run_athena_query(query: str, database: str, workgroup: str, output_location: str) -> list[dict]:
-    """Synchronous Athena query execution. Returns list of row dicts."""
-    client = boto3.client("athena", region_name=os.environ.get("AWS_DEFAULT_REGION", "eu-west-1"))
-
-    response = client.start_query_execution(
-        QueryString=query,
-        QueryExecutionContext={"Database": database},
-        WorkGroup=workgroup,
-        ResultConfiguration={"OutputLocation": output_location},
-    )
-    execution_id = response["QueryExecutionId"]
-
-    for _ in range(60):
-        result = client.get_query_execution(QueryExecutionId=execution_id)
-        state = result["QueryExecution"]["Status"]["State"]
-        if state == "SUCCEEDED":
-            break
-        if state in ("FAILED", "CANCELLED"):
-            reason = result["QueryExecution"]["Status"].get("StateChangeReason", "unknown")
-            raise RuntimeError(f"Athena query {state}: {reason}")
-        time.sleep(2)
-    else:
-        raise TimeoutError("Athena query timed out after 120 seconds")
-
-    paginator = client.get_paginator("get_query_results")
-    rows = []
-    columns = None
-    for page in paginator.paginate(QueryExecutionId=execution_id):
-        result_rows = page["ResultSet"]["Rows"]
-        if columns is None:
-            columns = [col["VarCharValue"] for col in result_rows[0]["Data"]]
-            result_rows = result_rows[1:]
-        for row in result_rows:
-            values = [cell.get("VarCharValue", "") for cell in row["Data"]]
-            rows.append(dict(zip(columns, values)))
-    return rows
 
 
 async def refresh_cache():
@@ -106,7 +69,12 @@ LIMIT 100
     try:
         rows = await loop.run_in_executor(
             None,
-            lambda: _run_athena_query(query, database, workgroup, output_location),
+            lambda: run_query(
+                query,
+                database=database,
+                workgroup=workgroup,
+                output_location=output_location,
+            ),
         )
         if rows:
             header = ",".join(rows[0].keys())
@@ -165,42 +133,18 @@ async def chat(request: Request, req: ChatRequest):
     if not _gold_cache:
         raise HTTPException(status_code=503, detail="캐시가 아직 준비되지 않았습니다.")
 
-    model_id = os.environ.get(
-        "BEDROCK_MODEL_ID",
-        "eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
-    )
-
     system_prompt = (
         "로봇 ID 언급 시 반드시 [ROBOT-XXXXX] 형식(대괄호+5자리 숫자)으로 표기하라. "
         "응답은 200자 이내, 점검 우선순위 위주로 답하라."
     )
     user_prompt = f"다음은 공장 로봇 상태 데이터야:\n{_gold_cache}\n\n질문: {req.question}"
 
-    body = json.dumps({
-        "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 512,
-        "system": system_prompt,
-        "messages": [{"role": "user", "content": user_prompt}],
-    })
-
     loop = asyncio.get_event_loop()
-    bedrock = boto3.client(
-        "bedrock-runtime",
-        region_name=os.environ.get("AWS_DEFAULT_REGION", "eu-west-1"),
-    )
-
     try:
-        response = await loop.run_in_executor(
+        response_text = await loop.run_in_executor(
             None,
-            lambda: bedrock.invoke_model(
-                modelId=model_id,
-                contentType="application/json",
-                accept="application/json",
-                body=body,
-            ),
+            lambda: invoke_claude(user_prompt, system=system_prompt),
         )
-        response_body = json.loads(response["body"].read())
-        response_text = response_body["content"][0]["text"]
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Bedrock 호출 실패: {exc}")
 
@@ -221,10 +165,7 @@ async def chat(request: Request, req: ChatRequest):
     }
 
 
-sagemaker_runtime = boto3.client(
-    "sagemaker-runtime",
-    region_name=os.environ.get("AWS_DEFAULT_REGION", "eu-west-1"),
-)
+sagemaker_runtime = get_client("sagemaker-runtime")
 ENDPOINT_NAME = os.environ.get("SAGEMAKER_ENDPOINT_NAME", "robot-failure-predictor")
 
 

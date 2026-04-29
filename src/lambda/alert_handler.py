@@ -34,9 +34,13 @@ def _post_to_slack(webhook_url: str, text: str) -> None:
 
 
 def handler(event, context):
+    """Kinesis → Slack alert. 실패 record는 batchItemFailures로 보고하여
+    Lambda가 해당 record만 재시도하도록 한다 (event source mapping의
+    function_response_types=["ReportBatchItemFailures"] 설정 필요)."""
     webhook_url = os.environ["SLACK_WEBHOOK_URL"]
     portal_url = _get_portal_url()
 
+    failures: list[dict] = []
     for record in event["Records"]:
         try:
             payload = json.loads(base64.b64decode(record["kinesis"]["data"]))
@@ -54,9 +58,8 @@ def handler(event, context):
 
             _post_to_slack(webhook_url, message)
         except Exception as e:
-            print(f"Error processing record: {str(e)}")
+            seq = record.get("kinesis", {}).get("sequenceNumber", "")
+            print(f"Error processing record seq={seq}: {str(e)}")
+            failures.append({"itemIdentifier": seq})
 
-    return {
-        "statusCode": 200,
-        "body": json.dumps("Alerts processed successfully")
-    }
+    return {"batchItemFailures": failures}
