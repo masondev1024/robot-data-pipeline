@@ -50,34 +50,29 @@ class TestFeatureColumns:
     """Tests for feature column alignment in train_entry."""
 
     def test_feature_cols_correct_order(self):
-        """Feature columns match expected order and values."""
+        """Feature columns match expected order and values (5 features incl. max_temp_load_ratio)."""
         from src.ml import train_entry
 
-        # Access the hardcoded feature_cols from main() context
-        # We'll test via the actual train_entry module
-        expected_cols = ["avg_motor_temp", "max_motor_temp", "battery_drain", "active_hours"]
+        expected_cols = ["avg_motor_temp", "max_motor_temp", "battery_drain", "active_hours", "max_temp_load_ratio"]
 
-        # Create a temporary CSV to test via main
         with tempfile.TemporaryDirectory() as tmpdir:
             train_dir = Path(tmpdir) / "train"
             model_dir = Path(tmpdir) / "model"
             train_dir.mkdir()
             model_dir.mkdir()
 
-            # Create CSV with expected columns
             df = pd.DataFrame({
                 "label": [0, 1, 1, 0],
                 "avg_motor_temp": [70, 88, 92, 60],
                 "max_motor_temp": [85, 95, 110, 70],
                 "battery_drain": [10, 20, 30, 5],
                 "active_hours": [8, 8, 12, 4],
+                "max_temp_load_ratio": [1.5, 2.8, 3.2, 1.1],
             })
             df.to_csv(train_dir / "train.csv", index=False, header=False)
 
-            # Mock XGBoost to capture feature handling
             with patch("xgboost.train") as mock_xgb_train:
                 with patch("xgboost.DMatrix") as mock_dmatrix:
-                    # Make DMatrix constructor return a mock that records X shape
                     mock_dm = MagicMock()
                     mock_dmatrix.return_value = mock_dm
 
@@ -88,10 +83,9 @@ class TestFeatureColumns:
                         with patch("sys.argv", ["train_entry.py"]):
                             train_entry.main()
 
-                    # Verify DMatrix was called with X having 4 columns
                     call_args = mock_dmatrix.call_args
-                    X = call_args[0][0]  # First positional arg is X
-                    assert X.shape[1] == 4, "X should have 4 feature columns"
+                    X = call_args[0][0]
+                    assert X.shape[1] == 5, "X should have 5 feature columns"
 
 
 class TestDataFrameProcessing:
@@ -105,20 +99,18 @@ class TestDataFrameProcessing:
             train_dir.mkdir()
             model_dir.mkdir()
 
-            # Create test data
             test_data = pd.DataFrame({
                 "label": [0, 1, 1, 0],
                 "avg_motor_temp": [70.0, 88.0, 92.0, 60.0],
                 "max_motor_temp": [85.0, 95.0, 110.0, 70.0],
                 "battery_drain": [10, 20, 30, 5],
                 "active_hours": [8, 8, 12, 4],
+                "max_temp_load_ratio": [1.5, 2.8, 3.2, 1.1],
             })
             test_data.to_csv(train_dir / "train.csv", index=False, header=False)
 
-            # Mock xgboost methods
             with patch("xgboost.train") as mock_xgb_train:
                 with patch("xgboost.DMatrix") as mock_dmatrix:
-                    # Capture DMatrix call to verify shape
                     dm_calls = []
                     def capture_dmatrix(X, label=None):
                         dm_calls.append((X.shape, label))
@@ -134,11 +126,9 @@ class TestDataFrameProcessing:
                             from src.ml import train_entry
                             train_entry.main()
 
-                    # Verify DMatrix received correct shapes
                     assert len(dm_calls) > 0, "DMatrix should be called"
                     X_shape, y = dm_calls[0]
-                    assert X_shape == (4, 4), "X should be (4 rows, 4 features)"
-                    # y should be the label series
+                    assert X_shape == (4, 5), "X should be (4 rows, 5 features)"
 
 
 class TestModelOutput:
@@ -152,13 +142,13 @@ class TestModelOutput:
             train_dir.mkdir()
             model_dir.mkdir()
 
-            # Create test CSV
             pd.DataFrame({
                 "label": [0, 1],
                 "avg_motor_temp": [70, 88],
                 "max_motor_temp": [85, 95],
                 "battery_drain": [10, 20],
                 "active_hours": [8, 8],
+                "max_temp_load_ratio": [1.5, 2.8],
             }).to_csv(train_dir / "train.csv", index=False, header=False)
 
             # Mock xgboost and capture save_model call

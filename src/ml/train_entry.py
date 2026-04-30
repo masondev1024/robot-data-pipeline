@@ -23,7 +23,7 @@ def parse_args():
 def main():
     args = parse_args()
     # train_dir 안의 모든 csv를 로드 (헤더 없음 — train.py 가 strip 후 업로드)
-    column_names = ["label", "avg_motor_temp", "max_motor_temp", "battery_drain", "active_hours"]
+    column_names = ["label", "avg_motor_temp", "max_motor_temp", "battery_drain", "active_hours", "max_temp_load_ratio"]
     csv_files = [f for f in os.listdir(args.train_dir) if f.endswith(".csv")]
     df = pd.concat([
         pd.read_csv(os.path.join(args.train_dir, f), header=None, names=column_names)

@@ -178,7 +178,11 @@ SELECT
     MIN(battery_level)                                                                  AS battery_end,
     MAX(battery_level) - MIN(battery_level)                                             AS battery_drain,
     CAST(COUNT(DISTINCT date_trunc('hour', from_iso8601_timestamp(timestamp))) AS INTEGER) AS active_hours,
-    DATE '{dt}'                                                                         AS dt
+    CAST(COUNT(CASE WHEN motor_temp >= 92.0
+                      AND motor_temp / GREATEST(CAST(current_load AS DOUBLE), 1.0) > 2.5
+                    THEN 1 END) AS INTEGER)                                              AS anomaly_record_count,
+    MAX(motor_temp / GREATEST(CAST(current_load AS DOUBLE), 1.0))                        AS max_temp_load_ratio,
+    DATE '{dt}'                                                                          AS dt
 FROM silver_robot_telemetry
 WHERE dt = DATE '{dt}'
 GROUP BY robot_id

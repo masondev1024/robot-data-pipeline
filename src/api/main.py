@@ -176,12 +176,13 @@ class PredictRequest(BaseModel):
     max_motor_temp: float
     battery_drain: int
     active_hours: int
+    max_temp_load_ratio: float
 
 
 @app.post("/api/predict")
 @limiter.limit("20/minute")
 async def predict_failure(request: Request, body: PredictRequest):
-    features = f"{body.avg_motor_temp},{body.max_motor_temp},{body.battery_drain},{body.active_hours}"
+    features = f"{body.avg_motor_temp},{body.max_motor_temp},{body.battery_drain},{body.active_hours},{body.max_temp_load_ratio}"
     loop = asyncio.get_event_loop()
     try:
         response = await loop.run_in_executor(

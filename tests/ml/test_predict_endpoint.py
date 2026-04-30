@@ -24,6 +24,7 @@ def test_predict_high_risk(mock_sm):
             "max_motor_temp": 97.0,
             "battery_drain": 30,
             "active_hours": 8,
+            "max_temp_load_ratio": 3.1,
         },
     )
     assert resp.status_code == 200
@@ -49,6 +50,7 @@ def test_predict_medium_risk(mock_sm):
             "max_motor_temp": 80.0,
             "battery_drain": 20,
             "active_hours": 6,
+            "max_temp_load_ratio": 2.0,
         },
     )
     assert resp.status_code == 200
@@ -71,6 +73,7 @@ def test_predict_low_risk(mock_sm):
             "max_motor_temp": 70.0,
             "battery_drain": 10,
             "active_hours": 4,
+            "max_temp_load_ratio": 1.2,
         },
     )
     assert resp.status_code == 200
@@ -94,6 +97,7 @@ def test_predict_returns_robot_id(mock_sm):
             "max_motor_temp": 72.0,
             "battery_drain": 15,
             "active_hours": 5,
+            "max_temp_load_ratio": 1.4,
         },
     )
     assert resp.status_code == 200

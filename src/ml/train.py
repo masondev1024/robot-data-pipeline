@@ -11,15 +11,21 @@ ATHENA_DATABASE = os.environ.get("ATHENA_DATABASE", "robot_telemetry_db")
 ATHENA_OUTPUT = os.environ.get("ATHENA_OUTPUT_LOCATION", f"s3://{S3_BUCKET}/project-athena-results/")
 MODEL_PREFIX = "ml-models/robot-failure-predictor"
 
+# 라벨 룰: Flink anomaly_detection.py 의 다변량 룰 (motor_temp >= 92.0 AND
+# motor_temp / current_load > 2.5) 을 silver_to_gold 가 day-aggregate 한 결과 사용.
+# anomaly_record_count > 0 인 robot/day 는 그날 1건 이상 anomaly 발생 → label=1.
+# (Flink 의 Z-Score 시계열 조건은 day-aggregate 표현 불가 — Option C 로 추후 보강)
 QUERY = """
 SELECT
-    CASE WHEN max_motor_temp > 90.0 THEN 1 ELSE 0 END AS label,
+    CASE WHEN anomaly_record_count > 0 THEN 1 ELSE 0 END AS label,
     avg_motor_temp,
     max_motor_temp,
     battery_drain,
-    active_hours
+    active_hours,
+    max_temp_load_ratio
 FROM gold_robot_daily_stats
 WHERE dt >= current_date - interval '30' day
+  AND anomaly_record_count IS NOT NULL
 """
 
 

@@ -1,11 +1,13 @@
 CREATE EXTERNAL TABLE IF NOT EXISTS robot_telemetry_db.gold_robot_daily_stats (
-    robot_id       STRING,
-    avg_motor_temp DOUBLE,
-    max_motor_temp DOUBLE,
-    battery_start  INT,
-    battery_end    INT,
-    battery_drain  INT,
-    active_hours   INT
+    robot_id             STRING,
+    avg_motor_temp       DOUBLE,
+    max_motor_temp       DOUBLE,
+    battery_start        INT,
+    battery_end          INT,
+    battery_drain        INT,
+    active_hours         INT,
+    anomaly_record_count INT,
+    max_temp_load_ratio  DOUBLE
 )
 PARTITIONED BY (dt DATE)
 STORED AS PARQUET

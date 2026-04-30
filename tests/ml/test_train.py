@@ -7,28 +7,33 @@ import pytest
 
 
 def test_query_contains_all_features_and_label():
-    """Query constant contains all 4 features and CASE WHEN label logic."""
+    """Query contains 5 features (Flink 정합 max_temp_load_ratio 추가) +
+    Flink 정합 라벨(anomaly_record_count > 0) 사용."""
     from src.ml.train import QUERY
 
-    # Verify QUERY contains all 4 feature columns
+    # Verify QUERY contains all 5 feature columns
     assert "avg_motor_temp" in QUERY
     assert "max_motor_temp" in QUERY
     assert "battery_drain" in QUERY
     assert "active_hours" in QUERY
+    assert "max_temp_load_ratio" in QUERY
 
-    # Verify QUERY contains CASE WHEN for label
-    assert "CASE WHEN max_motor_temp > 90" in QUERY
+    # Verify QUERY contains Flink-aligned label (anomaly_record_count > 0)
+    assert "CASE WHEN anomaly_record_count > 0" in QUERY
     assert "THEN 1 ELSE 0 END AS label" in QUERY
 
 
-def test_query_excludes_stale_columns():
-    """Query should NOT contain deprecated columns (regression guard)."""
+def test_query_excludes_stale_columns_and_old_label():
+    """Query should NOT contain deprecated columns OR old label rule (regression guard)."""
     from src.ml.train import QUERY
 
-    # Verify QUERY does NOT contain stale columns
+    # 옛 stale 컬럼 (Phase 5 cleanup 시 제거됨)
     stale_columns = ["battery_drain_rate", "operation_ratio", "machine_failure"]
     for col in stale_columns:
         assert col not in QUERY, f"Stale column '{col}' should not be in QUERY"
+
+    # 옛 라벨 룰 (max_motor_temp > 90.0) — Flink 와 불일치라 제거됨
+    assert "max_motor_temp > 90" not in QUERY, "Old label rule must be replaced by anomaly_record_count > 0"
 
 
 def test_athena_output_location_suffix():
