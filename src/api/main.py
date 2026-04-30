@@ -5,6 +5,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from botocore.exceptions import ClientError
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -293,6 +294,19 @@ async def predict_failure(request: Request, body: PredictRequest):
         )
         raw = response["Body"].read().decode()
         probs = _parse_softprob_response(raw)
+    except ClientError as exc:
+        # 비용 셧다운으로 endpoint 가 내려간 상태(2026-04-30 entry) 를 사용자 친화 503 으로 분리.
+        err = exc.response.get("Error", {})
+        if err.get("Code") == "ValidationError" and "not found" in err.get("Message", ""):
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "reason": "endpoint_offline",
+                    "message": "예측 모델은 비용 절감을 위해 평소엔 내려두며, 데모용 재배포로 활성화됩니다.",
+                    "endpoint": ENDPOINT_NAME,
+                },
+            )
+        raise HTTPException(status_code=502, detail=f"SageMaker 호출 실패: {exc}")
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"SageMaker 호출 실패: {exc}")
 

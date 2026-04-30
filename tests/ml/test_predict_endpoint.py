@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
+from botocore.exceptions import ClientError
 from fastapi.testclient import TestClient
 
 
@@ -131,3 +132,39 @@ def test_predict_recommended_action_for_each_type(mock_sm):
         assert expected_keyword in data["recommended_action"], (
             f"{expected_type}: '{expected_keyword}' not in {data['recommended_action']}"
         )
+
+
+@patch("src.api.main.sagemaker_runtime")
+def test_predict_endpoint_offline_returns_503(mock_sm):
+    """비용 셧다운으로 endpoint 가 내려간 상태(ValidationError 'not found') → 사용자 친화 503."""
+    mock_sm.invoke_endpoint.side_effect = ClientError(
+        error_response={
+            "Error": {
+                "Code": "ValidationError",
+                "Message": "Endpoint robot-failure-predictor of account 827913617635 not found.",
+            }
+        },
+        operation_name="InvokeEndpoint",
+    )
+    from src.api.main import app
+    client = TestClient(app)
+    resp = client.post("/api/predict", json=_BASE_PAYLOAD)
+    assert resp.status_code == 503, resp.text
+    detail = resp.json()["detail"]
+    assert detail["reason"] == "endpoint_offline"
+    assert "비용" in detail["message"]
+    assert detail["endpoint"] == "robot-failure-predictor"
+
+
+@patch("src.api.main.sagemaker_runtime")
+def test_predict_other_client_error_preserves_502(mock_sm):
+    """endpoint_offline 외 ClientError(예: ModelError) 는 기존 502 동작 유지."""
+    mock_sm.invoke_endpoint.side_effect = ClientError(
+        error_response={"Error": {"Code": "ModelError", "Message": "internal model failure"}},
+        operation_name="InvokeEndpoint",
+    )
+    from src.api.main import app
+    client = TestClient(app)
+    resp = client.post("/api/predict", json=_BASE_PAYLOAD)
+    assert resp.status_code == 502
+    assert "SageMaker 호출 실패" in resp.json()["detail"]

@@ -565,8 +565,25 @@
                         max_temp_load_ratio: ratio,
                     }),
                 });
-                if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
-                const data = await resp.json();
+                let payload = null;
+                try { payload = await resp.json(); } catch (_) { /* non-JSON body */ }
+                if (!resp.ok) {
+                    result.classList.add('show');
+                    const detail = payload && payload.detail;
+                    if (resp.status === 503 && detail && detail.reason === 'endpoint_offline') {
+                        result.style.background = '#e3f2fd';
+                        result.innerHTML = `
+                            <div style="font-weight:600;">🛈 예측 모델 일시 오프라인</div>
+                            <div style="margin-top:6px;color:var(--text-secondary);">${detail.message}</div>
+                            <div style="margin-top:4px;font-size:12px;color:var(--text-secondary);">endpoint=${detail.endpoint}</div>`;
+                    } else {
+                        result.style.background = '#ffebee';
+                        const msg = (detail && (typeof detail === 'string' ? detail : detail.message)) || resp.statusText;
+                        result.innerHTML = `⚠️ 예측 실패: HTTP ${resp.status}: ${msg}`;
+                    }
+                    return;
+                }
+                const data = payload;
                 const ft = data.predicted_failure_type;
                 const dist = data.failure_distribution || {};
                 const distLine = Object.entries(dist)
