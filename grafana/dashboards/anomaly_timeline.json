@@ -98,7 +98,7 @@
       "pluginVersion": "7.0.0",
       "targets": [
         {
-          "rawSql": "SELECT DATE_TRUNC('hour', from_iso8601_timestamp(timestamp)) AS event_hour, COUNT(*) AS anomaly_count FROM robot_telemetry_db.bronze_robot_telemetry WHERE motor_temp >= 92.0 AND motor_temp / GREATEST(current_load, 1.0) > 2.5 AND from_iso8601_timestamp(timestamp) > current_timestamp - INTERVAL '24' HOUR GROUP BY DATE_TRUNC('hour', from_iso8601_timestamp(timestamp)) ORDER BY event_hour ASC",
+          "rawSql": "SELECT DATE_TRUNC('hour', from_iso8601_timestamp(timestamp)) AS event_hour, COUNT(*) AS anomaly_count FROM robot_telemetry_db.bronze_robot_telemetry WHERE ((year = date_format(current_date, '%Y') AND month = date_format(current_date, '%m') AND day = date_format(current_date, '%d')) OR (year = date_format(current_date - INTERVAL '1' DAY, '%Y') AND month = date_format(current_date - INTERVAL '1' DAY, '%m') AND day = date_format(current_date - INTERVAL '1' DAY, '%d'))) AND motor_temp >= 92.0 AND motor_temp / GREATEST(current_load, 1.0) > 2.5 AND from_iso8601_timestamp(timestamp) > current_timestamp - INTERVAL '24' HOUR GROUP BY DATE_TRUNC('hour', from_iso8601_timestamp(timestamp)) ORDER BY event_hour ASC",
           "refId": "A"
         }
       ],
