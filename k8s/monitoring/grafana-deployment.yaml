@@ -35,9 +35,15 @@ spec:
               containerPort: 3000
           env:
             - name: GF_SECURITY_ADMIN_USER
-              value: admin
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-admin
+                  key: admin-user
             - name: GF_SECURITY_ADMIN_PASSWORD
-              value: changeme123
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-admin
+                  key: admin-password
             - name: GF_INSTALL_PLUGINS
               value: grafana-athena-datasource
             - name: GF_AUTH_ANONYMOUS_ENABLED
