@@ -32,10 +32,11 @@ data:
     \         \"placement\": \"bottom\"\r\n        },\r\n        \"tooltip\": {\r\n
     \         \"mode\": \"multi\"\r\n        }\r\n      },\r\n      \"pluginVersion\":
     \"7.0.0\",\r\n      \"targets\": [\r\n        {\r\n          \"rawSql\": \"SELECT
-    DATE_TRUNC('hour', CAST(timestamp AS TIMESTAMP)) AS event_hour, COUNT(*) AS anomaly_count
-    FROM robot_telemetry_db.bronze_robot_telemetry WHERE motor_temp > 90.0 AND CAST(timestamp
-    AS TIMESTAMP) > CAST(CURRENT_TIMESTAMP - INTERVAL '24' HOUR AS TIMESTAMP) GROUP
-    BY DATE_TRUNC('hour', CAST(timestamp AS TIMESTAMP)) ORDER BY event_hour ASC\",\r\n
+    DATE_TRUNC('hour', from_iso8601_timestamp(timestamp)) AS event_hour, COUNT(*)
+    AS anomaly_count FROM robot_telemetry_db.bronze_robot_telemetry WHERE motor_temp
+    >= 92.0 AND motor_temp / GREATEST(current_load, 1.0) > 2.5 AND from_iso8601_timestamp(timestamp)
+    > current_timestamp - INTERVAL '24' HOUR GROUP BY DATE_TRUNC('hour', from_iso8601_timestamp(timestamp))
+    ORDER BY event_hour ASC\",\r\n
     \         \"refId\": \"A\"\r\n        }\r\n      ],\r\n      \"title\": \"Anomaly
     Detection Timeline (24h)\",\r\n      \"type\": \"timeseries\"\r\n    }\r\n  ],\r\n
     \ \"refresh\": \"5m\",\r\n  \"schemaVersion\": 27,\r\n  \"style\": \"dark\",\r\n
