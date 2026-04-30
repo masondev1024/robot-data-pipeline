@@ -1,0 +1,61 @@
+name: eval
+
+# ADR-011 — LLM 출력 품질 회귀 평가. 비용/OIDC 부담으로 manual trigger 만 활성.
+# 향후 PR comment "[run-eval]" 또는 cron 으로 확장 가능.
+
+on:
+  workflow_dispatch:
+    inputs:
+      filter:
+        description: "category filter (normal|anomaly|edge|all)"
+        required: false
+        default: "all"
+      threshold:
+        description: "fail threshold for overall_avg"
+        required: false
+        default: "4.0"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  run-eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          pip install --quiet -r requirements.txt
+          pip install --quiet pyyaml fastapi pydantic apscheduler slowapi jinja2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-west-1
+
+      - name: Run eval
+        env:
+          BEDROCK_MODEL_ID: eu.anthropic.claude-sonnet-4-5-20250929-v1:0
+          JUDGE_MODEL_ID: eu.anthropic.claude-opus-4-1-20250805-v1:0
+          EVAL_REPORT_PATH: ${{ github.workspace }}/eval_report.json
+        run: |
+          ARGS=""
+          if [ "${{ github.event.inputs.filter }}" != "all" ]; then
+            ARGS="$ARGS --filter category=${{ github.event.inputs.filter }}"
+          fi
+          ARGS="$ARGS --threshold ${{ github.event.inputs.threshold }}"
+          python -m evals.run_eval $ARGS
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: eval_report.json
