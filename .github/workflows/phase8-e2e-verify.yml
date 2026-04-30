@@ -2,11 +2,11 @@ name: phase8-e2e-verify
 
 # Phase 8 (Multi-class PdM) E2E 시연 검증.
 # - workflow_dispatch: 수동 트리거 (언제든)
-# - schedule: 2026-05-03 01:00 UTC (= KST 10:00) 1회성 검증 — 매년 같은 날 반복되지만
-#   검증이 끝나면 schedule 트리거 블록 제거하거나 workflow 자체를 disable 하면 됨.
+# - schedule: 2026-05-03 01:00 UTC (= KST 10:00) — 매년 같은 날 반복되지만 검증 끝나면
+#   schedule 트리거 블록 제거하거나 workflow disable 하면 됨.
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
   schedule:
     - cron: "0 1 3 5 *"
 
@@ -43,16 +43,13 @@ jobs:
       - name: 1. ECR latest image push 시각 확인
         id: ecr_check
         run: |
-          PUSHED_AT=$(aws ecr describe-images \
-            --repository-name "$ECR_REPO" --region "$AWS_REGION" \
-            --query 'sort_by(imageDetails,&imagePushedAt)[-1].imagePushedAt' \
-            --output text)
+          PUSHED_AT=$(aws ecr describe-images --repository-name "$ECR_REPO" --region "$AWS_REGION" --query 'sort_by(imageDetails,&imagePushedAt)[-1].imagePushedAt' --output text)
           echo "ECR latest push: $PUSHED_AT"
           echo "pushed_at=$PUSHED_AT" >> "$GITHUB_OUTPUT"
           PUSHED_TS=$(date -u -d "$PUSHED_AT" +%s)
           MIN_TS=$(date -u -d "$MIN_PUSH_DATE" +%s)
           if [ "$PUSHED_TS" -lt "$MIN_TS" ]; then
-            echo "::warning::ECR image stale (pushed $PUSHED_AT < $MIN_PUSH_DATE) — k8s-deploy workflow 가 Phase 8 commit 이후 성공한 적 없음"
+            echo "::warning::ECR image stale (pushed $PUSHED_AT < $MIN_PUSH_DATE)"
             echo "ecr_status=STALE" >> "$GITHUB_OUTPUT"
           else
             echo "ecr_status=FRESH" >> "$GITHUB_OUTPUT"
@@ -62,27 +59,22 @@ jobs:
         id: gen_check
         run: |
           set +e
-          IMAGE=$(kubectl -n "$K8S_NS" get deploy/robot-telemetry-generator \
-            -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)
+          IMAGE=$(kubectl -n "$K8S_NS" get deploy/robot-telemetry-generator -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)
           if [ -z "$IMAGE" ]; then
             echo "deployment 없음"
             echo "gen_status=MISSING" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "Generator image: $IMAGE"
-
-          POD=$(kubectl -n "$K8S_NS" get pod -l app=robot-telemetry-generator \
-            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+          POD=$(kubectl -n "$K8S_NS" get pod -l app=robot-telemetry-generator -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
           if [ -z "$POD" ]; then
             echo "pod 없음"
             echo "gen_status=NO_POD" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-
           kubectl -n "$K8S_NS" exec "$POD" -- kill -USR1 1 || true
           sleep 60
           LOG=$(kubectl -n "$K8S_NS" logs "$POD" --tail=200 2>/dev/null)
-
           TRIGGERED=$(echo "$LOG" | grep -c 'force_anomaly_triggered' || true)
           FT_FOUND=$(echo "$LOG" | grep -c 'failure_type' || true)
           echo "force_anomaly_triggered events: $TRIGGERED"
@@ -105,41 +97,22 @@ jobs:
           HOUR=$(date -u +%H)
           QUERY="SELECT failure_type, COUNT(*) AS cnt FROM bronze_robot_telemetry WHERE year='$YEAR' AND month='$MONTH' AND day='$DAY' AND hour='$HOUR' GROUP BY failure_type"
           echo "Athena query: $QUERY"
-
-          EXEC_ID=$(aws athena start-query-execution \
-            --query-string "$QUERY" \
-            --query-execution-context "Database=$ATHENA_DB" \
-            --work-group "$ATHENA_WG" \
-            --result-configuration "OutputLocation=$ATHENA_OUTPUT" \
-            --region "$AWS_REGION" \
-            --query 'QueryExecutionId' --output text)
+          EXEC_ID=$(aws athena start-query-execution --query-string "$QUERY" --query-execution-context "Database=$ATHENA_DB" --work-group "$ATHENA_WG" --result-configuration "OutputLocation=$ATHENA_OUTPUT" --region "$AWS_REGION" --query 'QueryExecutionId' --output text)
           echo "Athena exec: $EXEC_ID"
-
+          STATE=UNKNOWN
           for i in $(seq 1 30); do
-            STATE=$(aws athena get-query-execution --query-execution-id "$EXEC_ID" \
-              --region "$AWS_REGION" --query 'QueryExecution.Status.State' --output text)
-            if [ "$STATE" = "SUCCEEDED" ] || [ "$STATE" = "FAILED" ] || [ "$STATE" = "CANCELLED" ]; then
-              break
-            fi
+            STATE=$(aws athena get-query-execution --query-execution-id "$EXEC_ID" --region "$AWS_REGION" --query 'QueryExecution.Status.State' --output text)
+            if [ "$STATE" = "SUCCEEDED" ] || [ "$STATE" = "FAILED" ] || [ "$STATE" = "CANCELLED" ]; then break; fi
             sleep 2
           done
           echo "Athena state: $STATE"
-
           if [ "$STATE" != "SUCCEEDED" ]; then
             echo "bronze_status=ATHENA_FAIL" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-
-          aws athena get-query-results --query-execution-id "$EXEC_ID" \
-            --region "$AWS_REGION" --output json > /tmp/bronze_result.json
-          NON_NONE=$(python3 -c '
-import json, sys
-data = json.load(open("/tmp/bronze_result.json"))
-rows = data.get("ResultSet", {}).get("Rows", [])[1:]
-non_none = sum(int(r["Data"][1]["VarCharValue"]) for r in rows
-                if r["Data"][0].get("VarCharValue", "NONE") not in ("NONE", ""))
-print(non_none)')
-          echo "Non-NONE failure_type rows in current hour partition: $NON_NONE"
+          aws athena get-query-results --query-execution-id "$EXEC_ID" --region "$AWS_REGION" --output json > /tmp/bronze_result.json
+          NON_NONE=$(python3 -c "import json; d=json.load(open('/tmp/bronze_result.json')); rows=d.get('ResultSet',{}).get('Rows',[])[1:]; print(sum(int(r['Data'][1].get('VarCharValue','0')) for r in rows if r['Data'][0].get('VarCharValue','NONE') not in ('NONE','')))")
+          echo "Non-NONE failure_type rows: $NON_NONE"
           echo "non_none=$NON_NONE" >> "$GITHUB_OUTPUT"
           if [ "$NON_NONE" -ge 1 ]; then
             echo "bronze_status=PASS" >> "$GITHUB_OUTPUT"
@@ -151,48 +124,32 @@ print(non_none)')
         id: api_check
         run: |
           set +e
-          ALB=$(kubectl -n "$K8S_NS" get ingress robot-telemetry-api-ingress \
-            -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+          ALB=$(kubectl -n "$K8S_NS" get ingress robot-telemetry-api-ingress -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
           if [ -z "$ALB" ]; then
             echo "ingress 없음"
             echo "api_status=NO_INGRESS" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "API ALB: $ALB"
-
-          RESP=$(curl -sS -X POST "http://$ALB/api/predict" \
-            -H "Content-Type: application/json" \
-            -d '{"robot_id":"ROBOT-00001","avg_motor_temp":92.0,"max_motor_temp":98.0,"battery_drain":30,"active_hours":8,"max_temp_load_ratio":3.1}' \
-            -w "\nHTTP_STATUS:%{http_code}")
-          STATUS=$(echo "$RESP" | grep -oP 'HTTP_STATUS:\K\d+')
-          BODY=$(echo "$RESP" | sed '/HTTP_STATUS:/d')
+          curl -sS -o /tmp/predict_body.json -w "%{http_code}" -X POST "http://$ALB/api/predict" -H "Content-Type: application/json" -d '{"robot_id":"ROBOT-00001","avg_motor_temp":92.0,"max_motor_temp":98.0,"battery_drain":30,"active_hours":8,"max_temp_load_ratio":3.1}' > /tmp/predict_status.txt
+          STATUS=$(cat /tmp/predict_status.txt)
           echo "HTTP status: $STATUS"
-          echo "Response body: $BODY"
-
+          echo "Body:"
+          cat /tmp/predict_body.json
+          echo
           if [ "$STATUS" != "200" ]; then
             echo "api_status=HTTP_$STATUS" >> "$GITHUB_OUTPUT"
-            echo "body<<EOF" >> "$GITHUB_OUTPUT"
-            echo "$BODY" >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-
-          MISSING=$(python3 -c '
-import json, sys
-body = json.loads(sys.argv[1])
-required = ["failure_distribution", "predicted_failure_type", "fault_probability", "risk_level", "recommended_action"]
-missing = [k for k in required if k not in body]
-valid_types = {"NONE","TWF","HDF","PWF","OSF","RNF"}
-if "predicted_failure_type" in body and body["predicted_failure_type"] not in valid_types:
-    missing.append(f"predicted_failure_type={body[\"predicted_failure_type\"]} 허용 외")
-print(",".join(missing) if missing else "OK")' "$BODY")
+          MISSING=$(python3 -c "import json; b=json.load(open('/tmp/predict_body.json')); req=['failure_distribution','predicted_failure_type','fault_probability','risk_level','recommended_action']; m=[k for k in req if k not in b]; v={'NONE','TWF','HDF','PWF','OSF','RNF'}; pft=b.get('predicted_failure_type'); m.append('invalid_pred='+str(pft)) if (pft is not None and pft not in v) else None; print(','.join(m) if m else 'OK')")
           echo "Missing/invalid: $MISSING"
+          PREDICTED=$(python3 -c "import json; print(json.load(open('/tmp/predict_body.json')).get('predicted_failure_type','?'))")
+          echo "predicted=$PREDICTED" >> "$GITHUB_OUTPUT"
           if [ "$MISSING" = "OK" ]; then
             echo "api_status=PASS" >> "$GITHUB_OUTPUT"
           else
             echo "api_status=FAIL" >> "$GITHUB_OUTPUT"
           fi
-          echo "predicted=$(echo "$BODY" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("predicted_failure_type", "?"))')" >> "$GITHUB_OUTPUT"
 
       - name: 5. 결과 리포트 (Step Summary)
         if: always()
@@ -218,16 +175,8 @@ print(",".join(missing) if missing else "OK")' "$BODY")
             echo "| 4. /api/predict multi-class 응답 | $API_STATUS | predicted=$API_PRED |"
             echo ""
             echo "## 다음 액션"
-            if [ "$ECR_STATUS" = "STALE" ]; then
-              echo "- **ECR stale**: GitHub Actions \`k8s-deploy\` workflow 마지막 run 상태 확인 + 실패 원인 진단."
-            fi
-            if [ "$GEN_STATUS" != "PASS" ]; then
-              echo "- **Generator FAIL**: pod log full 확인 — \`kubectl -n $K8S_NS logs deploy/robot-telemetry-generator --tail=500\`"
-            fi
-            if [ "$BRONZE_STATUS" != "PASS" ]; then
-              echo "- **Bronze FAIL**: Firehose buffer flush 지연(최대 5분) 가능 — 5분 후 재시도, 그래도 NONE만이면 schema 미적용 의심."
-            fi
-            if [ "$API_STATUS" != "PASS" ]; then
-              echo "- **API FAIL**: SageMaker endpoint 가 옛 binary 모델일 가능성 — \`SAGEMAKER_ROLE_ARN=... python3 -m src.ml.train\` 수동 실행 또는 Airflow \`retrain_ml_model\` task 트리거."
-            fi
+            if [ "$ECR_STATUS" = "STALE" ]; then echo "- **ECR stale**: k8s-deploy workflow 마지막 run 상태 확인."; fi
+            if [ "$GEN_STATUS" != "PASS" ]; then echo "- **Generator FAIL**: kubectl -n $K8S_NS logs deploy/robot-telemetry-generator --tail=500"; fi
+            if [ "$BRONZE_STATUS" != "PASS" ]; then echo "- **Bronze FAIL**: Firehose buffer flush 지연(최대 5분) 가능 — 재시도."; fi
+            if [ "$API_STATUS" != "PASS" ]; then echo "- **API FAIL**: SageMaker endpoint 가 옛 binary 모델 — 'python3 -m src.ml.train' 수동 실행 또는 Airflow retrain_ml_model task 트리거."; fi
           } >> "$GITHUB_STEP_SUMMARY"
