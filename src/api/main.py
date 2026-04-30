@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import re
 from datetime import datetime, timedelta, timezone
@@ -191,7 +192,10 @@ async def predict_failure(request: Request, body: PredictRequest):
                 Body=features,
             ),
         )
-        failure_prob = float(response["Body"].read().decode())
+        # SageMaker XGBoost 1.7 응답 형식: text/csv → "0.0319" / application/json → "[0.0319]"
+        # 두 형식 모두 안전 파싱.
+        raw = response["Body"].read().decode().strip()
+        failure_prob = float(json.loads(raw)[0]) if raw.startswith("[") else float(raw)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"SageMaker 호출 실패: {exc}")
     return {
