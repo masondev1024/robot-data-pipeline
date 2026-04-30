@@ -378,7 +378,10 @@
                         const params = new URLSearchParams(qs);
                         const rid = params.get('robot_id');
                         if (rid) {
-                            updateGrafanaFrame(`var-robot_id=${encodeURIComponent(rid)}`);
+                            // robot 링크 클릭 시 → Detail dashboard 강제 + var-robot_id 전달
+                            // (Fleet Status 는 fleet 통계라 individual robot 필터링이 의미 없음)
+                            const detailSrc = `${grafanaUrl}/d/robot-detail-001?kiosk=tv&orgId=1&var-robot_id=${encodeURIComponent(rid)}`;
+                            document.getElementById('grafana-frame').src = detailSrc;
                         } else {
                             updateGrafanaFrame();
                         }
