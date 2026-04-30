@@ -143,7 +143,7 @@ grep -q "robot-telemetry-api" terraform/cicd_gitops.tf && echo "OK: api ECR"
 1. 위 AC 커맨드를 실행한다.
 2. 아키텍처 체크리스트:
    - ECR repo가 generator + api 2개 모두 있는가?
-   - GitHub Actions OIDC의 `sub` 조건이 `masondev1024/robot-telemetry-platform`으로 제한되는가?
+   - GitHub Actions OIDC의 `sub` 조건이 `masondev1024/robot-data-pipeline`으로 제한되는가?
    - `modules/data_pipeline/` 하위 4개 파일이 존재하는가? (glue.tf 포함)
 3. `phases/0-setup/index.json` step 4 업데이트:
    - 성공 → `"status": "completed"`, `"summary": "cicd_gitops.tf: ECR(generator+api), GitHub OIDC. modules/data_pipeline/ 4파일 스캐폴드"`

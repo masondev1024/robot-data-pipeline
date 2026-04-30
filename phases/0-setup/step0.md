@@ -28,7 +28,7 @@ variable "vpc_cidr"            { default = "10.0.32.0/16" }
 variable "node_instance_type"  { default = "t3.large" }
 variable "environment"         { default = "dev" }
 variable "github_owner"        { default = "masondev1024" }
-variable "github_repo"         { default = "robot-telemetry-platform" }
+variable "github_repo"         { default = "robot-data-pipeline" }
 variable "github_branch"       { default = "main" }
 ```
 
