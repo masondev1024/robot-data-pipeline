@@ -56,6 +56,8 @@ def test_source_code_contains_deploy_endpoint_config():
     assert 'endpoint_name="robot-failure-predictor"' in source
     # Verify ml.t2.medium instance type is used for deployment
     assert 'instance_type="ml.t2.medium"' in source
+    # Verify update_endpoint=True for idempotent redeploy
+    assert "update_endpoint=True" in source
     # Verify ml.m5.large is used for training
     assert 'instance_type="ml.m5.large"' in source
 

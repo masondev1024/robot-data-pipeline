@@ -19,7 +19,7 @@ SELECT
     battery_drain,
     active_hours
 FROM gold_robot_daily_stats
-WHERE dt >= date_format(current_date - interval '30' day, '%Y-%m-%d')
+WHERE dt >= current_date - interval '30' day
 """
 
 
@@ -66,6 +66,7 @@ def main():
         initial_instance_count=1,
         instance_type="ml.t2.medium",
         endpoint_name="robot-failure-predictor",
+        update_endpoint=True,
     )
 
 
