@@ -147,7 +147,7 @@ data:
             {
               "alias": "P50",
               "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
-              "dimensions": { "TargetGroup": "robot-telemetry-api" },
+              "dimensions": { "LoadBalancer": "app/k8s-robottel-robottel-6592ec7239/6bbbe585ca861ef0" },
               "expression": "",
               "id": "",
               "matchExact": true,
@@ -165,7 +165,7 @@ data:
             {
               "alias": "P95",
               "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
-              "dimensions": { "TargetGroup": "robot-telemetry-api" },
+              "dimensions": { "LoadBalancer": "app/k8s-robottel-robottel-6592ec7239/6bbbe585ca861ef0" },
               "expression": "",
               "id": "",
               "matchExact": true,
@@ -183,7 +183,7 @@ data:
             {
               "alias": "P99",
               "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
-              "dimensions": { "TargetGroup": "robot-telemetry-api" },
+              "dimensions": { "LoadBalancer": "app/k8s-robottel-robottel-6592ec7239/6bbbe585ca861ef0" },
               "expression": "",
               "id": "",
               "matchExact": true,
@@ -230,7 +230,7 @@ data:
             {
               "alias": "5xx Count",
               "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
-              "dimensions": { "TargetGroup": "robot-telemetry-api" },
+              "dimensions": { "LoadBalancer": "app/k8s-robottel-robottel-6592ec7239/6bbbe585ca861ef0" },
               "expression": "",
               "id": "",
               "matchExact": true,
@@ -248,7 +248,7 @@ data:
             {
               "alias": "Total Requests",
               "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
-              "dimensions": { "TargetGroup": "robot-telemetry-api" },
+              "dimensions": { "LoadBalancer": "app/k8s-robottel-robottel-6592ec7239/6bbbe585ca861ef0" },
               "expression": "",
               "id": "",
               "matchExact": true,
