@@ -20,6 +20,8 @@ phases/**/step*-output.json
 terraform/.terraform/
 terraform/*.tfstate
 terraform/*.tfstate.backup
+terraform/*.tfstate.*.backup
+terraform/*.tfstate.*
 terraform/*.tfvars
 terraform/.terraform.lock.hcl
 # tfvars 추가 패턴 (어느 위치든 보호)
