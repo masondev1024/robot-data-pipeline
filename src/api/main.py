@@ -32,16 +32,19 @@ _grafana_url: str | None = None
 
 
 def _get_grafana_url() -> str:
-    """Late-binding: post-deploy.yml이 ALB DNS를 SSM에 저장한 뒤 첫 호출 시 1회 조회 + 모듈 캐시."""
+    """Late-binding: post-deploy.yml이 ALB DNS를 SSM에 저장한 뒤 첫 호출 시 1회 조회 + 모듈 캐시.
+    SSM 값이 trailing slash 보유 시 portal.html 이 `${grafanaUrl}/d/...` 로 합쳐 `//d/...` (404)
+    를 만드는 것을 방지하기 위해 rstrip('/') 적용 — single source of truth 로 정리."""
     global _grafana_url
     if _grafana_url is None:
         try:
-            _grafana_url = get_client("ssm").get_parameter(
+            value = get_client("ssm").get_parameter(
                 Name="/robot-telemetry/grafana-url"
             )["Parameter"]["Value"]
         except Exception as e:
             print(f"SSM get_parameter /robot-telemetry/grafana-url failed: {str(e)}")
-            _grafana_url = os.environ.get("GRAFANA_URL", "http://localhost:3000")
+            value = os.environ.get("GRAFANA_URL", "http://localhost:3000")
+        _grafana_url = value.rstrip("/")
     return _grafana_url
 
 

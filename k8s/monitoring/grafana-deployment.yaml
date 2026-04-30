@@ -52,6 +52,9 @@ spec:
               value: Viewer
             - name: GF_SECURITY_ALLOW_EMBEDDING
               value: "true"
+            # 같은-사이트 cookie 정책 완화 — portal iframe 안에서 dashboard 접근 시 cookie 전달
+            - name: GF_SECURITY_COOKIE_SAMESITE
+              value: "disabled"
             - name: AWS_REGION
               value: eu-west-1
             - name: AWS_DEFAULT_REGION
