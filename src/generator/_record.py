@@ -18,8 +18,10 @@ def jittered_pos(pos: float) -> float:
     return round(pos + random.uniform(-0.0001, 0.0001), 6)
 
 
-def jittered_load(load_base: int) -> int:
-    return int(min(100, max(0, load_base + random.gauss(0, 5))))
+def jittered_load(load_base: int) -> float:
+    # Glue Bronze catalog가 DOUBLE이므로 float로 송신해야 KDF Parquet 변환이
+    # 결정적으로 DOUBLE을 선택한다. INT 송신 시 INT32/DOUBLE 비결정 → HIVE_BAD_DATA.
+    return round(min(100.0, max(0.0, load_base + random.gauss(0, 5))), 2)
 
 
 def to_kinesis_record(record: dict) -> dict:

@@ -19,7 +19,7 @@
   "links": [],
   "panels": [
     {
-      "datasource": "${DS_ATHENA}",
+      "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
       "fieldConfig": {
         "defaults": {
           "color": {

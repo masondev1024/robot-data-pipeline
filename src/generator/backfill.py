@@ -90,13 +90,13 @@ def generate_record(profile: dict, t: datetime) -> dict:
         min(110.0, max(55.0, motor_base + random.gauss(0, 2) + spike)),
         2,
     )
-    load = int(min(100, max(0, profile["load_base"] + random.gauss(0, 5))))
+    load = round(min(100.0, max(0.0, profile["load_base"] + random.gauss(0, 5))), 2)
 
     return {
         "robot_id":      profile["robot_id"],
         "pos_x":         round(profile["pos_x"] + random.uniform(-0.0001, 0.0001), 6),
         "pos_y":         round(profile["pos_y"] + random.uniform(-0.0001, 0.0001), 6),
-        "battery_level": random.randint(20, 100),
+        "battery_level": round(random.uniform(20.0, 100.0), 2),
         "current_load":  load,
         "motor_temp":    motor_temp,
         "timestamp":     t.strftime(ISO_Z_FMT),
