@@ -1,93 +1,112 @@
 {
-  "title": "Robot Telemetry — Observability",
-  "uid": "robot-observability",
-  "schemaVersion": 36,
-  "version": 1,
-  "refresh": "30s",
-  "time": { "from": "now-1h", "to": "now" },
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
   "panels": [
     {
-      "id": 1,
-      "title": "Endpoint Latency — /api/chat & /api/predict (P50/P95/P99)",
-      "type": "timeseries",
-      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
       "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
-      "targets": [
-        {
-          "refId": "A",
-          "namespace": "AWS/ApplicationELB",
-          "metricName": "TargetResponseTime",
-          "statistics": ["p50"],
-          "dimensions": { "TargetGroup": "robot-telemetry-api" },
-          "alias": "/api/chat P50"
-        },
-        {
-          "refId": "B",
-          "namespace": "AWS/ApplicationELB",
-          "metricName": "TargetResponseTime",
-          "statistics": ["p95"],
-          "dimensions": { "TargetGroup": "robot-telemetry-api" },
-          "alias": "/api/chat P95"
-        },
-        {
-          "refId": "C",
-          "namespace": "AWS/ApplicationELB",
-          "metricName": "TargetResponseTime",
-          "statistics": ["p99"],
-          "dimensions": { "TargetGroup": "robot-telemetry-api" },
-          "alias": "/api/chat P99"
-        }
-      ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
-          "custom": { "lineWidth": 2 }
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": { "tooltip": false, "viz": false, "legend": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "id": 1,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "alias": "P50",
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "dimensions": { "TargetGroup": "robot-telemetry-api" },
+          "expression": "",
+          "id": "",
+          "matchExact": true,
+          "metricEditorMode": 0,
+          "metricName": "TargetResponseTime",
+          "metricQueryType": 0,
+          "namespace": "AWS/ApplicationELB",
+          "period": "60",
+          "queryMode": "Metrics",
+          "refId": "A",
+          "region": "eu-west-1",
+          "sqlExpression": "",
+          "statistic": "p50"
+        },
+        {
+          "alias": "P95",
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "dimensions": { "TargetGroup": "robot-telemetry-api" },
+          "expression": "",
+          "id": "",
+          "matchExact": true,
+          "metricEditorMode": 0,
+          "metricName": "TargetResponseTime",
+          "metricQueryType": 0,
+          "namespace": "AWS/ApplicationELB",
+          "period": "60",
+          "queryMode": "Metrics",
+          "refId": "B",
+          "region": "eu-west-1",
+          "sqlExpression": "",
+          "statistic": "p95"
+        },
+        {
+          "alias": "P99",
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "dimensions": { "TargetGroup": "robot-telemetry-api" },
+          "expression": "",
+          "id": "",
+          "matchExact": true,
+          "metricEditorMode": 0,
+          "metricName": "TargetResponseTime",
+          "metricQueryType": 0,
+          "namespace": "AWS/ApplicationELB",
+          "period": "60",
+          "queryMode": "Metrics",
+          "refId": "C",
+          "region": "eu-west-1",
+          "sqlExpression": "",
+          "statistic": "p99"
         }
-      }
+      ],
+      "title": "Endpoint Latency — /api/chat & /api/predict (P50/P95/P99)",
+      "type": "timeseries"
     },
     {
-      "id": 2,
-      "title": "Error Rate — 5xx Responses (%)",
-      "type": "timeseries",
-      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
       "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
-      "targets": [
-        {
-          "refId": "A",
-          "namespace": "AWS/ApplicationELB",
-          "metricName": "HTTPCode_Target_5XX_Count",
-          "statistics": ["Sum"],
-          "dimensions": { "TargetGroup": "robot-telemetry-api" },
-          "alias": "5xx Count"
-        },
-        {
-          "refId": "B",
-          "namespace": "AWS/ApplicationELB",
-          "metricName": "RequestCount",
-          "statistics": ["Sum"],
-          "dimensions": { "TargetGroup": "robot-telemetry-api" },
-          "alias": "Total Requests"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "calculateField",
-          "options": {
-            "alias": "5xx Rate (%)",
-            "mode": "reduceRow",
-            "reduce": { "reducer": "sum" },
-            "binary": {
-              "left": "5xx Count",
-              "right": "Total Requests",
-              "operator": "/"
-            }
-          }
-        }
-      ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
-          "custom": { "lineWidth": 2 },
+          "custom": { "lineWidth": 2, "drawStyle": "line", "fillOpacity": 10 },
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -95,53 +114,149 @@
               { "color": "yellow", "value": 1 },
               { "color": "red", "value": 5 }
             ]
-          }
-        }
-      }
-    },
-    {
-      "id": 3,
-      "title": "Generator → Kinesis PutRecords Latency (avg ms)",
-      "type": "timeseries",
-      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
-      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "id": 2,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
       "targets": [
         {
+          "alias": "5xx Count",
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "dimensions": { "TargetGroup": "robot-telemetry-api" },
+          "expression": "",
+          "id": "",
+          "matchExact": true,
+          "metricEditorMode": 0,
+          "metricName": "HTTPCode_Target_5XX_Count",
+          "metricQueryType": 0,
+          "namespace": "AWS/ApplicationELB",
+          "period": "60",
+          "queryMode": "Metrics",
           "refId": "A",
-          "namespace": "AWS/Kinesis",
-          "metricName": "PutRecords.Latency",
-          "statistics": ["Average"],
-          "dimensions": { "StreamName": "robot-telemetry-stream" },
-          "alias": "PutRecords Avg Latency"
+          "region": "eu-west-1",
+          "sqlExpression": "",
+          "statistic": "Sum"
         },
         {
+          "alias": "Total Requests",
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "dimensions": { "TargetGroup": "robot-telemetry-api" },
+          "expression": "",
+          "id": "",
+          "matchExact": true,
+          "metricEditorMode": 0,
+          "metricName": "RequestCount",
+          "metricQueryType": 0,
+          "namespace": "AWS/ApplicationELB",
+          "period": "60",
+          "queryMode": "Metrics",
           "refId": "B",
-          "namespace": "AWS/Kinesis",
-          "metricName": "PutRecords.SuccessfulRecords",
-          "statistics": ["Sum"],
-          "dimensions": { "StreamName": "robot-telemetry-stream" },
-          "alias": "Successful Records"
+          "region": "eu-west-1",
+          "sqlExpression": "",
+          "statistic": "Sum"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "custom": { "lineWidth": 2 }
-        }
-      }
+      "title": "Error Rate — 5xx Responses",
+      "type": "timeseries"
     },
     {
-      "id": 4,
-      "title": "X-Ray Service Map",
-      "type": "text",
-      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "id": 3,
       "options": {
-        "mode": "html",
-        "content": "<div style=\"display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column\"><p style=\"font-size:14px;color:#aaa\">X-Ray Service Map</p><p style=\"font-size:12px;color:#666\">Open AWS Console → X-Ray → Service Map<br/>Filter: robot-telemetry namespace</p><a href=\"https://eu-west-1.console.aws.amazon.com/xray/home?region=eu-west-1#/service-map\" target=\"_blank\" style=\"color:#5794f2\">View in AWS Console →</a></div>"
-      }
+        "legend": { "calcs": ["mean", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "alias": "PutRecords Avg Latency",
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "dimensions": { "StreamName": "robot-telemetry-stream" },
+          "expression": "",
+          "id": "",
+          "matchExact": true,
+          "metricEditorMode": 0,
+          "metricName": "PutRecords.Latency",
+          "metricQueryType": 0,
+          "namespace": "AWS/Kinesis",
+          "period": "60",
+          "queryMode": "Metrics",
+          "refId": "A",
+          "region": "eu-west-1",
+          "sqlExpression": "",
+          "statistic": "Average"
+        },
+        {
+          "alias": "Successful Records",
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "dimensions": { "StreamName": "robot-telemetry-stream" },
+          "expression": "",
+          "id": "",
+          "matchExact": true,
+          "metricEditorMode": 0,
+          "metricName": "PutRecords.SuccessfulRecords",
+          "metricQueryType": 0,
+          "namespace": "AWS/Kinesis",
+          "period": "60",
+          "queryMode": "Metrics",
+          "refId": "B",
+          "region": "eu-west-1",
+          "sqlExpression": "",
+          "statistic": "Sum"
+        }
+      ],
+      "title": "Generator → Kinesis PutRecords Latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "datasource", "uid": "grafana" },
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "id": 4,
+      "options": {
+        "code": { "language": "html", "showLineNumbers": false, "showMiniMap": false },
+        "content": "<div style=\"display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column\"><p style=\"font-size:14px;color:#aaa\">X-Ray Service Map</p><p style=\"font-size:12px;color:#666\">Open AWS Console → X-Ray → Service Map<br/>Filter: robot-telemetry namespace</p><a href=\"https://eu-west-1.console.aws.amazon.com/xray/home?region=eu-west-1#/service-map\" target=\"_blank\" style=\"color:#5794f2\">View in AWS Console →</a></div>",
+        "mode": "html"
+      },
+      "title": "X-Ray Service Map",
+      "type": "text"
     }
   ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["robot-telemetry", "observability"],
   "templating": { "list": [] },
-  "annotations": { "list": [] },
-  "links": []
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "UTC",
+  "title": "Robot Telemetry — Observability",
+  "uid": "robot-observability",
+  "version": 1,
+  "weekStart": ""
 }
