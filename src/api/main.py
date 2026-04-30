@@ -172,6 +172,17 @@ async def chat(request: Request, req: ChatRequest):
 sagemaker_runtime = get_client("sagemaker-runtime")
 ENDPOINT_NAME = os.environ.get("SAGEMAKER_ENDPOINT_NAME", "robot-failure-predictor")
 
+# Task 8.3: Multi-class 응답 매핑. train.py 의 LABEL_MAP 과 정합.
+FAILURE_TYPE_LABELS = ["NONE", "TWF", "HDF", "PWF", "OSF", "RNF"]
+RECOMMENDED_ACTIONS = {
+    "NONE": "정상 — 일상 점검 외 별도 조치 불필요",
+    "TWF": "공구 마모(TWF) — 공구 마모도 측정 + 교체 주기 점검",
+    "HDF": "방열 결함(HDF) — 방열핀/팬 청소·점검, 냉각 유로 확인",
+    "PWF": "전력 결함(PWF) — 전력 공급부·인버터 점검, 전압/전류 모니터링",
+    "OSF": "과부하(OSF) — 부하 한도 재설정, 토크 프로파일 검토",
+    "RNF": "랜덤 결함(RNF) — 통신/배선/센서 연결 상태 종합 점검",
+}
+
 
 class PredictRequest(BaseModel):
     robot_id: str
@@ -180,6 +191,23 @@ class PredictRequest(BaseModel):
     battery_drain: int
     active_hours: int
     max_temp_load_ratio: float
+
+
+def _parse_softprob_response(raw: str) -> list[float]:
+    """SageMaker XGBoost multi:softprob 응답을 6-class 확률 리스트로 파싱.
+
+    응답 형식:
+      - text/csv  : "0.72,0.05,0.08,0.06,0.05,0.04" (한 줄, 콤마 구분)
+      - JSON      : "[[0.72, 0.05, ...]]" 또는 "[0.72, 0.05, ...]"
+    """
+    raw = raw.strip()
+    if raw.startswith("["):
+        data = json.loads(raw)
+        probs = data[0] if isinstance(data, list) and data and isinstance(data[0], list) else data
+    else:
+        first_line = raw.split("\n")[0]
+        probs = [float(v) for v in first_line.split(",")]
+    return [float(p) for p in probs]
 
 
 @app.post("/api/predict")
@@ -196,16 +224,36 @@ async def predict_failure(request: Request, body: PredictRequest):
                 Body=features,
             ),
         )
-        # SageMaker XGBoost 1.7 응답 형식: text/csv → "0.0319" / application/json → "[0.0319]"
-        # 두 형식 모두 안전 파싱.
-        raw = response["Body"].read().decode().strip()
-        failure_prob = float(json.loads(raw)[0]) if raw.startswith("[") else float(raw)
+        raw = response["Body"].read().decode()
+        probs = _parse_softprob_response(raw)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"SageMaker 호출 실패: {exc}")
+
+    if len(probs) != len(FAILURE_TYPE_LABELS):
+        raise HTTPException(
+            status_code=502,
+            detail=f"SageMaker 응답 차원 불일치: {len(probs)} (expected {len(FAILURE_TYPE_LABELS)})",
+        )
+
+    distribution = {label: round(p, 4) for label, p in zip(FAILURE_TYPE_LABELS, probs)}
+    argmax_idx = max(range(len(probs)), key=lambda i: probs[i])
+    predicted = FAILURE_TYPE_LABELS[argmax_idx]
+    fault_prob = round(1.0 - distribution["NONE"], 4)
+
+    if fault_prob > 0.7:
+        risk = "high"
+    elif fault_prob > 0.4:
+        risk = "medium"
+    else:
+        risk = "low"
+
     return {
         "robot_id": body.robot_id,
-        "failure_probability": round(failure_prob, 4),
-        "risk_level": "high" if failure_prob > 0.7 else "medium" if failure_prob > 0.4 else "low",
+        "failure_distribution": distribution,
+        "predicted_failure_type": predicted,
+        "fault_probability": fault_prob,
+        "risk_level": risk,
+        "recommended_action": RECOMMENDED_ACTIONS[predicted],
     }
 
 

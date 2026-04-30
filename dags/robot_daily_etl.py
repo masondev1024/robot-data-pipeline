@@ -50,8 +50,18 @@ def _run_athena_query(query: str) -> str:
     return execution_id
 
 
-def evaluate_quality(total: int, null_id: int, bad_temp: int, bad_battery: int) -> list[str]:
-    """Bronze 품질 게이트 평가. 빈 리스트 = 통과."""
+def evaluate_quality(
+    total: int,
+    null_id: int,
+    bad_temp: int,
+    bad_battery: int,
+    bad_failure_type: int = 0,
+) -> list[str]:
+    """Bronze 품질 게이트 평가. 빈 리스트 = 통과.
+
+    Task 8.6: bad_failure_type — failure_type ∉ {NONE,TWF,HDF,PWF,OSF,RNF} 건수
+    (NULL은 silver 변환 시 'NONE' 으로 fill 되므로 제외).
+    """
     if total == 0:
         return ["레코드 0건"]
 
@@ -62,6 +72,8 @@ def evaluate_quality(total: int, null_id: int, bad_temp: int, bad_battery: int) 
         failures.append(f"motor_temp 이상치 비율 {bad_temp/total:.2%}")
     if bad_battery / total >= DQ_FAILURE_RATIO_THRESHOLD:
         failures.append(f"battery_level 이상치 비율 {bad_battery/total:.2%}")
+    if bad_failure_type / total >= DQ_FAILURE_RATIO_THRESHOLD:
+        failures.append(f"failure_type enum 이탈 비율 {bad_failure_type/total:.2%}")
     return failures
 
 
@@ -91,7 +103,10 @@ SELECT
     COUNT(*)                                                            AS total_count,
     SUM(CASE WHEN robot_id IS NULL THEN 1 ELSE 0 END)                   AS null_robot_id,
     SUM(CASE WHEN motor_temp NOT BETWEEN 0 AND 500 THEN 1 ELSE 0 END)   AS bad_temp,
-    SUM(CASE WHEN battery_level NOT BETWEEN 0 AND 100 THEN 1 ELSE 0 END) AS bad_battery
+    SUM(CASE WHEN battery_level NOT BETWEEN 0 AND 100 THEN 1 ELSE 0 END) AS bad_battery,
+    SUM(CASE WHEN failure_type IS NOT NULL
+                  AND failure_type NOT IN ('NONE','TWF','HDF','PWF','OSF','RNF')
+             THEN 1 ELSE 0 END)                                          AS bad_failure_type
 FROM bronze_robot_telemetry
 WHERE year = '{year:04d}' AND month = '{month:02d}' AND day = '{day:02d}'
 """
@@ -100,9 +115,9 @@ WHERE year = '{year:04d}' AND month = '{month:02d}' AND day = '{day:02d}'
     athena = boto3.client("athena", region_name=AWS_REGION)
     rows = athena.get_query_results(QueryExecutionId=execution_id)["ResultSet"]["Rows"]
     values = [cell.get("VarCharValue", "0") for cell in rows[1]["Data"]]
-    total, null_id, bad_temp, bad_battery = (int(v) for v in values)
+    total, null_id, bad_temp, bad_battery, bad_failure_type = (int(v) for v in values)
 
-    failures = evaluate_quality(total, null_id, bad_temp, bad_battery)
+    failures = evaluate_quality(total, null_id, bad_temp, bad_battery, bad_failure_type)
     if failures:
         msg = "; ".join(failures)
         _publish_dq_failure(msg)
@@ -135,6 +150,7 @@ def _bronze_to_silver(**ctx):
 
     _delete_s3_partition(f"silver/dt={dt}/")
 
+    # Task 8.1/8.6: failure_type NULL → 'NONE' fill (backward compat: v1 schema 송출 데이터)
     query = f"""
 INSERT INTO silver_robot_telemetry
 SELECT
@@ -145,6 +161,7 @@ SELECT
     CAST(current_load AS INTEGER)  AS current_load,
     CAST(motor_temp AS DOUBLE)     AS motor_temp,
     timestamp,
+    COALESCE(failure_type, 'NONE') AS failure_type,
     DATE '{dt}'                    AS dt
 FROM (
     SELECT *,
@@ -168,24 +185,37 @@ def _silver_to_gold(**ctx):
 
     _delete_s3_partition(f"gold/dt={dt}/")
 
+    # Task 8.1: dominant_failure_type — 일일 최빈 failure_type (NONE 제외 후 mode).
+    # 모든 record 가 NONE 이면 'NONE'. Athena Trino: array_agg + filter 패턴 사용
+    # (Trino 는 MODE() 함수 미지원).
     query = f"""
 INSERT INTO gold_robot_daily_stats
 SELECT
-    robot_id,
-    AVG(motor_temp)                                                                     AS avg_motor_temp,
-    MAX(motor_temp)                                                                     AS max_motor_temp,
-    MAX(battery_level)                                                                  AS battery_start,
-    MIN(battery_level)                                                                  AS battery_end,
-    MAX(battery_level) - MIN(battery_level)                                             AS battery_drain,
-    CAST(COUNT(DISTINCT date_trunc('hour', from_iso8601_timestamp(timestamp))) AS INTEGER) AS active_hours,
-    CAST(COUNT(CASE WHEN motor_temp >= 92.0
-                      AND motor_temp / GREATEST(CAST(current_load AS DOUBLE), 1.0) > 2.5
-                    THEN 1 END) AS INTEGER)                                              AS anomaly_record_count,
-    MAX(motor_temp / GREATEST(CAST(current_load AS DOUBLE), 1.0))                        AS max_temp_load_ratio,
-    DATE '{dt}'                                                                          AS dt
-FROM silver_robot_telemetry
-WHERE dt = DATE '{dt}'
-GROUP BY robot_id
+    s.robot_id,
+    AVG(s.motor_temp)                                                                     AS avg_motor_temp,
+    MAX(s.motor_temp)                                                                     AS max_motor_temp,
+    MAX(s.battery_level)                                                                  AS battery_start,
+    MIN(s.battery_level)                                                                  AS battery_end,
+    MAX(s.battery_level) - MIN(s.battery_level)                                           AS battery_drain,
+    CAST(COUNT(DISTINCT date_trunc('hour', from_iso8601_timestamp(s.timestamp))) AS INTEGER) AS active_hours,
+    CAST(COUNT(CASE WHEN s.motor_temp >= 92.0
+                      AND s.motor_temp / GREATEST(CAST(s.current_load AS DOUBLE), 1.0) > 2.5
+                    THEN 1 END) AS INTEGER)                                                AS anomaly_record_count,
+    MAX(s.motor_temp / GREATEST(CAST(s.current_load AS DOUBLE), 1.0))                      AS max_temp_load_ratio,
+    COALESCE(
+        (SELECT failure_type
+         FROM silver_robot_telemetry s2
+         WHERE s2.dt = DATE '{dt}' AND s2.robot_id = s.robot_id
+           AND s2.failure_type <> 'NONE'
+         GROUP BY failure_type
+         ORDER BY COUNT(*) DESC
+         LIMIT 1),
+        'NONE'
+    )                                                                                      AS dominant_failure_type,
+    DATE '{dt}'                                                                            AS dt
+FROM silver_robot_telemetry s
+WHERE s.dt = DATE '{dt}'
+GROUP BY s.robot_id
 """
     _run_athena_query(query)
 

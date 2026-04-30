@@ -267,6 +267,81 @@
             transition: all 0.15s;
         }
         .empty-state .example:hover { background: #c5dafc; }
+
+        /* Task 8.4: 예측 점검 패널 */
+        .predict-section {
+            background: var(--surface);
+            border-radius: 10px;
+            box-shadow: var(--shadow-md);
+            padding: 14px 16px;
+            margin-bottom: 12px;
+        }
+        .predict-header {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text);
+        }
+        .predict-header::before { content: "🔮"; }
+        .predict-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+        .predict-form input {
+            padding: 7px 9px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 12px;
+            min-width: 0;
+        }
+        .predict-form input:focus { outline: none; border-color: var(--primary); }
+        .predict-form .full { grid-column: 1 / -1; }
+        .predict-btn {
+            width: 100%;
+            padding: 8px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12.5px;
+            font-weight: 600;
+            min-height: 36px;
+        }
+        .predict-btn:hover { background: var(--primary-dark); }
+        .predict-btn:disabled { background: #b0bcca; cursor: not-allowed; }
+        .predict-result {
+            margin-top: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 12.5px;
+            line-height: 1.5;
+            display: none;
+        }
+        .predict-result.show { display: block; }
+        .ft-badge {
+            display: inline-block;
+            padding: 3px 9px;
+            border-radius: 12px;
+            font-size: 11.5px;
+            font-weight: 700;
+            color: white;
+            margin-right: 6px;
+        }
+        .ft-NONE { background: #757575; }
+        .ft-HDF  { background: #e53935; }
+        .ft-PWF  { background: #fb8c00; }
+        .ft-OSF  { background: #fdd835; color: #5a4500; }
+        .ft-TWF  { background: #1e88e5; }
+        .ft-RNF  { background: #8e8e8e; }
+        .risk-high   { color: #c62828; font-weight: 700; }
+        .risk-medium { color: #ef6c00; font-weight: 600; }
+        .risk-low    { color: #2e7d32; }
     </style>
 </head>
 <body>
@@ -285,7 +360,22 @@
             <iframe id="grafana-frame" src=""></iframe>
         </div>
 
-        <div class="chat-section">
+        <div class="right-column" style="display: flex; flex-direction: column; min-height: 0;">
+        <div class="predict-section">
+            <div class="predict-header">예측 점검 (Failure Type)</div>
+            <div class="predict-form">
+                <input id="pf-robot" class="full" placeholder="robot_id (예: ROBOT-00012)" value="{{ robot_id }}">
+                <input id="pf-avg-temp" type="number" step="0.1" placeholder="평균 온도 °C">
+                <input id="pf-max-temp" type="number" step="0.1" placeholder="최고 온도 °C">
+                <input id="pf-drain" type="number" step="1" placeholder="배터리 소모">
+                <input id="pf-hours" type="number" step="1" placeholder="가동 시간(h)">
+                <input id="pf-ratio" class="full" type="number" step="0.01" placeholder="최고 온도/부하 비율">
+            </div>
+            <button id="predict-btn" class="predict-btn">예측</button>
+            <div id="predict-result" class="predict-result"></div>
+        </div>
+
+        <div class="chat-section" style="flex: 1;">
             <div class="chat-header">AI 분석 상담</div>
             <div class="chat-messages" id="chat-messages">
                 <div class="empty-state" id="empty-state">
@@ -305,6 +395,7 @@
                 <input type="text" id="chat-input" placeholder="로봇 상태를 물어보세요..." autocomplete="off">
                 <button id="send-btn">전송</button>
             </div>
+        </div>
         </div>
     </div>
 
@@ -440,6 +531,68 @@
         document.querySelectorAll('.empty-state .example').forEach(el => {
             el.addEventListener('click', () => sendChat(el.dataset.q));
         });
+
+        // Task 8.4: /api/predict 호출 + failure_type 뱃지 + recommended_action 표시
+        async function runPredict() {
+            const robotId   = document.getElementById('pf-robot').value.trim();
+            const avgTemp   = parseFloat(document.getElementById('pf-avg-temp').value);
+            const maxTemp   = parseFloat(document.getElementById('pf-max-temp').value);
+            const drain     = parseInt(document.getElementById('pf-drain').value, 10);
+            const hours     = parseInt(document.getElementById('pf-hours').value, 10);
+            const ratio     = parseFloat(document.getElementById('pf-ratio').value);
+            const result    = document.getElementById('predict-result');
+
+            if (!robotId || isNaN(avgTemp) || isNaN(maxTemp) || isNaN(drain) || isNaN(hours) || isNaN(ratio)) {
+                result.classList.add('show');
+                result.style.background = '#fff4e6';
+                result.innerHTML = '⚠️ 모든 필드를 채워주세요.';
+                return;
+            }
+
+            const btn = document.getElementById('predict-btn');
+            btn.disabled = true;
+            btn.textContent = '예측 중…';
+            try {
+                const resp = await fetch('/api/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        robot_id: robotId,
+                        avg_motor_temp: avgTemp,
+                        max_motor_temp: maxTemp,
+                        battery_drain: drain,
+                        active_hours: hours,
+                        max_temp_load_ratio: ratio,
+                    }),
+                });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
+                const data = await resp.json();
+                const ft = data.predicted_failure_type;
+                const dist = data.failure_distribution || {};
+                const distLine = Object.entries(dist)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 3)
+                    .map(([k, v]) => `${k}=${(v * 100).toFixed(1)}%`)
+                    .join(' · ');
+                result.classList.add('show');
+                result.style.background = ft === 'NONE' ? '#e8f5e9' : '#fff8e1';
+                result.innerHTML = `
+                    <div><span class="ft-badge ft-${ft}">${ft}</span>
+                    <span class="risk-${data.risk_level}">[${data.risk_level.toUpperCase()}]</span>
+                    fault_prob=${(data.fault_probability * 100).toFixed(1)}%</div>
+                    <div style="margin-top:6px;color:var(--text-secondary);">${distLine}</div>
+                    <div style="margin-top:6px;">${data.recommended_action}</div>
+                `;
+            } catch (e) {
+                result.classList.add('show');
+                result.style.background = '#ffebee';
+                result.innerHTML = `⚠️ 예측 실패: ${e.message}`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '예측';
+            }
+        }
+        document.getElementById('predict-btn').addEventListener('click', runPredict);
 
         loadStatus();
         updateGrafanaFrame();

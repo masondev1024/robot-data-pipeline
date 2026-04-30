@@ -67,6 +67,10 @@ resource "aws_glue_catalog_table" "bronze" {
       name = "timestamp"
       type = "string"
     }
+    columns {
+      name = "failure_type"
+      type = "string"
+    }
   }
 
   partition_keys {
@@ -95,6 +99,8 @@ resource "aws_glue_schema" "telemetry" {
   schema_name   = "robot-telemetry-schema"
   registry_arn  = aws_glue_registry.main.arn
   data_format   = "JSON"
+  # Phase 8: failure_type 추가는 backward-compatible (default "NONE" + required 미포함).
+  # 기존 v1 송신자도 v2 schema 로 검증 가능.
   compatibility = "BACKWARD"
   schema_definition = jsonencode({
     type = "object"
@@ -106,6 +112,11 @@ resource "aws_glue_schema" "telemetry" {
       current_load  = { type = "number" }
       motor_temp    = { type = "number" }
       timestamp     = { type = "string" }
+      failure_type = {
+        type    = "string"
+        enum    = ["NONE", "TWF", "HDF", "PWF", "OSF", "RNF"]
+        default = "NONE"
+      }
     }
     required = ["robot_id", "timestamp"]
   })

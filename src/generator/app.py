@@ -15,6 +15,7 @@ from src.generator._record import (
     iso_z_now,
     jittered_pos,
     load_temp_delta,
+    resolve_failure_type,
     to_kinesis_record,
 )
 from src.generator.schema_validator import get_failure_count, validate_record
@@ -75,6 +76,7 @@ def load_profiles(csv_path: str, robot_count: int) -> list[dict]:
       Rotational speed [rpm]  → load_base         (1168~2886 → 0~100 정규화)
       Tool wear [min]         → drain_factor       (0~250 → 0.1~3.0)
       Machine failure         → is_faulty          (True면 스파이크 확률 70%)
+      TWF/HDF/PWF/OSF/RNF     → failure_type       (Task 8.1, ground truth 라벨)
     """
     with open(csv_path, newline="") as f:
         rows = list(csv.DictReader(f))
@@ -95,6 +97,12 @@ def load_profiles(csv_path: str, robot_count: int) -> list[dict]:
         grid_x = 37.4 + (i % 100) * 0.003
         grid_y = 126.8 + (i // 100) * 0.004
 
+        # is_faulty=True 인데 5종 칼럼이 모두 0인 row가 존재 (CSV 정합) → "RNF"로 기본 분류.
+        is_faulty = bool(failure)
+        f_type = resolve_failure_type(r) if is_faulty else "NONE"
+        if is_faulty and f_type == "NONE":
+            f_type = "RNF"
+
         profiles.append({
             "robot_id":        f"ROBOT-{i+1:05d}",
             "pos_x":           round(grid_x, 6),
@@ -102,7 +110,8 @@ def load_profiles(csv_path: str, robot_count: int) -> list[dict]:
             "motor_temp_base": motor_base,
             "load_base":       load_base,
             "drain_factor":    drain,
-            "is_faulty":       bool(failure),
+            "is_faulty":       is_faulty,
+            "failure_type":    f_type,
             "battery":         random.randint(50, 100),
         })
     return profiles
@@ -175,6 +184,15 @@ async def simulate_robot(profile: dict,
             if battery <= 5.0:
                 charging = True  # 5% 도달 시 charging 진입 (즉시 100% 점프 금지)
 
+        # Task 8.1: fault episode (OVERHEATED/STUCK) 발화 시에만 ground truth
+        # failure_type 송출. NORMAL/RAMPING/COOLING 은 NONE — 라벨이 episode 의
+        # peak 구간에 정렬되도록 한다 (ML 학습 신호 정합).
+        active_phase = fault_state["phase"]
+        if active_phase in (Phase.OVERHEATED, Phase.STUCK):
+            emit_failure_type = profile.get("failure_type", "NONE")
+        else:
+            emit_failure_type = "NONE"
+
         record = {
             "robot_id":      profile["robot_id"],
             "pos_x":         jittered_pos(profile["pos_x"]),
@@ -183,6 +201,7 @@ async def simulate_robot(profile: dict,
             "current_load":  current_load,
             "motor_temp":    motor_temp,
             "timestamp":     iso_z_now(),
+            "failure_type":  emit_failure_type,
         }
         await queue.put(record)
         try:

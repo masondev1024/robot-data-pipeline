@@ -5,7 +5,8 @@ CREATE EXTERNAL TABLE IF NOT EXISTS robot_telemetry_db.bronze_robot_telemetry (
     battery_level DOUBLE,
     current_load  DOUBLE,
     motor_temp    DOUBLE,
-    `timestamp`   STRING
+    `timestamp`   STRING,
+    failure_type  STRING
 )
 PARTITIONED BY (year INT, month INT, day INT, hour INT)
 STORED AS PARQUET

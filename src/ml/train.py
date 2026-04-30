@@ -11,13 +11,35 @@ ATHENA_DATABASE = os.environ.get("ATHENA_DATABASE", "robot_telemetry_db")
 ATHENA_OUTPUT = os.environ.get("ATHENA_OUTPUT_LOCATION", f"s3://{S3_BUCKET}/project-athena-results/")
 MODEL_PREFIX = "ml-models/robot-failure-predictor"
 
-# 라벨 룰: Flink anomaly_detection.py 의 다변량 룰 (motor_temp >= 92.0 AND
-# motor_temp / current_load > 2.5) 을 silver_to_gold 가 day-aggregate 한 결과 사용.
-# anomaly_record_count > 0 인 robot/day 는 그날 1건 이상 anomaly 발생 → label=1.
-# (Flink 의 Z-Score 시계열 조건은 day-aggregate 표현 불가 — Option C 로 추후 보강)
-QUERY = """
+# Task 8.2: 라벨을 룰 기반(anomaly_record_count) 자기참조에서 generator ground truth
+# (dominant_failure_type) 6-class 로 전환. NONE→0, TWF→1, HDF→2, PWF→3, OSF→4, RNF→5.
+# Athena 결과는 "label,sample_weight,feat1..feat5" 컬럼 순서로 SageMaker 학습에 전달.
+LABEL_MAP = {"NONE": 0, "TWF": 1, "HDF": 2, "PWF": 3, "OSF": 4, "RNF": 5}
+NUM_CLASSES = len(LABEL_MAP)
+FEATURE_COLUMNS = [
+    "avg_motor_temp",
+    "max_motor_temp",
+    "battery_drain",
+    "active_hours",
+    "max_temp_load_ratio",
+]
+
+# Class-imbalance: NONE 이 ~99% 점유 예상 → minority class 가중치 50.0 (faulty 1건 ≈ NONE 50건).
+# XGBoost multi:softprob 는 scale_pos_weight 미지원이므로 sample_weight 칼럼으로 가중치 주입.
+_MINORITY_WEIGHT = 50.0
+QUERY = f"""
 SELECT
-    CASE WHEN anomaly_record_count > 0 THEN 1 ELSE 0 END AS label,
+    CASE dominant_failure_type
+        WHEN 'NONE' THEN 0
+        WHEN 'TWF'  THEN 1
+        WHEN 'HDF'  THEN 2
+        WHEN 'PWF'  THEN 3
+        WHEN 'OSF'  THEN 4
+        WHEN 'RNF'  THEN 5
+        ELSE 0
+    END                                                         AS label,
+    CASE WHEN dominant_failure_type = 'NONE' THEN 1.0
+         ELSE {_MINORITY_WEIGHT} END                            AS sample_weight,
     avg_motor_temp,
     max_motor_temp,
     battery_drain,
@@ -25,7 +47,8 @@ SELECT
     max_temp_load_ratio
 FROM gold_robot_daily_stats
 WHERE dt >= current_date - interval '30' day
-  AND anomaly_record_count IS NOT NULL
+  AND avg_motor_temp IS NOT NULL
+  AND dominant_failure_type IS NOT NULL
 """
 
 
@@ -54,7 +77,9 @@ def run_training_job(data_s3_uri: str, role_arn: str):
         instance_type="ml.m5.large",
         framework_version="1.7-1",
         hyperparameters={
-            "objective": "binary:logistic",
+            "objective": "multi:softprob",
+            "num_class": NUM_CLASSES,
+            "eval_metric": "mlogloss",
             "num_round": 100,
             "max_depth": 5,
             "eta": 0.1,

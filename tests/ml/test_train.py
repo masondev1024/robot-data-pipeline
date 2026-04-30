@@ -1,39 +1,66 @@
 """Unit tests for SageMaker XGBoost training pipeline (train.py).
-All boto3 and SageMaker calls are mocked.
+
+Task 8.2: Multi-class (6 classes) — 라벨이 dominant_failure_type 기반,
+sample_weight 칼럼이 추가됨.
 """
 
 from unittest.mock import MagicMock, patch
+
 import pytest
 
 
-def test_query_contains_all_features_and_label():
-    """Query contains 5 features (Flink 정합 max_temp_load_ratio 추가) +
-    Flink 정합 라벨(anomaly_record_count > 0) 사용."""
+def test_query_contains_all_features_and_label_column():
+    """Query contains 5 features + label CASE on dominant_failure_type + sample_weight."""
     from src.ml.train import QUERY
 
-    # Verify QUERY contains all 5 feature columns
-    assert "avg_motor_temp" in QUERY
-    assert "max_motor_temp" in QUERY
-    assert "battery_drain" in QUERY
-    assert "active_hours" in QUERY
-    assert "max_temp_load_ratio" in QUERY
+    for col in [
+        "avg_motor_temp",
+        "max_motor_temp",
+        "battery_drain",
+        "active_hours",
+        "max_temp_load_ratio",
+    ]:
+        assert col in QUERY
 
-    # Verify QUERY contains Flink-aligned label (anomaly_record_count > 0)
-    assert "CASE WHEN anomaly_record_count > 0" in QUERY
-    assert "THEN 1 ELSE 0 END AS label" in QUERY
+    # 라벨은 dominant_failure_type 기반 6-class CASE
+    assert "CASE dominant_failure_type" in QUERY
+    assert "AS label" in QUERY
+    assert "sample_weight" in QUERY
 
 
-def test_query_excludes_stale_columns_and_old_label():
-    """Query should NOT contain deprecated columns OR old label rule (regression guard)."""
+def test_query_contains_six_class_label_mapping():
+    """6-class enum: NONE/TWF/HDF/PWF/OSF/RNF."""
+    from src.ml.train import QUERY, LABEL_MAP, NUM_CLASSES
+
+    assert LABEL_MAP == {"NONE": 0, "TWF": 1, "HDF": 2, "PWF": 3, "OSF": 4, "RNF": 5}
+    assert NUM_CLASSES == 6
+    for label_name in ["NONE", "TWF", "HDF", "PWF", "OSF", "RNF"]:
+        assert f"'{label_name}'" in QUERY
+
+
+def test_query_excludes_old_self_referential_label():
+    """옛 자기참조 라벨(anomaly_record_count > 0) 제거 확인."""
     from src.ml.train import QUERY
 
-    # 옛 stale 컬럼 (Phase 5 cleanup 시 제거됨)
-    stale_columns = ["battery_drain_rate", "operation_ratio", "machine_failure"]
-    for col in stale_columns:
+    assert "anomaly_record_count > 0" not in QUERY, (
+        "self-referential label rule must be replaced by dominant_failure_type"
+    )
+    assert "max_motor_temp > 90" not in QUERY
+
+
+def test_query_excludes_stale_columns():
+    """옛 stale 컬럼 (Phase 5 cleanup 시 제거됨) — 회귀 가드."""
+    from src.ml.train import QUERY
+
+    for col in ["battery_drain_rate", "operation_ratio", "machine_failure"]:
         assert col not in QUERY, f"Stale column '{col}' should not be in QUERY"
 
-    # 옛 라벨 룰 (max_motor_temp > 90.0) — Flink 와 불일치라 제거됨
-    assert "max_motor_temp > 90" not in QUERY, "Old label rule must be replaced by anomaly_record_count > 0"
+
+def test_query_filters_null_dominant_failure_type():
+    """dominant_failure_type IS NOT NULL 필터로 라벨 누락 row 제외."""
+    from src.ml.train import QUERY
+
+    assert "dominant_failure_type IS NOT NULL" in QUERY
 
 
 def test_athena_output_location_suffix():
@@ -56,20 +83,15 @@ def test_source_code_contains_deploy_endpoint_config():
     from src.ml import train
 
     source = inspect.getsource(train)
-
-    # Verify deploy is called with correct endpoint name
     assert 'endpoint_name="robot-failure-predictor"' in source
-    # Verify ml.t2.medium instance type is used for deployment
     assert 'instance_type="ml.t2.medium"' in source
-    # SDK 2.257+ 에서 update_endpoint kwarg 제거 → 명시적 cleanup 함수로 대체
     assert "_cleanup_existing_endpoint" in source
-    # Verify ml.m5.large is used for training
     assert 'instance_type="ml.m5.large"' in source
 
 
 @patch("boto3.client")
 def test_fetch_training_data_calls_athena(mock_boto_client):
-    """fetch_training_data calls boto3.client('athena') with region eu-west-1."""
+    """fetch_training_data calls boto3.client('athena')."""
     from src.ml.train import fetch_training_data
 
     mock_athena = MagicMock()
@@ -82,16 +104,15 @@ def test_fetch_training_data_calls_athena(mock_boto_client):
     try:
         fetch_training_data()
     except Exception:
-        pass  # May fail on result processing, but we check the boto3 call
+        pass
 
-    # Verify boto3.client was called
     assert mock_boto_client.called
 
 
 @patch("src.ml.train.XGBoost")
 @patch("src.ml.train.sagemaker")
-def test_xgboost_config(mock_sagemaker, mock_xgboost_class):
-    """XGBoost estimator is configured with correct entry_point and framework_version."""
+def test_xgboost_multi_class_hyperparameters(mock_sagemaker, mock_xgboost_class):
+    """Estimator 호출 시 multi:softprob, num_class=6, eval_metric=mlogloss 가 전달된다."""
     from src.ml.train import run_training_job
 
     mock_estimator = MagicMock()
@@ -103,12 +124,14 @@ def test_xgboost_config(mock_sagemaker, mock_xgboost_class):
     except Exception:
         pass
 
-    # Verify XGBoost was called
     assert mock_xgboost_class.called
 
-    # Verify call arguments
-    if mock_xgboost_class.call_args:
-        call_kwargs = mock_xgboost_class.call_args[1]
-        assert call_kwargs.get("entry_point") == "train_entry.py"
-        assert call_kwargs.get("framework_version") == "1.7-1"
-        assert call_kwargs.get("instance_type") == "ml.m5.large"
+    call_kwargs = mock_xgboost_class.call_args[1]
+    assert call_kwargs.get("entry_point") == "train_entry.py"
+    assert call_kwargs.get("framework_version") == "1.7-1"
+    assert call_kwargs.get("instance_type") == "ml.m5.large"
+
+    hp = call_kwargs.get("hyperparameters", {})
+    assert hp.get("objective") == "multi:softprob"
+    assert hp.get("num_class") == 6
+    assert hp.get("eval_metric") == "mlogloss"

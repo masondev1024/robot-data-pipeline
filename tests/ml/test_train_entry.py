@@ -1,23 +1,32 @@
 """Unit tests for SageMaker XGBoost entry point (train_entry.py).
-Tests SageMaker environment variable handling and feature processing.
+
+Task 8.2: Multi-class — 입력 CSV 컬럼은 [label, sample_weight, 5 features].
 """
 
 import os
-import sys
 import tempfile
-import pandas as pd
-import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch, Mock
-import importlib
+from unittest.mock import MagicMock, patch
+
+import pandas as pd
+
+
+def _write_train_csv(train_dir: Path, n_rows: int = 4) -> None:
+    """[label, sample_weight, 5 features] 7열 CSV 작성 (header 없음)."""
+    df = pd.DataFrame({
+        "label":         [0, 2, 1, 0][:n_rows],
+        "sample_weight": [1.0, 50.0, 50.0, 1.0][:n_rows],
+        "avg_motor_temp": [70.0, 88.0, 92.0, 60.0][:n_rows],
+        "max_motor_temp": [85.0, 95.0, 110.0, 70.0][:n_rows],
+        "battery_drain":  [10, 20, 30, 5][:n_rows],
+        "active_hours":   [8, 8, 12, 4][:n_rows],
+        "max_temp_load_ratio": [1.5, 2.8, 3.2, 1.1][:n_rows],
+    })
+    df.to_csv(train_dir / "train.csv", index=False, header=False)
 
 
 class TestParseArgs:
-    """Tests for parse_args function in train_entry."""
-
     def test_parse_args_reads_sm_model_dir(self):
-        """parse_args reads SM_MODEL_DIR from environment."""
-        # Mock sys.argv to avoid argparse issues
         with patch.dict(os.environ, {"SM_MODEL_DIR": "/custom/model/dir"}):
             with patch("sys.argv", ["train_entry.py"]):
                 from src.ml import train_entry
@@ -25,99 +34,55 @@ class TestParseArgs:
                 assert args.model_dir == "/custom/model/dir"
 
     def test_parse_args_reads_sm_channel_train(self):
-        """parse_args reads SM_CHANNEL_TRAIN from environment."""
         with patch.dict(os.environ, {"SM_CHANNEL_TRAIN": "/custom/train/dir"}):
             with patch("sys.argv", ["train_entry.py"]):
                 from src.ml import train_entry
                 args = train_entry.parse_args()
                 assert args.train_dir == "/custom/train/dir"
 
-    def test_parse_args_both_sm_env_vars(self):
-        """parse_args reads both SM_MODEL_DIR and SM_CHANNEL_TRAIN together."""
-        env_vars = {
-            "SM_MODEL_DIR": "/opt/ml/model",
-            "SM_CHANNEL_TRAIN": "/opt/ml/input/data/train",
-        }
-        with patch.dict(os.environ, env_vars):
-            with patch("sys.argv", ["train_entry.py"]):
-                from src.ml import train_entry
-                args = train_entry.parse_args()
-                assert args.model_dir == "/opt/ml/model"
-                assert args.train_dir == "/opt/ml/input/data/train"
+    def test_parse_args_default_objective_is_multi_softprob(self):
+        with patch("sys.argv", ["train_entry.py"]):
+            from src.ml import train_entry
+            args = train_entry.parse_args()
+            assert args.objective == "multi:softprob"
+            assert args.num_class == 6
+            assert args.eval_metric == "mlogloss"
 
 
 class TestFeatureColumns:
-    """Tests for feature column alignment in train_entry."""
-
-    def test_feature_cols_correct_order(self):
-        """Feature columns match expected order and values (5 features incl. max_temp_load_ratio)."""
+    def test_feature_cols_constant_correct(self):
+        """FEATURE_COLS 상수가 5개 feature 만 포함 (label/sample_weight 제외)."""
         from src.ml import train_entry
 
-        expected_cols = ["avg_motor_temp", "max_motor_temp", "battery_drain", "active_hours", "max_temp_load_ratio"]
+        assert train_entry.FEATURE_COLS == [
+            "avg_motor_temp",
+            "max_motor_temp",
+            "battery_drain",
+            "active_hours",
+            "max_temp_load_ratio",
+        ]
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            train_dir = Path(tmpdir) / "train"
-            model_dir = Path(tmpdir) / "model"
-            train_dir.mkdir()
-            model_dir.mkdir()
+    def test_column_names_includes_sample_weight(self):
+        from src.ml import train_entry
 
-            df = pd.DataFrame({
-                "label": [0, 1, 1, 0],
-                "avg_motor_temp": [70, 88, 92, 60],
-                "max_motor_temp": [85, 95, 110, 70],
-                "battery_drain": [10, 20, 30, 5],
-                "active_hours": [8, 8, 12, 4],
-                "max_temp_load_ratio": [1.5, 2.8, 3.2, 1.1],
-            })
-            df.to_csv(train_dir / "train.csv", index=False, header=False)
-
-            with patch("xgboost.train") as mock_xgb_train:
-                with patch("xgboost.DMatrix") as mock_dmatrix:
-                    mock_dm = MagicMock()
-                    mock_dmatrix.return_value = mock_dm
-
-                    with patch.dict(os.environ, {
-                        "SM_MODEL_DIR": str(model_dir),
-                        "SM_CHANNEL_TRAIN": str(train_dir),
-                    }):
-                        with patch("sys.argv", ["train_entry.py"]):
-                            train_entry.main()
-
-                    call_args = mock_dmatrix.call_args
-                    X = call_args[0][0]
-                    assert X.shape[1] == 5, "X should have 5 feature columns"
+        assert train_entry.COLUMN_NAMES[0] == "label"
+        assert train_entry.COLUMN_NAMES[1] == "sample_weight"
+        assert len(train_entry.COLUMN_NAMES) == 7
 
 
 class TestDataFrameProcessing:
-    """Tests for DataFrame loading and processing in train_entry."""
-
-    def test_load_csv_and_split_features_labels(self):
-        """train_entry loads CSV and splits into X and y correctly."""
+    def test_dmatrix_called_with_weight_kwarg(self):
+        """xgb.DMatrix 호출 시 weight=sample_weight 칼럼 전달 확인."""
         with tempfile.TemporaryDirectory() as tmpdir:
             train_dir = Path(tmpdir) / "train"
             model_dir = Path(tmpdir) / "model"
             train_dir.mkdir()
             model_dir.mkdir()
+            _write_train_csv(train_dir, n_rows=4)
 
-            test_data = pd.DataFrame({
-                "label": [0, 1, 1, 0],
-                "avg_motor_temp": [70.0, 88.0, 92.0, 60.0],
-                "max_motor_temp": [85.0, 95.0, 110.0, 70.0],
-                "battery_drain": [10, 20, 30, 5],
-                "active_hours": [8, 8, 12, 4],
-                "max_temp_load_ratio": [1.5, 2.8, 3.2, 1.1],
-            })
-            test_data.to_csv(train_dir / "train.csv", index=False, header=False)
-
-            with patch("xgboost.train") as mock_xgb_train:
+            with patch("xgboost.train"):
                 with patch("xgboost.DMatrix") as mock_dmatrix:
-                    dm_calls = []
-                    def capture_dmatrix(X, label=None):
-                        dm_calls.append((X.shape, label))
-                        return MagicMock()
-
-                    mock_dmatrix.side_effect = capture_dmatrix
-
+                    mock_dmatrix.return_value = MagicMock()
                     with patch.dict(os.environ, {
                         "SM_MODEL_DIR": str(model_dir),
                         "SM_CHANNEL_TRAIN": str(train_dir),
@@ -126,43 +91,55 @@ class TestDataFrameProcessing:
                             from src.ml import train_entry
                             train_entry.main()
 
-                    assert len(dm_calls) > 0, "DMatrix should be called"
-                    X_shape, y = dm_calls[0]
-                    assert X_shape == (4, 5), "X should be (4 rows, 5 features)"
+                    call = mock_dmatrix.call_args
+                    X = call[0][0]
+                    assert X.shape == (4, 5), "X must be (4 rows, 5 features)"
+                    # weight kwarg
+                    weight = call.kwargs.get("weight")
+                    assert weight is not None
+                    assert list(weight) == [1.0, 50.0, 50.0, 1.0]
+
+    def test_xgb_train_receives_multi_class_params(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            train_dir = Path(tmpdir) / "train"
+            model_dir = Path(tmpdir) / "model"
+            train_dir.mkdir()
+            model_dir.mkdir()
+            _write_train_csv(train_dir, n_rows=4)
+
+            with patch("xgboost.train") as mock_train:
+                mock_train.return_value = MagicMock()
+                with patch("xgboost.DMatrix"):
+                    with patch.dict(os.environ, {
+                        "SM_MODEL_DIR": str(model_dir),
+                        "SM_CHANNEL_TRAIN": str(train_dir),
+                    }):
+                        with patch("sys.argv", ["train_entry.py"]):
+                            from src.ml import train_entry
+                            train_entry.main()
+
+                    call = mock_train.call_args
+                    params = call[0][0]
+                    assert params["objective"] == "multi:softprob"
+                    assert params["num_class"] == 6
+                    assert params["eval_metric"] == "mlogloss"
 
 
 class TestModelOutput:
-    """Tests for model file output in train_entry."""
-
     def test_model_saved_to_model_dir(self):
-        """train_entry saves xgboost-model to args.model_dir."""
         with tempfile.TemporaryDirectory() as tmpdir:
             train_dir = Path(tmpdir) / "train"
             model_dir = Path(tmpdir) / "model"
             train_dir.mkdir()
             model_dir.mkdir()
+            _write_train_csv(train_dir, n_rows=2)
 
-            pd.DataFrame({
-                "label": [0, 1],
-                "avg_motor_temp": [70, 88],
-                "max_motor_temp": [85, 95],
-                "battery_drain": [10, 20],
-                "active_hours": [8, 8],
-                "max_temp_load_ratio": [1.5, 2.8],
-            }).to_csv(train_dir / "train.csv", index=False, header=False)
-
-            # Mock xgboost and capture save_model call
-            with patch("xgboost.train") as mock_xgb_train:
+            with patch("xgboost.train") as mock_train:
                 with patch("xgboost.DMatrix"):
-                    # Create a mock booster with save_model method
                     mock_booster = MagicMock()
                     saved_paths = []
-
-                    def capture_save_model(path):
-                        saved_paths.append(path)
-
-                    mock_booster.save_model.side_effect = capture_save_model
-                    mock_xgb_train.return_value = mock_booster
+                    mock_booster.save_model.side_effect = lambda p: saved_paths.append(p)
+                    mock_train.return_value = mock_booster
 
                     with patch.dict(os.environ, {
                         "SM_MODEL_DIR": str(model_dir),
@@ -172,7 +149,4 @@ class TestModelOutput:
                             from src.ml import train_entry
                             train_entry.main()
 
-                    # Verify save_model was called with correct path
-                    assert len(saved_paths) > 0, "save_model should be called"
-                    saved_path = saved_paths[0]
-                    assert saved_path == str(model_dir / "xgboost-model")
+                    assert saved_paths == [str(model_dir / "xgboost-model")]

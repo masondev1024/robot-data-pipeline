@@ -16,6 +16,9 @@ from src.common.aws import get_client
 _required_fields: Optional[frozenset[str]] = None
 _validation_failures: int = 0
 
+# Task 8.1: failure_type enum 가드 (Glue Schema Registry v2 미반영 시 fallback)
+VALID_FAILURE_TYPES = frozenset({"NONE", "TWF", "HDF", "PWF", "OSF", "RNF"})
+
 
 def _fetch_required_fields() -> frozenset[str]:
     """Glue Schema Registry에서 robot-telemetry-schema의 required 필드 set 반환."""
@@ -45,7 +48,10 @@ def get_required_fields() -> frozenset[str]:
 
 
 def validate_record(record: dict) -> bool:
-    """필수 필드가 모두 있고 None이 아닌지 확인. False → drop."""
+    """필수 필드가 모두 있고 None이 아닌지 확인. False → drop.
+
+    Task 8.1: failure_type 이 enum 6값 외이면 drop (라벨 오염 방지).
+    """
     global _validation_failures
     required = get_required_fields()
     missing = [k for k in required if record.get(k) is None]
@@ -53,6 +59,13 @@ def validate_record(record: dict) -> bool:
         _validation_failures += 1
         if _validation_failures % 100 == 1:
             print(f"[schema_validator] missing fields: {missing} (total failures: {_validation_failures})")
+        return False
+
+    f_type = record.get("failure_type")
+    if f_type is not None and f_type not in VALID_FAILURE_TYPES:
+        _validation_failures += 1
+        if _validation_failures % 100 == 1:
+            print(f"[schema_validator] invalid failure_type: {f_type} (total failures: {_validation_failures})")
         return False
     return True
 

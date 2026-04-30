@@ -49,6 +49,24 @@ def hour_load_multiplier(hour_utc: int, variance: float) -> float:
     return baseline + swing
 
 
+FAILURE_TYPE_PRIORITY = ("HDF", "PWF", "OSF", "TWF", "RNF")
+
+
+def resolve_failure_type(row: dict) -> str:
+    """AI4I 5종 failure 칼럼(int 또는 str "1"/"0") → 단일 enum 라벨.
+
+    우선순위: HDF > PWF > OSF > TWF > RNF (모터 직결 우선). 다중 1 인 경우
+    가장 위 우선순위만 채택. 모두 0이면 "NONE".
+    """
+    for key in FAILURE_TYPE_PRIORITY:
+        val = row.get(key, 0)
+        if isinstance(val, str):
+            val = int(val) if val.isdigit() else 0
+        if int(val) == 1:
+            return key
+    return "NONE"
+
+
 def battery_drain_factor(
     current_load: float,
     motor_temp: float,
