@@ -4,12 +4,19 @@
 # 주요 결정:
 # - KubernetesExecutor: task마다 worker pod 동적 생성. Helm chart가 만드는
 #   `airflow-worker` SA가 IRSA(robot-telemetry-airflow-irsa)를 assume.
-# - DAG는 ConfigMap(`airflow-dags`)로 마운트. gitSync/PVC 미사용.
+# - DAG는 GitSync로 main 브랜치를 매분 sync. subPath=dags 지정해도 chart는
+#   repo root 전체를 /opt/airflow/dags/repo/ 로 가져오고 dags_folder를
+#   /opt/airflow/dags/repo/dags 로 설정함. DAG가 `from src.common ...` 으로
+#   repo root의 src 패키지를 import 하므로 PYTHONPATH=/opt/airflow/dags/repo 필수.
 # - boto3는 _PIP_ADDITIONAL_REQUIREMENTS로 worker 시작 시 자동 설치.
 
 executor: KubernetesExecutor
 
 # 시연용 — 콘솔에서 패스워드 모르면 진입 불가하므로 명시 설정
+# webserver SA 에도 동일 IRSA 부여 — UI 에서 S3 fallback 으로 task 로그 GetObject 시 필요.
+# (KubernetesExecutor 환경에서 worker pod 가 task 종료 후 즉시 사라지면 in-cluster log
+#  HTTP 페치가 NameResolutionError 로 실패하므로, S3 remote logging 으로 fallback 하려면
+#  webserver pod 도 동일 IRSA 로 S3 GetObject 권한을 가져야 함.)
 webserver:
   defaultUser:
     enabled: true
@@ -19,64 +26,74 @@ webserver:
     email: admin@admin.com
     firstName: admin
     lastName: admin
+  serviceAccount:
+    create: true
+    name: airflow-webserver
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::827913617635:role/robot-telemetry-airflow-irsa
 
-  extraVolumes:
-    - name: dags-cm
-      configMap:
-        name: airflow-dags
-  extraVolumeMounts:
-    - name: dags-cm
-      mountPath: /opt/airflow/dags
-
-# Scheduler가 DAG를 파싱하므로 동일 ConfigMap 마운트
-scheduler:
-  extraVolumes:
-    - name: dags-cm
-      configMap:
-        name: airflow-dags
-  extraVolumeMounts:
-    - name: dags-cm
-      mountPath: /opt/airflow/dags
-
-# KubernetesExecutor가 만드는 worker pod에도 동일 마운트
+# KubernetesExecutor가 만드는 worker pod에 IRSA 부여
 workers:
   serviceAccount:
     create: true
     name: airflow-worker
     annotations:
       eks.amazonaws.com/role-arn: arn:aws:iam::827913617635:role/robot-telemetry-airflow-irsa
-  extraVolumes:
-    - name: dags-cm
-      configMap:
-        name: airflow-dags
-  extraVolumeMounts:
-    - name: dags-cm
-      mountPath: /opt/airflow/dags
 
-# DAG persistence/gitSync 모두 끔 — ConfigMap 마운트로 대체
+# Remote logging (S3) — KubernetesExecutor ephemeral pod 로그 수집 픽스.
+# Worker pod 가 task 실행 중 로그를 S3 에도 동시 업로드 → pod 삭제되어도 잔존 →
+# webserver 가 in-cluster <pod>:8793 페치 실패 시 S3 에서 fallback 으로 읽음.
+# remote_log_conn_id 는 비워둠 → boto3 default credential chain 사용 → IRSA 의
+# WebIdentity 토큰을 자동으로 픽업 (별도 Airflow Connection 등록 불필요).
+config:
+  logging:
+    remote_logging: "True"
+    remote_base_log_folder: "s3://de-ai-06-smartfactory-bucket/airflow-logs/"
+    remote_log_conn_id: ""
+    encrypt_s3_logs: "False"
+
+# DAG sync — GitSync sidecar가 60초마다 main 브랜치 pull
 dags:
   persistence:
     enabled: false
   gitSync:
-    enabled: false
+    enabled: true
+    repo: git@github.com:masondev1024/robot-data-pipeline.git
+    branch: main
+    subPath: dags
+    wait: 60
+    sshKeySecret: airflow-ssh-secret
+    knownHosts: |
+      github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
+      github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+      github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
 
 # Bundled Postgres metadata DB (8Gi gp2 EBS PVC, 시연용)
+# bitnami가 paid 전환 후 legacy registry 분리 → bitnamilegacy/postgresql 명시.
 postgresql:
   enabled: true
+  image:
+    repository: bitnamilegacy/postgresql
   primary:
     persistence:
       enabled: true
       size: 8Gi
       storageClass: gp2
 
-# KubernetesExecutor에서는 redis/PgBouncer 불필요
+# KubernetesExecutor에서는 redis/PgBouncer/Triggerer 불필요
 redis:
   enabled: false
 pgbouncer:
   enabled: false
+triggerer:
+  enabled: false
 
-# Airflow 환경변수 — boto3 자동 설치, AWS region 주입
+# Airflow 환경변수
+# PYTHONPATH: GitSync가 repo root 전체를 /opt/airflow/dags/repo/ 로 가져오므로
+# DAG의 `from src.common.athena import ...` 가 동작하려면 repo root 추가 필수.
 env:
+  - name: PYTHONPATH
+    value: "/opt/airflow/dags/repo"
   - name: _PIP_ADDITIONAL_REQUIREMENTS
     value: "boto3==1.35.0"
   - name: AWS_DEFAULT_REGION
@@ -90,7 +107,7 @@ env:
   - name: ATHENA_OUTPUT_LOCATION
     value: "s3://de-ai-06-smartfactory-bucket/project-athena-results/"
   - name: BEDROCK_MODEL_ID
-    value: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    value: "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
   - name: DQ_SNS_TOPIC_ARN
     value: "arn:aws:sns:eu-west-1:827913617635:robot-anomaly-alerts"
 

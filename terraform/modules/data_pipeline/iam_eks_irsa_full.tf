@@ -315,8 +315,13 @@ data "aws_iam_policy_document" "airflow_assume_role" {
     condition {
       test     = "StringEquals"
       variable = "${trimprefix(var.eks_oidc_issuer_url, "https://")}:sub"
-      # Airflow Helm chart의 default worker SA (KubernetesExecutor가 Worker Pod 띄울 때 사용)
-      values = ["system:serviceaccount:airflow:airflow-worker"]
+      # Airflow Helm chart의 worker + webserver SA 모두 신뢰.
+      # - airflow-worker: KubernetesExecutor가 Worker Pod 띄울 때 사용 (S3 PutObject 로그)
+      # - airflow-webserver: UI에서 S3 fallback으로 로그 GetObject 시 사용
+      values = [
+        "system:serviceaccount:airflow:airflow-worker",
+        "system:serviceaccount:airflow:airflow-webserver",
+      ]
     }
   }
 }
