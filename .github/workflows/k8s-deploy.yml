@@ -45,7 +45,7 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           if [ -f src/api/Dockerfile ]; then
-            docker build -t $ECR_REGISTRY/robot-telemetry-api:$IMAGE_TAG src/api/
+            docker build -t $ECR_REGISTRY/robot-telemetry-api:$IMAGE_TAG -f src/api/Dockerfile .
             docker push $ECR_REGISTRY/robot-telemetry-api:$IMAGE_TAG
             docker tag $ECR_REGISTRY/robot-telemetry-api:$IMAGE_TAG $ECR_REGISTRY/robot-telemetry-api:latest
             docker push $ECR_REGISTRY/robot-telemetry-api:latest
