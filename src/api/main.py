@@ -15,7 +15,6 @@ from slowapi.util import get_remote_address
 
 from src.common.athena import run_query
 from src.common.aws import get_client
-from src.common.bedrock import invoke_claude
 
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="Robot Telemetry AI Query API")
@@ -215,7 +214,7 @@ async def chat(request: Request, req: ChatRequest):
     try:
         response_text = await loop.run_in_executor(
             None,
-            lambda: invoke_claude(user_prompt, system=ROBOT_ANALYST_SYSTEM_PROMPT),
+            lambda: _converse_with_tools(user_prompt),
         )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Bedrock 호출 실패: {exc}")
@@ -335,3 +334,191 @@ async def portal(request: Request, robot_id: str = ""):
             "GRAFANA_URL": _get_grafana_url(),
         },
     )
+
+
+# ============================================================================
+# ADR-013 — Bedrock Converse API + Tool Use
+# ============================================================================
+
+_bedrock_runtime = get_client("bedrock-runtime")
+
+CHAT_TOOL_CONFIG = {
+    "tools": [
+        {
+            "toolSpec": {
+                "name": "predict_robot_failure",
+                "description": (
+                    "특정 로봇의 향후 24시간 내 6가지 failure type "
+                    "(NONE/TWF/HDF/PWF/OSF/RNF) 확률을 SageMaker XGBoost 모델로 예측합니다. "
+                    "사용자가 특정 robot_id 의 ML 예측·고장 확률·정비 우선순위를 물을 때만 호출하세요. "
+                    "단순 데이터 요약 질문이면 호출하지 않습니다."
+                ),
+                "inputSchema": {
+                    "json": {
+                        "type": "object",
+                        "properties": {
+                            "robot_id": {
+                                "type": "string",
+                                "description": "ROBOT-XXXXX 형식 로봇 ID (예: ROBOT-00018)",
+                            },
+                        },
+                        "required": ["robot_id"],
+                    },
+                },
+            },
+        },
+    ],
+}
+
+
+def _lookup_robot_features(robot_id: str) -> dict | None:
+    """_gold_cache (CSV 문자열) 에서 robot_id 행을 찾아 dict 반환. 없으면 None."""
+    if not _gold_cache:
+        return None
+    lines = _gold_cache.split("\n")
+    if len(lines) < 2:
+        return None
+    header = lines[0].split(",")
+    for line in lines[1:]:
+        cols = line.split(",")
+        if len(cols) != len(header):
+            continue
+        row = dict(zip(header, cols))
+        if row.get("robot_id") == robot_id:
+            return row
+    return None
+
+
+def _tool_predict_robot_failure(robot_id: str) -> dict:
+    """Tool implementation — Gold 데이터 lookup + SageMaker invoke.
+
+    SageMaker endpoint 미배포 시 명시적 error 반환 → LLM 이 자연어로 사용자에게 안내.
+    """
+    row = _lookup_robot_features(robot_id)
+    if row is None:
+        return {"error": f"{robot_id} 가 오늘 Gold 데이터에 없습니다."}
+
+    try:
+        avg_t = float(row["avg_motor_temp"])
+        max_t = float(row["max_motor_temp"])
+        battery_drain = int(float(row["battery_drain"]))
+        active_hours = int(float(row["active_hours"]))
+        # max_temp_load_ratio 는 train.py 기준 max_motor_temp / avg_motor_temp 근사.
+        load_ratio = round(max_t / max(avg_t, 1.0), 4)
+    except (KeyError, ValueError) as exc:
+        return {"error": f"feature 추출 실패: {exc}"}
+
+    body = f"{avg_t},{max_t},{battery_drain},{active_hours},{load_ratio}"
+    try:
+        response = sagemaker_runtime.invoke_endpoint(
+            EndpointName=ENDPOINT_NAME,
+            ContentType="text/csv",
+            Body=body,
+        )
+        raw = response["Body"].read().decode()
+        probs = _parse_softprob_response(raw)
+    except Exception as exc:
+        # 2026-04-30 시점 endpoint 미배포 — graceful degradation.
+        return {
+            "error": "predictor not deployed",
+            "fallback_message": (
+                f"SageMaker endpoint '{ENDPOINT_NAME}' 가 현재 비활성화 상태입니다. "
+                f"임계값 룰 기반 추정만 가능: max_motor_temp={max_t}°C, "
+                f"battery_drain={battery_drain}, active_hours={active_hours}h."
+            ),
+            "fallback_features": {
+                "avg_motor_temp": avg_t,
+                "max_motor_temp": max_t,
+                "battery_drain": battery_drain,
+                "active_hours": active_hours,
+            },
+        }
+
+    distribution = {label: round(p, 4) for label, p in zip(FAILURE_TYPE_LABELS, probs)}
+    argmax_idx = max(range(len(probs)), key=lambda i: probs[i])
+    predicted = FAILURE_TYPE_LABELS[argmax_idx]
+    return {
+        "robot_id": robot_id,
+        "probabilities": distribution,
+        "top_failure_type": predicted,
+        "top_probability": distribution[predicted],
+        "recommended_action": RECOMMENDED_ACTIONS[predicted],
+    }
+
+
+_TOOL_IMPLEMENTATIONS = {
+    "predict_robot_failure": _tool_predict_robot_failure,
+}
+
+
+def _converse_with_tools(user_prompt: str, max_turns: int = 3) -> str:
+    """Bedrock Converse API + tool loop. ADR-013 참조.
+
+    Prompt Caching 은 Converse 의 cachePoint 블록으로 적용 — system block 을 두 개로 나누고
+    그 사이에 cachePoint 를 두면 system 부분이 캐시 대상.
+    """
+    model_id = os.environ.get(
+        "BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
+    )
+    system = [
+        {"text": ROBOT_ANALYST_SYSTEM_PROMPT},
+        {"cachePoint": {"type": "default"}},
+    ]
+    messages = [{"role": "user", "content": [{"text": user_prompt}]}]
+
+    for _ in range(max_turns):
+        response = _bedrock_runtime.converse(
+            modelId=model_id,
+            system=system,
+            messages=messages,
+            inferenceConfig={"maxTokens": 512},
+            toolConfig=CHAT_TOOL_CONFIG,
+        )
+        usage = response.get("usage", {})
+        print(json.dumps({
+            "event": "bedrock_converse",
+            "model": model_id,
+            "input_tokens": usage.get("inputTokens"),
+            "output_tokens": usage.get("outputTokens"),
+            "cache_read_input_tokens": usage.get("cacheReadInputTokens", 0),
+            "cache_write_input_tokens": usage.get("cacheWriteInputTokens", 0),
+            "stop_reason": response.get("stopReason"),
+        }))
+
+        stop_reason = response.get("stopReason")
+        output_msg = response["output"]["message"]
+        messages.append(output_msg)
+
+        if stop_reason != "tool_use":
+            # 최종 응답 — text content blocks 결합.
+            return "".join(b.get("text", "") for b in output_msg.get("content", []) if "text" in b)
+
+        # tool_use 블록 실행 후 toolResult append.
+        tool_results = []
+        for block in output_msg.get("content", []):
+            if "toolUse" not in block:
+                continue
+            tool_use = block["toolUse"]
+            name = tool_use["name"]
+            tool_input = tool_use.get("input", {})
+            impl = _TOOL_IMPLEMENTATIONS.get(name)
+            if impl is None:
+                result = {"error": f"unknown tool: {name}"}
+            else:
+                try:
+                    result = impl(**tool_input)
+                except Exception as exc:
+                    result = {"error": f"tool execution failed: {exc}"}
+            tool_results.append({
+                "toolResult": {
+                    "toolUseId": tool_use["toolUseId"],
+                    "content": [{"json": result}],
+                },
+            })
+        messages.append({"role": "user", "content": tool_results})
+
+    # max_turns 초과 — 마지막 응답 텍스트 그대로 반환.
+    last = messages[-1]
+    if last.get("role") == "assistant":
+        return "".join(b.get("text", "") for b in last.get("content", []) if "text" in b)
+    return "(tool loop max_turns 초과 — 응답 생성 실패)"
