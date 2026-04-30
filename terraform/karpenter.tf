@@ -41,7 +41,7 @@ resource "aws_iam_role" "karpenter_controller" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action = "sts:AssumeRole"
+      Action = "sts:AssumeRoleWithWebIdentity"
       Effect = "Allow"
       Principal = {
         Federated = aws_iam_openid_connect_provider.eks.arn
@@ -49,6 +49,7 @@ resource "aws_iam_role" "karpenter_controller" {
       Condition = {
         StringEquals = {
           "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" : "system:serviceaccount:karpenter:karpenter"
+          "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" : "sts.amazonaws.com"
         }
       }
     }]
