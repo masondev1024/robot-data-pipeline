@@ -240,28 +240,30 @@ LIMIT {BEDROCK_REPORT_TOP_N}
         f"배터리소모={r['battery_drain']}, 가동시간={r['active_hours']}h"
         for r in rows
     )
+    system_prompt = (
+        "당신은 한국 스마트 팩토리 정비반장에게 보내는 일별 리포트를 작성하는 분석가입니다. "
+        "주어진 로봇 텔레메트리 지표를 바탕으로, 점검이 가장 시급한 로봇 3대와 그 이유를 markdown 으로 요약합니다. "
+        "로봇 ID 는 [ROBOT-XXXXX] 형식으로 표기하고, 수치 인용 시 컬럼명(avg_motor_temp, max_motor_temp, battery_drain, active_hours)을 명시합니다. "
+        "본문 300자 이내, 추측 금지, 데이터에 명시되지 않은 정보는 인용하지 않습니다."
+    )
     prompt = (
-        f"다음은 오늘 공장 로봇들의 상태 지표야.\n{data_summary}\n\n"
-        "이를 분석해서 가장 점검이 시급한 로봇 3대와 그 이유를 정비반장에게 보내는 형식으로 300자 이내로 요약해."
+        f"<gold_data>\n{data_summary}\n</gold_data>\n\n"
+        "위 데이터에서 점검이 가장 시급한 로봇 3대와 그 이유를 정비반장 보고 형식으로 요약하세요."
     )
 
-    bedrock = boto3.client("bedrock-runtime", region_name=AWS_REGION)
-    body = json.dumps({
-        "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 512,
-        "messages": [{"role": "user", "content": prompt}],
-    })
     model_id = os.environ.get(
         "BEDROCK_MODEL_ID",
         "eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
     )
-    response = bedrock.invoke_model(
-        modelId=model_id,
-        contentType="application/json",
-        accept="application/json",
-        body=body,
+    # cache_system=False — 본 함수는 daily 1회 호출이라 5분 TTL 캐시 적중 불가.
+    # ADR-012 의 caching 패턴은 chat API(고빈도) 에 적용.
+    report_text = invoke_claude(
+        prompt,
+        system=system_prompt,
+        max_tokens=512,
+        model_id=model_id,
+        cache_system=False,
     )
-    report_text = json.loads(response["body"].read())["content"][0]["text"]
 
     s3 = boto3.client("s3", region_name=AWS_REGION)
     s3.put_object(
