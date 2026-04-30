@@ -65,14 +65,27 @@ def run_training_job(data_s3_uri: str, role_arn: str):
     return estimator
 
 
+def _cleanup_existing_endpoint(endpoint_name: str = "robot-failure-predictor"):
+    """멱등성: SDK 2.257+ 에서 update_endpoint kwarg 제거됨에 따라 명시적 cleanup."""
+    sm = get_client("sagemaker")
+    for delete_fn, name_kwarg in [
+        (sm.delete_endpoint, "EndpointName"),
+        (sm.delete_endpoint_config, "EndpointConfigName"),
+    ]:
+        try:
+            delete_fn(**{name_kwarg: endpoint_name})
+        except sm.exceptions.ClientError:
+            pass  # 없으면 무시
+
+
 def main():
     data_uri = fetch_training_data()
     estimator = run_training_job(data_uri, os.environ["SAGEMAKER_ROLE_ARN"])
+    _cleanup_existing_endpoint()
     estimator.deploy(
         initial_instance_count=1,
         instance_type="ml.t2.medium",
         endpoint_name="robot-failure-predictor",
-        update_endpoint=True,
     )
 
 
