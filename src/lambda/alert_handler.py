@@ -33,13 +33,36 @@ def _post_to_slack(webhook_url: str, text: str) -> None:
             raise RuntimeError(f"Slack POST failed: status={resp.status}")
 
 
-def handler(event, context):
-    """Kinesis → Slack alert. 실패 record는 batchItemFailures로 보고하여
-    Lambda가 해당 record만 재시도하도록 한다 (event source mapping의
-    function_response_types=["ReportBatchItemFailures"] 설정 필요)."""
-    webhook_url = os.environ["SLACK_WEBHOOK_URL"]
-    portal_url = _get_portal_url()
+def _handle_cloudwatch_alarm(event: dict, webhook_url: str) -> dict:
+    """CloudWatch Alarm 직접 invoke 분기. alarm 발화/회복 시 Slack 알림."""
+    alarm_name = event.get("AlarmName", "UNKNOWN")
+    new_state = event.get("NewStateValue", "?")
+    reason = event.get("NewStateReason", "")
+    region = event.get("Region", "?")
 
+    icon = "🚨" if new_state == "ALARM" else ("✅" if new_state == "OK" else "ℹ️")
+    message = (
+        f"{icon} [CloudWatch] {alarm_name} → {new_state}\n"
+        f"리전: {region}\n"
+        f"사유: {reason[:300]}"
+    )
+    _post_to_slack(webhook_url, message)
+    return {"statusCode": 200, "alarm": alarm_name, "newState": new_state}
+
+
+def handler(event, context):
+    """이벤트 source 분기 후 처리:
+    - Kinesis Records: Flink 이상 탐지 알람 (batchItemFailures 보고).
+    - CloudWatch Alarm: Firehose DLQ 등 인프라 알람 직접 invoke.
+    """
+    webhook_url = os.environ["SLACK_WEBHOOK_URL"]
+
+    # CloudWatch Alarm 이벤트는 "AlarmName" 키로 식별
+    if isinstance(event, dict) and "AlarmName" in event:
+        return _handle_cloudwatch_alarm(event, webhook_url)
+
+    # 기본 Kinesis Records 경로
+    portal_url = _get_portal_url()
     failures: list[dict] = []
     for record in event["Records"]:
         try:

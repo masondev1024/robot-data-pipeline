@@ -33,6 +33,11 @@ terraform.tfvars.json
 # Lambda 빌드 아티팩트
 terraform/lambda_*.zip
 
+# Flink Application 모드 산출물 — Studio Notebook 채택(ADR-010 REVISED 2026-04-30) 후 deprecated
+flink/anomaly_detection.zip
+flink/lib/*.jar
+flink/*_deploy.log
+
 # Seed 데이터 — 전체 Kaggle 데이터셋은 커밋 금지 (sample만 허용)
 data/seed_data.csv
 data/*.zip

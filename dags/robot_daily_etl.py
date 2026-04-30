@@ -29,7 +29,7 @@ dag = DAG(
     dag_id="robot_daily_etl",
     default_args=default_args,
     description="Bronze→Silver→Gold ETL + Bedrock 리포트 + 주간 ML 재학습",
-    schedule_interval="0 15 * * *",  # 매일 00:00 KST (UTC 15:00)
+    schedule="0 15 * * *",  # 매일 00:00 KST (UTC 15:00). schedule_interval 은 Airflow 3 에서 제거 예정.
     start_date=datetime(2026, 1, 1),
     catchup=False,
     tags=["robot-telemetry", "etl"],
@@ -66,11 +66,11 @@ def evaluate_quality(total: int, null_id: int, bad_temp: int, bad_battery: int) 
 
 
 def _publish_dq_failure(detail: str):
-    """SNS robot-telemetry-anomaly-alerts 토픽으로 DQ 실패 알림 발송."""
+    """SNS robot-anomaly-alerts 토픽으로 DQ 실패 알림 발송."""
     sns = boto3.client("sns", region_name=AWS_REGION)
     topic_arn = os.environ.get(
         "DQ_SNS_TOPIC_ARN",
-        f"arn:aws:sns:{AWS_REGION}:{os.environ.get('AWS_ACCOUNT_ID', '')}:robot-telemetry-anomaly-alerts",
+        f"arn:aws:sns:{AWS_REGION}:{os.environ.get('AWS_ACCOUNT_ID', '')}:robot-anomaly-alerts",
     )
     sns.publish(
         TopicArn=topic_arn,

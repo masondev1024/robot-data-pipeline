@@ -155,3 +155,37 @@ class TestAlertHandler:
         req = mock_urlopen.call_args.args[0]
         body = json.loads(req.data.decode("utf-8"))
         assert "포털" in body["text"] or "조회 실패" in body["text"]
+
+    @patch("urllib.request.urlopen")
+    @patch("boto3.client")
+    def test_cloudwatch_alarm_event_routed(self, mock_boto, mock_urlopen, monkeypatch):
+        """CloudWatch Alarm 직접 invoke event 가 분기를 타고 Slack 으로 알림 발송."""
+        urlopen_mock = _make_urlopen_mock()
+        mock_urlopen.side_effect = urlopen_mock
+
+        module = _load_module("ah6")
+
+        monkeypatch.setenv("SLACK_WEBHOOK_URL", "https://hooks.slack.com/services/T/B/X")
+
+        alarm_event = {
+            "AlarmName": "robot-telemetry-firehose-delivery-errors",
+            "AlarmDescription": "Firehose delivery to S3 success rate < 95%",
+            "NewStateValue": "ALARM",
+            "OldStateValue": "OK",
+            "NewStateReason": "Threshold Crossed: 2 datapoints were less than the threshold (95.0).",
+            "Region": "EU (Ireland)",
+            "AlarmArn": "arn:aws:cloudwatch:eu-west-1:827913617635:alarm:robot-telemetry-firehose-delivery-errors",
+        }
+
+        result = module.handler(alarm_event, None)
+
+        # SSM 은 호출되지 않아야 함 (CloudWatch alarm 분기는 portal_url 불필요)
+        assert mock_boto.call_count == 0
+        assert mock_urlopen.called
+        req = mock_urlopen.call_args.args[0]
+        body = json.loads(req.data.decode("utf-8"))
+        assert "[CloudWatch]" in body["text"]
+        assert "ALARM" in body["text"]
+        assert "robot-telemetry-firehose-delivery-errors" in body["text"]
+        assert result["alarm"] == "robot-telemetry-firehose-delivery-errors"
+        assert result["newState"] == "ALARM"
