@@ -5,10 +5,14 @@ COPY src/generator/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/__init__.py /app/src/__init__.py
+COPY src/common/__init__.py /app/src/common/__init__.py
+COPY src/common/aws.py /app/src/common/aws.py
 COPY src/generator/__init__.py /app/src/generator/__init__.py
 COPY src/generator/app.py /app/src/generator/app.py
 COPY src/generator/schema_validator.py /app/src/generator/schema_validator.py
 COPY src/generator/backfill.py /app/src/generator/backfill.py
+COPY src/generator/_fault_state.py /app/src/generator/_fault_state.py
+COPY src/generator/_record.py /app/src/generator/_record.py
 
 RUN mkdir /data
 
