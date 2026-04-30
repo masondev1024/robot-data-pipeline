@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Robot Telemetry Portal</title>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -111,6 +112,39 @@
             color: #333;
             align-self: flex-start;
             max-width: 90%;
+        }
+        .message.assistant h1,
+        .message.assistant h2,
+        .message.assistant h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin: 8px 0 4px 0;
+        }
+        .message.assistant h1:first-child,
+        .message.assistant h2:first-child,
+        .message.assistant h3:first-child {
+            margin-top: 0;
+        }
+        .message.assistant p {
+            margin: 4px 0;
+        }
+        .message.assistant ul,
+        .message.assistant ol {
+            margin: 4px 0;
+            padding-left: 20px;
+        }
+        .message.assistant li {
+            margin: 2px 0;
+        }
+        .message.assistant code {
+            background: #e8e8e8;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-family: ui-monospace, "SF Mono", Menlo, monospace;
+            font-size: 12px;
+        }
+        .message.assistant strong {
+            font-weight: 600;
         }
         .links-container {
             display: flex;
@@ -254,7 +288,11 @@
             msg.className = `message ${isUser ? 'user' : 'assistant'}`;
 
             const content = document.createElement('div');
-            content.textContent = text;
+            if (isUser) {
+                content.textContent = text;
+            } else {
+                content.innerHTML = DOMPurify.sanitize(marked.parse(text));
+            }
             msg.appendChild(content);
 
             if (!isUser && links.length > 0) {
