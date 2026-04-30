@@ -112,6 +112,62 @@ kubectl apply -f k8s/ --recursive                    # EKS 워크로드
 
 ---
 
+## AI Engineering 의사결정
+
+LLM을 단순 호출 1회로 끝내지 않고, **probabilistic system을 deterministic 보이게** 운영하기 위한 4가지 축으로 설계.
+
+### 1. 모델 선택 — Cost / Quality Trade-off
+
+| 호출 패턴 | 모델 | 근거 |
+|---|---|---|
+| 야간 배치 리포트 ([dags/robot_daily_etl.py](dags/robot_daily_etl.py)) | **Claude Haiku 4.5** + Batch API (계획) | 정량 요약 위주 → Haiku 충분, **75% + 50% (Batch) = 87% 절감** |
+| 실시간 챗 ([src/api/main.py](src/api/main.py)) | **Claude Sonnet 4.5** + Prompt Caching | 분석 깊이 우선, system prompt 90% 캐시 적중으로 비용 보전 |
+| 시계열 예측 | SageMaker Random Cut Forest (정형) | Foundation TS model(Chronos) zero-shot은 다음 분기 ADR 후보 |
+
+### 2. Prompt Caching ([ADR-012](docs/ADR.md))
+
+`src/common/bedrock.py`의 `system` 블록을 `cache_control: ephemeral`로 마킹 → 시스템 프롬프트(역할/citation 규칙/edge case 처리, ~1.5K tokens)가 5분간 캐시 → **`cache_read_input_tokens` 메트릭으로 적중률 추적**.
+
+### 3. Tool Use — Conversational Agent ([ADR-013](docs/ADR.md))
+
+단순 `invoke_model` → **Bedrock Converse API**로 마이그레이션, LLM이 직접 도구를 선택해 호출:
+- `predict_robot_failure(robot_id)` — SageMaker endpoint 호출
+- `query_telemetry(robot_id, hours)` — Athena Gold 테이블 조회
+- LLM이 SQL 결과를 보고 "추가 ML 예측 필요" 판단 시 자체적으로 tool 호출 → 자연어 종합
+
+→ "단순 chatbot이 아니라 agent를 설계할 줄 안다" 시그널.
+
+### 4. Eval-Driven Development ([ADR-011](docs/ADR.md))
+
+```
+evals/
+├── golden_qa.yaml       # 30개 질문 (정상/이상/엣지)
+├── run_eval.py          # /api/chat 호출 → 응답 수집
+├── judge_prompt.py      # Opus 4가 relevance/accuracy/grounding 1-5점 채점
+└── README.md
+```
+
+GitHub Actions `eval.yml`로 prompt/모델 변경 PR마다 회귀 검증. **LLM 출력은 비결정적이라는 사실을 코드가 아닌 데이터로 검증**.
+
+### 트렌드 흡수 신호 (2026 H1 기준)
+
+- ✅ **Prompt Caching** — Anthropic 2024.08 → AWS Bedrock 정식 지원, 90% 절감
+- ✅ **Tool Use / Converse API** — `invoke_model` 시대를 넘어 agent pattern
+- ✅ **Eval-as-code** — Cursor/Anthropic이 공개적으로 강조 중인 표준 패턴
+- 🔜 **MCP Server** — 텔레메트리 데이터를 Claude Desktop에서 직접 조회 (다음 PR)
+- 🔜 **Chronos / TimesFM** — 시계열 foundation model을 RCF와 ensemble (다음 분기)
+
+### Failure Mode 의식
+
+| 모드 | 대응 |
+|---|---|
+| Hallucination | Tool 결과 인용 강제 (`<source>` 태그 + SQL 행 번호) |
+| Prompt Injection | 사용자 입력을 `<user_input>` 태그 격리, system에 boundary 명시 |
+| Cost runaway | `max_tokens=512` 캡 + CloudWatch billing alarm $20 |
+| Output 비결정성 | LLM-as-judge 정량 점수 회귀 (PR마다) |
+
+---
+
 ## 프로젝트 메타
 
 - **데드라인**: 2026-05-01
