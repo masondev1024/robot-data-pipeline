@@ -33,7 +33,12 @@ from typing import Iterable, Iterator
 import boto3
 
 from src.common.aws import AWS_REGION
-from src.generator._record import ISO_Z_FMT, to_kinesis_record
+from src.generator._record import (
+    ISO_Z_FMT,
+    hour_load_multiplier,
+    load_temp_delta,
+    to_kinesis_record,
+)
 from src.generator.app import load_profiles
 
 
@@ -76,21 +81,35 @@ def generate_timestamps(days: int, interval_min: int) -> list[datetime]:
 
 
 def generate_record(profile: dict, t: datetime) -> dict:
-    """Backfill용 단일 record. simulate_robot 알고리즘 단순화 — drift/battery 누적 없음.
+    """Backfill용 단일 record (stateless).
 
-    daemon 모드의 stateful drift/battery 누적은 backfill 의 의도(과거 분포 재현)와
-    무관하므로 제거. 각 timestamp 의 motor_temp 는 base + 노이즈 + faulty spike 만 반영.
+    daemon 모드의 fault state machine / battery 누적 / drift 는 stateful 이므로
+    backfill 에는 미적용. 단, daemon 분포와 비슷하게 맞추기 위해:
+      1) spike 확률 5% → 1% 으로 하향 (faulty 로봇 한정)
+      2) load↔temp 양의 상관 (default LOAD_TEMP_COEFF=5.0)
+      3) hour-of-day load 사이클 (timestamp 의 시간 사용)
     """
-    motor_base = profile["motor_temp_base"]
-    spike = 0.0
-    if profile["is_faulty"] and random.random() < 0.05:
-        spike = random.uniform(91, 99) - motor_base
+    spike_prob = float(os.environ.get("BACKFILL_SPIKE_PROB", "0.01"))
+    load_temp_coeff = float(os.environ.get("LOAD_TEMP_COEFF", "5.0"))
+    hour_variance = float(os.environ.get("HOUR_LOAD_VARIANCE", "0.4"))
+    peak_temp_delta = float(os.environ.get("FAULT_PEAK_TEMP_DELTA", "25.0"))
 
-    motor_temp = round(
-        min(110.0, max(55.0, motor_base + random.gauss(0, 2) + spike)),
+    motor_base = profile["motor_temp_base"]
+    shift_factor = hour_load_multiplier(t.hour, hour_variance)
+    load = round(
+        min(100.0, max(0.0, profile["load_base"] * shift_factor + random.gauss(0, 5))),
         2,
     )
-    load = round(min(100.0, max(0.0, profile["load_base"] + random.gauss(0, 5))), 2)
+    load_corr = load_temp_delta(load, load_temp_coeff)
+
+    spike = 0.0
+    if profile["is_faulty"] and random.random() < spike_prob:
+        spike = peak_temp_delta + random.uniform(-3.0, 3.0)
+
+    motor_temp = round(
+        min(110.0, max(55.0, motor_base + load_corr + random.gauss(0, 2) + spike)),
+        2,
+    )
 
     return {
         "robot_id":      profile["robot_id"],

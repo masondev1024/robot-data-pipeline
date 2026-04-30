@@ -8,7 +8,15 @@ import time
 from datetime import datetime, timezone
 
 from src.common.aws import get_client
-from src.generator._record import iso_z_now, jittered_load, jittered_pos, to_kinesis_record
+from src.generator._fault_state import Phase, advance_phase, init_state
+from src.generator._record import (
+    battery_drain_factor,
+    hour_load_multiplier,
+    iso_z_now,
+    jittered_pos,
+    load_temp_delta,
+    to_kinesis_record,
+)
 from src.generator.schema_validator import get_failure_count, validate_record
 
 
@@ -17,11 +25,28 @@ from src.generator.schema_validator import get_failure_count, validate_record
 _force_anomaly_until_ts: float = 0.0
 
 
-def _should_spike(profile: dict, now_ts: float, force_until_ts: float) -> bool:
-    """이번 tick에서 motor_temp spike 여부 결정.
+def _load_realism_params() -> dict:
+    """Env var 기반 fault-state 파라미터 + realism 계수 dict 반환."""
+    return {
+        "fault_entry_prob": float(os.environ.get("FAULT_ENTRY_PROB", "0.0002")),
+        "fault_ramp_ticks": int(os.environ.get("FAULT_RAMP_TICKS", "20")),
+        "fault_peak_ticks": int(os.environ.get("FAULT_PEAK_TICKS", "40")),
+        "fault_cooldown_ticks": int(os.environ.get("FAULT_COOLDOWN_TICKS", "30")),
+        "fault_peak_temp_delta": float(os.environ.get("FAULT_PEAK_TEMP_DELTA", "25.0")),
+        "stuck_entry_prob": float(os.environ.get("STUCK_ENTRY_PROB", "0.00005")),
+        "stuck_min_ticks": int(os.environ.get("STUCK_MIN_TICKS", "60")),
+        "stuck_max_ticks": int(os.environ.get("STUCK_MAX_TICKS", "120")),
+        "load_temp_coeff": float(os.environ.get("LOAD_TEMP_COEFF", "5.0")),
+        "hour_load_variance": float(os.environ.get("HOUR_LOAD_VARIANCE", "0.4")),
+        "battery_load_coeff": float(os.environ.get("BATTERY_LOAD_COEFF", "0.5")),
+        "battery_temp_coeff": float(os.environ.get("BATTERY_TEMP_COEFF", "0.3")),
+    }
 
-    - force window 내(now < force_until_ts): 모든 로봇 무조건 spike
-    - 그 외: 기존 룰(is_faulty 로봇만 5% 확률)
+
+def _should_spike(profile: dict, now_ts: float, force_until_ts: float) -> bool:
+    """[DEPRECATED — Phase 7 fault-state machine으로 대체됨]
+    하위 호환성을 위해 시그니처 보존. 실제 simulate_robot 흐름은 advance_phase 사용.
+    test_force_anomaly.py 기존 케이스 보존을 위해 단발 룰 그대로 유지.
     """
     if now_ts < force_until_ts:
         return True
@@ -86,34 +111,76 @@ def load_profiles(csv_path: str, robot_count: int) -> list[dict]:
 async def simulate_robot(profile: dict,
                           queue: asyncio.Queue,
                           tick_interval: float,
-                          shutdown: asyncio.Event) -> None:
+                          shutdown: asyncio.Event,
+                          params: dict | None = None,
+                          rng: random.Random | None = None) -> None:
     """tick_interval초마다 센서 레코드 1건 생성하여 queue에 넣는다.
-    shutdown 이벤트가 set되면 즉시 종료."""
+
+    Phase 7: 단발 spike → fault-state machine(NORMAL/RAMPING/OVERHEATED/COOLING/STUCK)
+    + load↔temp 상관 + hour-of-day 부하 사이클 + 현실적 battery drain.
+    shutdown 이벤트가 set되면 즉시 종료.
+    """
     battery = profile["battery"]
     drift   = 0.0  # 점진적 온도 드리프트
+    fault_state = init_state()
+    last_motor_temp: float | None = None
+    charging = False
+    if params is None:
+        params = _load_realism_params()
+    if rng is None:
+        rng = random.Random()
 
     while not shutdown.is_set():
-        # motor_temp: 베이스 ± 가우시안 노이즈 + 드리프트
-        noise = random.gauss(0, 2)
-        spike = 0.0
-        if _should_spike(profile, time.time(), _force_anomaly_until_ts):
-            spike = random.uniform(91, 99) - profile["motor_temp_base"]
-        drift = drift * 0.99 + random.gauss(0, 0.1)
-        motor_temp = round(
-            min(110.0, max(55.0,
-                profile["motor_temp_base"] + noise + drift + spike)), 2)
+        # 1) 현재 시간대 기반 부하 multiplier
+        hour_utc = datetime.now(timezone.utc).hour
+        shift_factor = hour_load_multiplier(hour_utc, params["hour_load_variance"])
+        current_load = round(
+            min(100.0, max(0.0,
+                profile["load_base"] * shift_factor + random.gauss(0, 5))),
+            2,
+        )
 
-        # battery: drain_factor 기반 감소, 0 도달 시 재충전
-        battery -= profile["drain_factor"] * random.uniform(0.01, 0.05)
-        if battery <= 0:
-            battery = round(random.uniform(80, 100), 1)
+        # 2) Fault state machine 진행
+        force_active = time.time() < _force_anomaly_until_ts
+        fault_state, episode_delta, is_stuck = advance_phase(
+            fault_state, profile, params, force_active, rng,
+        )
+
+        # 3) motor_temp 계산: base + load 상관 + noise + drift + episode delta
+        if is_stuck and last_motor_temp is not None:
+            motor_temp = last_motor_temp
+        else:
+            noise = random.gauss(0, 2)
+            drift = drift * 0.99 + random.gauss(0, 0.1)
+            load_corr = load_temp_delta(current_load, params["load_temp_coeff"])
+            motor_temp = round(
+                min(110.0, max(55.0,
+                    profile["motor_temp_base"] + load_corr + noise + drift + episode_delta)),
+                2,
+            )
+            last_motor_temp = motor_temp
+
+        # 4) Battery: load·temp factor 기반 drain + 점진적 충전
+        if charging:
+            battery += random.uniform(0.5, 1.0)
+            if battery >= 100.0:
+                battery = 100.0
+                charging = False
+        else:
+            factor = battery_drain_factor(
+                current_load, motor_temp,
+                params["battery_load_coeff"], params["battery_temp_coeff"],
+            )
+            battery -= profile["drain_factor"] * factor * random.uniform(0.01, 0.05)
+            if battery <= 5.0:
+                charging = True  # 5% 도달 시 charging 진입 (즉시 100% 점프 금지)
 
         record = {
             "robot_id":      profile["robot_id"],
             "pos_x":         jittered_pos(profile["pos_x"]),
             "pos_y":         jittered_pos(profile["pos_y"]),
             "battery_level": round(float(max(0.0, min(100.0, battery))), 2),
-            "current_load":  jittered_load(profile["load_base"]),
+            "current_load":  current_load,
             "motor_temp":    motor_temp,
             "timestamp":     iso_z_now(),
         }
@@ -257,8 +324,11 @@ async def main() -> None:
     except (NotImplementedError, AttributeError):
         pass  # Windows: SIGUSR1 미존재
 
-    sim_tasks = [asyncio.create_task(simulate_robot(p, queue, tick_interval, shutdown))
-                 for p in profiles]
+    realism_params = _load_realism_params()
+    sim_tasks = [
+        asyncio.create_task(simulate_robot(p, queue, tick_interval, shutdown, realism_params))
+        for p in profiles
+    ]
     sender_task = asyncio.create_task(batch_sender(queue, stream_name, kinesis, shutdown))
 
     print(f"Started {len(profiles)} robot simulators. Streaming to {stream_name}...")
