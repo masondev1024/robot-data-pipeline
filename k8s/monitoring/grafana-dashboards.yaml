@@ -6,7 +6,7 @@ data:
     1)\",\r\n        \"name\": \"Annotations & Alerts\",\r\n        \"type\": \"dashboard\"\r\n
     \     }\r\n    ]\r\n  },\r\n  \"editable\": true,\r\n  \"gnetId\": null,\r\n  \"graphTooltip\":
     0,\r\n  \"id\": null,\r\n  \"links\": [],\r\n  \"panels\": [\r\n    {\r\n      \"datasource\":
-    \"${DS_ATHENA}\",\r\n      \"fieldConfig\": {\r\n        \"defaults\": {\r\n          \"color\":
+    { \"type\": \"grafana-athena-datasource\", \"uid\": \"athena\" },\r\n      \"fieldConfig\": {\r\n        \"defaults\": {\r\n          \"color\":
     {\r\n            \"mode\": \"palette-classic\"\r\n          },\r\n          \"custom\":
     {\r\n            \"axisLabel\": \"Anomaly Count\",\r\n            \"axisPlacement\":
     \"auto\",\r\n            \"barAlignment\": 0,\r\n            \"drawStyle\": \"line\",\r\n
@@ -114,7 +114,7 @@ data:
     1)\",\r\n        \"name\": \"Annotations & Alerts\",\r\n        \"type\": \"dashboard\"\r\n
     \     }\r\n    ]\r\n  },\r\n  \"editable\": true,\r\n  \"gnetId\": null,\r\n  \"graphTooltip\":
     0,\r\n  \"id\": null,\r\n  \"links\": [],\r\n  \"panels\": [\r\n    {\r\n      \"datasource\":
-    \"${DS_CLOUDWATCH}\",\r\n      \"fieldConfig\": {\r\n        \"defaults\": {\r\n
+    { \"type\": \"cloudwatch\", \"uid\": \"cloudwatch\" },\r\n      \"fieldConfig\": {\r\n        \"defaults\": {\r\n
     \         \"color\": {\r\n            \"mode\": \"palette-classic\"\r\n          },\r\n
     \         \"custom\": {\r\n            \"axisLabel\": \"Records/sec\",\r\n            \"axisPlacement\":
     \"auto\",\r\n            \"barAlignment\": 0,\r\n            \"drawStyle\": \"line\",\r\n
@@ -143,7 +143,7 @@ data:
     \"AWS/Kinesis\",\r\n          \"period\": \"60\",\r\n          \"refId\": \"A\",\r\n
     \         \"statistics\": [\r\n            \"Average\"\r\n          ]\r\n        }\r\n
     \     ],\r\n      \"title\": \"Kinesis Data Stream - Incoming Records\",\r\n      \"type\":
-    \"timeseries\"\r\n    },\r\n    {\r\n      \"datasource\": \"${DS_CLOUDWATCH}\",\r\n
+    \"timeseries\"\r\n    },\r\n    {\r\n      \"datasource\": { \"type\": \"cloudwatch\", \"uid\": \"cloudwatch\" },\r\n
     \     \"fieldConfig\": {\r\n        \"defaults\": {\r\n          \"color\": {\r\n
     \           \"mode\": \"palette-classic\"\r\n          },\r\n          \"custom\":
     {\r\n            \"axisLabel\": \"Records\",\r\n            \"axisPlacement\":
@@ -174,7 +174,7 @@ data:
     \         \"refId\": \"A\",\r\n          \"statistics\": [\r\n            \"Sum\"\r\n
     \         ]\r\n        }\r\n      ],\r\n      \"title\": \"Kinesis Firehose -
     Delivery to S3\",\r\n      \"type\": \"timeseries\"\r\n    },\r\n    {\r\n      \"datasource\":
-    \"${DS_CLOUDWATCH}\",\r\n      \"fieldConfig\": {\r\n        \"defaults\": {\r\n
+    { \"type\": \"cloudwatch\", \"uid\": \"cloudwatch\" },\r\n      \"fieldConfig\": {\r\n        \"defaults\": {\r\n
     \         \"color\": {\r\n            \"mode\": \"palette-classic\"\r\n          },\r\n
     \         \"custom\": {\r\n            \"axisLabel\": \"Percentage\",\r\n            \"axisPlacement\":
     \"auto\",\r\n            \"barAlignment\": 0,\r\n            \"drawStyle\": \"line\",\r\n
@@ -206,7 +206,7 @@ data:
     \         \"namespace\": \"ContainerInsights\",\r\n          \"period\": \"60\",\r\n
     \         \"refId\": \"A\",\r\n          \"statistics\": [\r\n            \"Average\"\r\n
     \         ]\r\n        }\r\n      ],\r\n      \"title\": \"EKS Node CPU Utilization\",\r\n
-    \     \"type\": \"timeseries\"\r\n    },\r\n    {\r\n      \"datasource\": \"${DS_CLOUDWATCH}\",\r\n
+    \     \"type\": \"timeseries\"\r\n    },\r\n    {\r\n      \"datasource\": { \"type\": \"cloudwatch\", \"uid\": \"cloudwatch\" },\r\n
     \     \"fieldConfig\": {\r\n        \"defaults\": {\r\n          \"color\": {\r\n
     \           \"mode\": \"palette-classic\"\r\n          },\r\n          \"custom\":
     {\r\n            \"axisLabel\": \"Bytes\",\r\n            \"axisPlacement\": \"auto\",\r\n
@@ -249,7 +249,7 @@ data:
     \       \"name\": \"Annotations & Alerts\",\r\n        \"type\": \"dashboard\"\r\n
     \     }\r\n    ]\r\n  },\r\n  \"editable\": true,\r\n  \"gnetId\": null,\r\n  \"graphTooltip\":
     0,\r\n  \"id\": null,\r\n  \"links\": [],\r\n  \"panels\": [\r\n    {\r\n      \"datasource\":
-    \"${DS_ATHENA}\",\r\n      \"fieldConfig\": {\r\n        \"defaults\": {\r\n          \"color\":
+    { \"type\": \"grafana-athena-datasource\", \"uid\": \"athena\" },\r\n      \"fieldConfig\": {\r\n        \"defaults\": {\r\n          \"color\":
     {\r\n            \"mode\": \"palette-classic\"\r\n          },\r\n          \"custom\":
     {\r\n            \"axisLabel\": \"Avg Motor Temp (°C)\",\r\n            \"axisPlacement\":
     \"auto\",\r\n            \"barAlignment\": 0,\r\n            \"drawStyle\": \"bars\",\r\n
@@ -278,7 +278,7 @@ data:
     '1' DAY AS DATE) ORDER BY avg_motor_temp DESC LIMIT 10\",\r\n          \"refId\":
     \"A\"\r\n        }\r\n      ],\r\n      \"title\": \"Top 10 Robots by Avg Motor
     Temperature\",\r\n      \"type\": \"timeseries\"\r\n    },\r\n    {\r\n      \"datasource\":
-    \"${DS_ATHENA}\",\r\n      \"fieldConfig\": {\r\n        \"defaults\": {\r\n          \"custom\":
+    { \"type\": \"grafana-athena-datasource\", \"uid\": \"athena\" },\r\n      \"fieldConfig\": {\r\n        \"defaults\": {\r\n          \"custom\":
     {\r\n            \"align\": \"auto\",\r\n            \"displayMode\": \"auto\"\r\n
     \         },\r\n          \"mappings\": [],\r\n          \"thresholds\": {\r\n
     \           \"mode\": \"absolute\",\r\n            \"steps\": [\r\n              {\r\n
