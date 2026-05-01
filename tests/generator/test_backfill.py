@@ -99,13 +99,15 @@ class TestGenerateRecord:
             assert 0 <= rec["current_load"] <= 100
 
     def test_faulty_robot_can_spike(self):
-        # is_faulty 로봇은 5% 확률로 spike → 100회 시도 시 1건이라도 90+ 이면 OK
+        # is_faulty 로봇은 1% 확률로 spike (BACKFILL_SPIKE_PROB). P(no spike in 200) ≈ 13%
+        # → flaky. seed 고정 + 1000 trial 로 결정성 확보.
+        import random as _r
+        _r.seed(42)
         t = datetime(2026, 4, 25, 12, 0, tzinfo=timezone.utc)
         temps = [
             backfill.generate_record(FAULTY_PROFILE, t)["motor_temp"]
-            for _ in range(200)
+            for _ in range(1000)
         ]
-        # faulty robot은 motor_base=75 이지만 spike 시 91~99 도달 가능
         assert max(temps) >= 90.0
 
 
