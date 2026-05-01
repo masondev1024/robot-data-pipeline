@@ -46,7 +46,10 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            text-decoration: none;
+            cursor: pointer;
         }
+        .header-title:hover { opacity: 0.8; }
         .header-title::before {
             content: "🤖";
             font-size: 22px;
@@ -346,7 +349,7 @@
 </head>
 <body>
     <header>
-        <div class="header-title">Robot Telemetry Portal</div>
+        <a class="header-title" href="/" title="홈으로 새로고침">Robot Telemetry Portal</a>
         <div class="header-info" id="status-info">Loading...</div>
         <div class="dashboard-tabs">
             <button class="dashboard-tab active" data-uid="robot-fleet-001">Fleet</button>
