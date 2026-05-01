@@ -22,6 +22,11 @@ spec:
         - name: generator
           image: 827913617635.dkr.ecr.eu-west-1.amazonaws.com/robot-telemetry-generator:latest
           env:
+            # SIGUSR1 핸들러의 print() 가 즉시 stdout 으로 flush 되도록.
+            # 미설정 시 block-buffering 으로 force_anomaly_triggered 로그가 buffer 에 갇혀
+            # `kubectl logs --tail` 에 잡히지 않음 (verify run 25181144263 에서 발견).
+            - name: PYTHONUNBUFFERED
+              value: "1"
             - name: ROBOT_COUNT
               value: "50"
             - name: TICK_INTERVAL_SECONDS

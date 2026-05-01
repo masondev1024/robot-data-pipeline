@@ -17,4 +17,5 @@ COPY src/generator/_record.py /app/src/generator/_record.py
 RUN mkdir /data
 
 USER 65534
-CMD ["python3", "-m", "src.generator.app"]
+# -u: 비버퍼 stdout/stderr — SIGUSR1 핸들러의 print 가 즉시 flush.
+CMD ["python3", "-u", "-m", "src.generator.app"]
