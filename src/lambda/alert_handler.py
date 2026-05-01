@@ -34,11 +34,20 @@ def _post_to_slack(webhook_url: str, text: str) -> None:
 
 
 def _handle_cloudwatch_alarm(event: dict, webhook_url: str) -> dict:
-    """CloudWatch Alarm 직접 invoke 분기. alarm 발화/회복 시 Slack 알림."""
-    alarm_name = event.get("AlarmName", "UNKNOWN")
-    new_state = event.get("NewStateValue", "?")
-    reason = event.get("NewStateReason", "")
-    region = event.get("Region", "?")
+    """CloudWatch Alarm 직접 invoke 분기. alarm 발화/회복 시 Slack 알림.
+
+    두 가지 alarm event schema 모두 지원:
+    - Lambda direct invoke (alarm_actions = Lambda ARN): `alarmData.alarmName`,
+      `alarmData.state.value`, `alarmData.state.reason` (중첩, camelCase).
+    - SNS-published alarm: `AlarmName`, `NewStateValue`, `NewStateReason` (top-level, PascalCase).
+    """
+    alarm_data = event.get("alarmData") or {}
+    state_data = alarm_data.get("state") or {}
+
+    alarm_name = alarm_data.get("alarmName") or event.get("AlarmName", "UNKNOWN")
+    new_state = state_data.get("value") or event.get("NewStateValue", "?")
+    reason = state_data.get("reason") or event.get("NewStateReason", "")
+    region = event.get("region") or event.get("Region", "?")
 
     icon = "🚨" if new_state == "ALARM" else ("✅" if new_state == "OK" else "ℹ️")
     message = (
@@ -46,7 +55,10 @@ def _handle_cloudwatch_alarm(event: dict, webhook_url: str) -> dict:
         f"리전: {region}\n"
         f"사유: {reason[:300]}"
     )
+    # 운영 가시성: CloudWatch Logs 에서 grep 가능하도록 alarm 처리 진입점 명시.
+    print(f"[cloudwatch_alarm] name={alarm_name} state={new_state} region={region}")
     _post_to_slack(webhook_url, message)
+    print(f"[cloudwatch_alarm] slack_post_success name={alarm_name} state={new_state}")
     return {"statusCode": 200, "alarm": alarm_name, "newState": new_state}
 
 
@@ -57,8 +69,8 @@ def handler(event, context):
     """
     webhook_url = os.environ["SLACK_WEBHOOK_URL"]
 
-    # CloudWatch Alarm 이벤트는 "AlarmName" 키로 식별
-    if isinstance(event, dict) and "AlarmName" in event:
+    # CloudWatch Alarm event 식별: direct invoke(`alarmData`) 또는 SNS-published(`AlarmName`).
+    if isinstance(event, dict) and ("alarmData" in event or "AlarmName" in event):
         return _handle_cloudwatch_alarm(event, webhook_url)
 
     # 기본 Kinesis Records 경로

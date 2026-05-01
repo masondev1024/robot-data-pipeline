@@ -189,3 +189,47 @@ class TestAlertHandler:
         assert "robot-telemetry-firehose-delivery-errors" in body["text"]
         assert result["alarm"] == "robot-telemetry-firehose-delivery-errors"
         assert result["newState"] == "ALARM"
+
+    @patch("urllib.request.urlopen")
+    @patch("boto3.client")
+    def test_cloudwatch_alarm_lambda_direct_invoke_schema(self, mock_boto, mock_urlopen, monkeypatch):
+        """Lambda direct invoke (alarm_actions=Lambda ARN) 시 AWS 가 사용하는 nested
+        camelCase schema(`alarmData.alarmName`, `alarmData.state.value`) 를 정확히 파싱.
+        """
+        urlopen_mock = _make_urlopen_mock()
+        mock_urlopen.side_effect = urlopen_mock
+
+        module = _load_module("ah7")
+
+        monkeypatch.setenv("SLACK_WEBHOOK_URL", "https://hooks.slack.com/services/T/B/X")
+
+        # Lambda direct invoke schema (실 운영에서 받는 실제 payload 형식)
+        alarm_event = {
+            "source": "aws.cloudwatch",
+            "alarmArn": "arn:aws:cloudwatch:eu-west-1:827913617635:alarm:robot-telemetry-firehose-delivery-errors",
+            "accountId": "827913617635",
+            "time": "2026-05-01T10:30:39Z",
+            "region": "eu-west-1",
+            "alarmData": {
+                "alarmName": "robot-telemetry-firehose-delivery-errors",
+                "state": {
+                    "value": "ALARM",
+                    "reason": "manual e2e test",
+                    "timestamp": "2026-05-01T10:30:39Z",
+                },
+                "previousState": {"value": "OK"},
+                "configuration": {"description": "Firehose delivery success < 95%"},
+            },
+        }
+
+        result = module.handler(alarm_event, None)
+
+        assert mock_boto.call_count == 0  # SSM 미호출
+        assert mock_urlopen.called
+        body = json.loads(mock_urlopen.call_args.args[0].data.decode("utf-8"))
+        assert "[CloudWatch]" in body["text"]
+        assert "ALARM" in body["text"]
+        assert "robot-telemetry-firehose-delivery-errors" in body["text"]
+        assert "eu-west-1" in body["text"]
+        assert result["alarm"] == "robot-telemetry-firehose-delivery-errors"
+        assert result["newState"] == "ALARM"

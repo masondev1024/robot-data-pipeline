@@ -44,10 +44,14 @@ LOGS=$(aws logs filter-log-events \
   --query 'events[].message' \
   --output text 2>/dev/null || echo "")
 
-if echo "$LOGS" | grep -q "$ALARM_NAME"; then
-  echo "[dlq-e2e] ✅ Lambda 가 alarm event 수신 확인"
+SUCCESS_LINES=$(echo "$LOGS" | grep -c "slack_post_success" || true)
+ERROR_LINES=$(echo "$LOGS" | grep -cE "ERROR|Traceback" || true)
+if [ "$SUCCESS_LINES" -ge 1 ]; then
+  echo "[dlq-e2e] ✅ Lambda alarm event 처리 + Slack POST 성공 ($SUCCESS_LINES events)"
+elif echo "$LOGS" | grep -q "$ALARM_NAME"; then
+  echo "[dlq-e2e] ✅ Lambda 가 alarm event 수신 확인 (slack_post_success 마커 부재 — 옛 코드 가능성)"
 else
-  echo "[dlq-e2e] ⚠️  Lambda log 에 alarm name 미발견 (전파 지연 또는 permission 누락 가능성)"
+  echo "[dlq-e2e] ⚠️  Lambda log 에 alarm 처리 흔적 없음 (errors=$ERROR_LINES)"
   echo "[dlq-e2e]    수동 확인: aws logs tail /aws/lambda/$LAMBDA_NAME --since 2m --region $REGION"
 fi
 
