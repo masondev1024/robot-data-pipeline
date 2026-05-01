@@ -25,3 +25,13 @@ data:
           catalog: AwsDataCatalog
           database: robot_telemetry_db
           workgroup: robot-telemetry-workgroup
+      # X-Ray (Task 5.1) — ADOT Operator + Collector 배포 후 활성. Grafana
+      # X-Ray plugin (grafana-x-ray-datasource) 가 별도 install 필요:
+      # GF_INSTALL_PLUGINS=grafana-x-ray-datasource (k8s/monitoring/grafana-deployment.yaml)
+      - name: X-Ray
+        uid: xray
+        type: grafana-x-ray-datasource
+        access: proxy
+        jsonData:
+          authType: default
+          defaultRegion: eu-west-1
