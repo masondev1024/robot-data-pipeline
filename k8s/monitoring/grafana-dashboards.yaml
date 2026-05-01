@@ -708,7 +708,7 @@ data:
               "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
               "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
               "format": 1,
-              "rawSQL": "SELECT max_motor_temp AS \"최고 온도\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE robot_id = '${robot_id}' AND dt = CAST(CURRENT_DATE - INTERVAL '1' DAY AS DATE)",
+              "rawSQL": "SELECT max_motor_temp AS \"최고 온도\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE robot_id = '${robot_id}' AND dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
               "refId": "A",
               "table": "gold_robot_daily_stats"
             }
@@ -750,7 +750,7 @@ data:
               "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
               "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
               "format": 1,
-              "rawSQL": "SELECT avg_motor_temp AS \"평균 온도\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE robot_id = '${robot_id}' AND dt = CAST(CURRENT_DATE - INTERVAL '1' DAY AS DATE)",
+              "rawSQL": "SELECT avg_motor_temp AS \"평균 온도\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE robot_id = '${robot_id}' AND dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
               "refId": "A",
               "table": "gold_robot_daily_stats"
             }
@@ -792,7 +792,7 @@ data:
               "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
               "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
               "format": 1,
-              "rawSQL": "SELECT battery_drain AS \"배터리 소모\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE robot_id = '${robot_id}' AND dt = CAST(CURRENT_DATE - INTERVAL '1' DAY AS DATE)",
+              "rawSQL": "SELECT battery_drain AS \"배터리 소모\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE robot_id = '${robot_id}' AND dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
               "refId": "A",
               "table": "gold_robot_daily_stats"
             }
@@ -834,7 +834,7 @@ data:
               "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
               "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
               "format": 1,
-              "rawSQL": "SELECT anomaly_record_count AS \"이상치 발생\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE robot_id = '${robot_id}' AND dt = CAST(CURRENT_DATE - INTERVAL '1' DAY AS DATE)",
+              "rawSQL": "SELECT anomaly_record_count AS \"이상치 발생\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE robot_id = '${robot_id}' AND dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
               "refId": "A",
               "table": "gold_robot_daily_stats"
             }
@@ -1004,23 +1004,13 @@ data:
         "list": [
           {
             "current": { "selected": false, "text": "ROBOT-00001", "value": "ROBOT-00001" },
-            "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
-            "definition": "SELECT DISTINCT robot_id FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CURRENT_DATE - INTERVAL '1' DAY AS DATE) ORDER BY robot_id",
             "hide": 0,
-            "includeAll": false,
             "label": "Robot ID",
-            "multi": false,
             "name": "robot_id",
             "options": [],
-            "query": {
-              "format": 1,
-              "rawSQL": "SELECT DISTINCT robot_id FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CURRENT_DATE - INTERVAL '1' DAY AS DATE) ORDER BY robot_id"
-            },
-            "refresh": 1,
-            "regex": "",
+            "query": "ROBOT-00001",
             "skipUrlSync": false,
-            "sort": 1,
-            "type": "query"
+            "type": "textbox"
           }
         ]
       },
@@ -1081,7 +1071,7 @@ data:
               "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
               "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
               "format": 1,
-              "rawSQL": "SELECT COUNT(*) AS \"총 가동 로봇\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CURRENT_DATE - INTERVAL '1' DAY AS DATE)",
+              "rawSQL": "SELECT COUNT(*) AS \"총 가동 로봇\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
               "refId": "A",
               "table": "gold_robot_daily_stats"
             }
@@ -1123,7 +1113,7 @@ data:
               "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
               "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
               "format": 1,
-              "rawSQL": "SELECT SUM(CASE WHEN anomaly_record_count > 0 THEN 1 ELSE 0 END) AS \"이상치 발생 로봇\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CURRENT_DATE - INTERVAL '1' DAY AS DATE)",
+              "rawSQL": "SELECT SUM(CASE WHEN anomaly_record_count > 0 THEN 1 ELSE 0 END) AS \"이상치 발생 로봇\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
               "refId": "A",
               "table": "gold_robot_daily_stats"
             }
@@ -1165,7 +1155,7 @@ data:
               "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
               "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
               "format": 1,
-              "rawSQL": "SELECT SUM(CASE WHEN max_motor_temp > 95 THEN 1 ELSE 0 END) AS \"위험 (95°C 초과)\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CURRENT_DATE - INTERVAL '1' DAY AS DATE)",
+              "rawSQL": "SELECT SUM(CASE WHEN max_motor_temp > 95 THEN 1 ELSE 0 END) AS \"위험 (95°C 초과)\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
               "refId": "A",
               "table": "gold_robot_daily_stats"
             }
@@ -1210,7 +1200,7 @@ data:
               "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
               "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
               "format": 1,
-              "rawSQL": "SELECT ROUND(100.0 * SUM(CASE WHEN anomaly_record_count = 0 AND max_motor_temp <= 95 THEN 1 ELSE 0 END) / COUNT(*), 1) AS \"정상 가동률\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CURRENT_DATE - INTERVAL '1' DAY AS DATE)",
+              "rawSQL": "SELECT ROUND(100.0 * SUM(CASE WHEN anomaly_record_count = 0 AND max_motor_temp <= 95 THEN 1 ELSE 0 END) / COUNT(*), 1) AS \"정상 가동률\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
               "refId": "A",
               "table": "gold_robot_daily_stats"
             }
@@ -1248,7 +1238,7 @@ data:
               "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
               "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
               "format": 1,
-              "rawSQL": "SELECT SUM(CASE WHEN anomaly_record_count > 100 OR max_motor_temp > 100 THEN 1 ELSE 0 END) AS \"Critical\", SUM(CASE WHEN (anomaly_record_count > 0 OR max_motor_temp > 95) AND NOT (anomaly_record_count > 100 OR max_motor_temp > 100) THEN 1 ELSE 0 END) AS \"High\", SUM(CASE WHEN max_motor_temp > 85 AND anomaly_record_count = 0 AND max_motor_temp <= 95 THEN 1 ELSE 0 END) AS \"Medium\", SUM(CASE WHEN max_motor_temp <= 85 AND anomaly_record_count = 0 THEN 1 ELSE 0 END) AS \"Normal\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CURRENT_DATE - INTERVAL '1' DAY AS DATE)",
+              "rawSQL": "SELECT SUM(CASE WHEN anomaly_record_count > 100 OR max_motor_temp > 100 THEN 1 ELSE 0 END) AS \"Critical\", SUM(CASE WHEN (anomaly_record_count > 0 OR max_motor_temp > 95) AND NOT (anomaly_record_count > 100 OR max_motor_temp > 100) THEN 1 ELSE 0 END) AS \"High\", SUM(CASE WHEN max_motor_temp > 85 AND anomaly_record_count = 0 AND max_motor_temp <= 95 THEN 1 ELSE 0 END) AS \"Medium\", SUM(CASE WHEN max_motor_temp <= 85 AND anomaly_record_count = 0 THEN 1 ELSE 0 END) AS \"Normal\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
               "refId": "A",
               "table": "gold_robot_daily_stats"
             }
@@ -1290,7 +1280,7 @@ data:
               "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
               "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
               "format": 0,
-              "rawSQL": "SELECT CAST(dt AS TIMESTAMP) AS time, SUM(CASE WHEN anomaly_record_count > 0 THEN 1 ELSE 0 END) AS \"이상치 로봇 수\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt >= CURRENT_DATE - INTERVAL '7' DAY AND anomaly_record_count IS NOT NULL GROUP BY dt ORDER BY dt ASC",
+              "rawSQL": "SELECT CAST(dt AS TIMESTAMP) AS time, SUM(CASE WHEN anomaly_record_count > 0 THEN 1 ELSE 0 END) AS \"이상치 로봇 수\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt >= CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '7' DAY AND anomaly_record_count IS NOT NULL GROUP BY dt ORDER BY dt ASC",
               "refId": "A",
               "table": "gold_robot_daily_stats"
             }
@@ -1348,7 +1338,7 @@ data:
               "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
               "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
               "format": 1,
-              "rawSQL": "SELECT robot_id AS \"로봇 ID\", ROUND(max_motor_temp, 1) AS \"최고 온도(°C)\", battery_drain AS \"배터리 소모\", anomaly_record_count AS \"이상치 발생\", ROUND(max_temp_load_ratio, 2) AS \"최대 부하율\", ROUND(max_motor_temp + COALESCE(anomaly_record_count, 0) * 0.05 + battery_drain * 0.3 + COALESCE(max_temp_load_ratio, 0) * 5, 1) AS \"위험도\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CURRENT_DATE - INTERVAL '1' DAY AS DATE) ORDER BY \"위험도\" DESC LIMIT 15",
+              "rawSQL": "SELECT robot_id AS \"로봇 ID\", ROUND(max_motor_temp, 1) AS \"최고 온도(°C)\", battery_drain AS \"배터리 소모\", anomaly_record_count AS \"이상치 발생\", ROUND(max_temp_load_ratio, 2) AS \"최대 부하율\", ROUND(max_motor_temp + COALESCE(anomaly_record_count, 0) * 0.05 + battery_drain * 0.3 + COALESCE(max_temp_load_ratio, 0) * 5, 1) AS \"위험도\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE) ORDER BY \"위험도\" DESC LIMIT 15",
               "refId": "A",
               "table": "gold_robot_daily_stats"
             }
@@ -1406,7 +1396,7 @@ data:
               "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
               "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
               "format": 1,
-              "rawSQL": "SELECT robot_id, ROUND(max_motor_temp, 1) AS \"최고 온도\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CURRENT_DATE - INTERVAL '1' DAY AS DATE) ORDER BY max_motor_temp DESC LIMIT 10",
+              "rawSQL": "SELECT robot_id, ROUND(max_motor_temp, 1) AS \"최고 온도\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE) ORDER BY max_motor_temp DESC LIMIT 10",
               "refId": "A",
               "table": "gold_robot_daily_stats"
             }
