@@ -84,7 +84,10 @@ jobs:
           echo "failure_type log mentions: $FT_FOUND"
           echo "triggered=$TRIGGERED" >> "$GITHUB_OUTPUT"
           echo "ft_found=$FT_FOUND" >> "$GITHUB_OUTPUT"
-          if [ "$TRIGGERED" -ge 1 ] && [ "$FT_FOUND" -ge 1 ]; then
+          # PASS 조건은 SIGUSR1 핸들러 발화(=trigger 1건 이상). failure_type 텍스트는
+          # generator happy-path 에선 stdout 에 안 찍힘 (record 는 Kinesis 로만 송출). 실제
+          # 송출 검증은 step 3 (Bronze 적재)가 담당.
+          if [ "$TRIGGERED" -ge 1 ]; then
             echo "gen_status=PASS" >> "$GITHUB_OUTPUT"
           else
             echo "gen_status=FAIL" >> "$GITHUB_OUTPUT"
