@@ -65,10 +65,12 @@ resource "aws_eks_cluster" "main" {
   ]
 }
 
-# EKS Node Group (Spot — t3.large × 2)
+# EKS Node Group (Spot — t3.large × 1, Karpenter NodePool 가 추가 capacity 관리)
+# 04-29 evening Karpenter 도입 시 라이브에서 spot-ng 로 rename + desired=1 로 축소.
+# Karpenter `general` NodePool 이 부하 시 spot 노드 자동 launch (4 노드 풀 시연 검증).
 resource "aws_eks_node_group" "main" {
   cluster_name    = aws_eks_cluster.main.name
-  node_group_name = "${var.project_name}-node-group"
+  node_group_name = "${var.project_name}-spot-ng"
   node_role_arn   = aws_iam_role.eks_node.arn
   subnet_ids      = aws_subnet.app_private[*].id
 
@@ -76,9 +78,9 @@ resource "aws_eks_node_group" "main" {
   capacity_type  = "SPOT"
 
   scaling_config {
-    desired_size = 2
+    desired_size = 1
     max_size     = 10
-    min_size     = 2
+    min_size     = 1
   }
 
   update_config {
