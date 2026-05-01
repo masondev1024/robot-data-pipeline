@@ -65,6 +65,35 @@ resource "aws_iam_role_policy" "github_actions" {
         Action   = ["ssm:PutParameter", "ssm:GetParameter"]
         Effect   = "Allow"
         Resource = "arn:aws:ssm:${var.aws_region}:*:parameter/robot-telemetry/*"
+      },
+      # phase8-e2e-verify 워크플로우의 Bronze 파티션 검증용. workgroup 한정.
+      {
+        Action = [
+          "athena:StartQueryExecution",
+          "athena:GetQueryExecution",
+          "athena:GetQueryResults",
+          "athena:StopQueryExecution",
+          "athena:GetWorkGroup",
+        ]
+        Effect   = "Allow"
+        Resource = "arn:aws:athena:${var.aws_region}:*:workgroup/robot-telemetry-workgroup"
+      },
+      # Athena 가 Glue 카탈로그 메타데이터 읽기 권한 필요. 읽기만 허용.
+      {
+        Action = [
+          "glue:GetDatabase",
+          "glue:GetDatabases",
+          "glue:GetTable",
+          "glue:GetTables",
+          "glue:GetPartition",
+          "glue:GetPartitions",
+        ]
+        Effect = "Allow"
+        Resource = [
+          "arn:aws:glue:${var.aws_region}:*:catalog",
+          "arn:aws:glue:${var.aws_region}:*:database/robot_telemetry_db",
+          "arn:aws:glue:${var.aws_region}:*:table/robot_telemetry_db/*",
+        ]
       }
     ]
   })
