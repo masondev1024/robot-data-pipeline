@@ -53,3 +53,6 @@ plan.md
 프로젝트 정보/
 requirements.txt
 terraform/tfplan
+
+# Claude Code 세션 lock (매 세션마다 갱신)
+.claude/scheduled_tasks.lock
