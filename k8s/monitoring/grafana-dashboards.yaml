@@ -1004,13 +1004,23 @@ data:
         "list": [
           {
             "current": { "selected": false, "text": "ROBOT-00001", "value": "ROBOT-00001" },
+            "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+            "definition": "SELECT DISTINCT robot_id FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CURRENT_DATE - INTERVAL '1' DAY AS DATE) ORDER BY robot_id",
             "hide": 0,
+            "includeAll": false,
             "label": "Robot ID",
+            "multi": false,
             "name": "robot_id",
             "options": [],
-            "query": "ROBOT-00001",
+            "query": {
+              "format": 1,
+              "rawSQL": "SELECT DISTINCT robot_id FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CURRENT_DATE - INTERVAL '1' DAY AS DATE) ORDER BY robot_id"
+            },
+            "refresh": 1,
+            "regex": "",
             "skipUrlSync": false,
-            "type": "textbox"
+            "sort": 1,
+            "type": "query"
           }
         ]
       },
