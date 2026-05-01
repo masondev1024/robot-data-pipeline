@@ -111,17 +111,12 @@ env:
   - name: DQ_SNS_TOPIC_ARN
     value: "arn:aws:sns:eu-west-1:827913617635:robot-anomaly-alerts"
 
-# ALB Ingress — 외부 접근
+# ALB Ingress — 비활성화 (port-forward 로 접근)
+# Why: 퍼블릭 ALB 노출 시 봇 스캔(/robots.txt) + 비용 발생 → 내부 접근만 허용
+# Access: kubectl port-forward -n airflow svc/airflow-webserver 8080:8080
 ingress:
   web:
-    enabled: true
-    ingressClassName: alb
-    annotations:
-      alb.ingress.kubernetes.io/scheme: internet-facing
-      alb.ingress.kubernetes.io/target-type: ip
-      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
-    path: "/"
-    pathType: "Prefix"
+    enabled: false
 
 # 세션 쿠키 서명 (dummy, 시연용 — 운영 시 Secret 분리)
 webserverSecretKey: "demo-only-secret-key-change-in-prod-32"
