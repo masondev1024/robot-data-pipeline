@@ -28,7 +28,7 @@ spec:
             - name: PYTHONUNBUFFERED
               value: "1"
             - name: ROBOT_COUNT
-              value: "50"
+              value: "1000"
             - name: TICK_INTERVAL_SECONDS
               value: "0.5"
             - name: KINESIS_STREAM_NAME
