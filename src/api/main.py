@@ -338,6 +338,29 @@ async def predict_failure(request: Request, body: PredictRequest):
     }
 
 
+@app.get("/api/robot/{robot_id}/recent-features")
+async def recent_features(robot_id: str):
+    if not _gold_cache:
+        raise HTTPException(status_code=503, detail="캐시가 아직 준비되지 않았습니다.")
+    row = _lookup_robot_features(robot_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"{robot_id} 가 오늘 Gold 데이터에 없습니다.")
+    try:
+        avg_t = float(row["avg_motor_temp"])
+        max_t = float(row["max_motor_temp"])
+        return {
+            "robot_id": robot_id,
+            "avg_motor_temp": round(avg_t, 1),
+            "max_motor_temp": round(max_t, 1),
+            "battery_drain": int(float(row["battery_drain"])),
+            "active_hours": int(float(row["active_hours"])),
+            "max_temp_load_ratio": round(max_t / max(avg_t, 1.0), 4),
+            "data_date": row.get("dt", _data_date),
+        }
+    except (KeyError, ValueError) as exc:
+        raise HTTPException(status_code=500, detail=f"feature 추출 실패: {exc}")
+
+
 @app.get("/", response_class=HTMLResponse)
 async def portal(request: Request, robot_id: str = ""):
     return templates.TemplateResponse(

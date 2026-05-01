@@ -86,8 +86,36 @@
             border-radius: 10px;
             overflow: hidden;
             box-shadow: var(--shadow-md);
+            position: relative;
         }
-        #grafana-frame { width: 100%; height: 100%; border: none; }
+        #grafana-frame { width: 100%; height: 100%; border: none; display: block; }
+        .iframe-placeholder {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: linear-gradient(180deg, #f7f9fc 0%, #eef2f7 100%);
+            color: var(--text-secondary);
+            font-size: 13px;
+            transition: opacity 0.25s;
+            pointer-events: none;
+            z-index: 1;
+        }
+        .iframe-placeholder.hidden { opacity: 0; }
+        .iframe-placeholder.error { background: #fff8f6; color: #c62828; pointer-events: auto; }
+        .iframe-placeholder .spinner {
+            width: 28px;
+            height: 28px;
+            border: 3px solid #d6dde7;
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        .iframe-placeholder.error .spinner { display: none; }
+        @keyframes spin { to { transform: rotate(360deg); } }
         .chat-section {
             background: var(--surface);
             border-radius: 10px;
@@ -292,18 +320,60 @@
         .predict-form {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 6px;
+            gap: 8px 6px;
             margin-bottom: 8px;
         }
+        .predict-form label {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            min-width: 0;
+        }
+        .predict-form label .lbl-text { display: flex; justify-content: space-between; gap: 6px; }
+        .predict-form label .hint { font-size: 10.5px; color: #98a3b3; font-weight: 400; }
         .predict-form input {
             padding: 7px 9px;
             border: 1px solid var(--border);
             border-radius: 6px;
             font-size: 12px;
             min-width: 0;
+            color: var(--text);
         }
-        .predict-form input:focus { outline: none; border-color: var(--primary); }
+        .predict-form input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(25,118,210,0.10); }
+        .predict-form input[readonly] { background: #f3f6fa; color: var(--text-secondary); }
         .predict-form .full { grid-column: 1 / -1; }
+        .predict-actions { display: flex; gap: 6px; }
+        .autofill-btn {
+            flex: 0 0 auto;
+            padding: 8px 12px;
+            background: #fff;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            min-height: 36px;
+            transition: all 0.15s;
+        }
+        .autofill-btn:hover { background: var(--primary-light); }
+        .autofill-btn:disabled { color: #98a3b3; border-color: #c9d1de; cursor: not-allowed; }
+        .autofill-btn::before { content: "🤖 "; }
+        .ft-legend {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed #d0d7e2;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 6px;
+            font-size: 10.5px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+        .ft-legend .item { display: inline-flex; align-items: center; gap: 4px; }
         .predict-btn {
             width: 100%;
             padding: 8px;
@@ -360,6 +430,10 @@
 
     <div class="container">
         <div class="grafana-section">
+            <div class="iframe-placeholder" id="iframe-placeholder">
+                <div class="spinner"></div>
+                <div id="iframe-placeholder-msg">Grafana 대시보드 로딩 중…</div>
+            </div>
             <iframe id="grafana-frame" src=""></iframe>
         </div>
 
@@ -367,15 +441,44 @@
         <div class="predict-section">
             <div class="predict-header">예측 점검 (Failure Type)</div>
             <div class="predict-form">
-                <input id="pf-robot" class="full" placeholder="robot_id (예: ROBOT-00012)" value="{{ robot_id }}">
-                <input id="pf-avg-temp" type="number" step="0.1" placeholder="평균 온도 °C">
-                <input id="pf-max-temp" type="number" step="0.1" placeholder="최고 온도 °C">
-                <input id="pf-drain" type="number" step="1" placeholder="배터리 소모">
-                <input id="pf-hours" type="number" step="1" placeholder="가동 시간(h)">
-                <input id="pf-ratio" class="full" type="number" step="0.01" placeholder="최고 온도/부하 비율">
+                <label class="full">
+                    <span class="lbl-text">robot_id <span class="hint">예: ROBOT-00012</span></span>
+                    <input id="pf-robot" placeholder="ROBOT-XXXXX" value="{{ robot_id }}">
+                </label>
+                <label>
+                    <span class="lbl-text">평균 모터 온도 (°C) <span class="hint">정상 25~70</span></span>
+                    <input id="pf-avg-temp" type="number" step="0.1" min="0" max="200" placeholder="예: 65.0">
+                </label>
+                <label>
+                    <span class="lbl-text">최고 모터 온도 (°C) <span class="hint">90↑ 주의 / 100↑ 긴급</span></span>
+                    <input id="pf-max-temp" type="number" step="0.1" min="0" max="200" placeholder="예: 95.0">
+                </label>
+                <label>
+                    <span class="lbl-text">배터리 소모 (%) <span class="hint">70↑ 주의 / 95↑ 긴급</span></span>
+                    <input id="pf-drain" type="number" step="1" min="0" max="100" placeholder="예: 60">
+                </label>
+                <label>
+                    <span class="lbl-text">가동 시간 (h) <span class="hint">12↑ 주의 / 16↑ 긴급</span></span>
+                    <input id="pf-hours" type="number" step="1" min="0" max="24" placeholder="예: 10">
+                </label>
+                <label class="full">
+                    <span class="lbl-text">최고 온도 / 평균 온도 비율 <span class="hint">자동 계산 (직접 입력 가능)</span></span>
+                    <input id="pf-ratio" type="number" step="0.001" min="0" placeholder="자동 계산됨">
+                </label>
             </div>
-            <button id="predict-btn" class="predict-btn">예측</button>
+            <div class="predict-actions">
+                <button id="autofill-btn" class="autofill-btn" type="button" title="해당 robot_id 의 어제자 Gold 데이터로 5개 필드 자동 입력">자동 채우기</button>
+                <button id="predict-btn" class="predict-btn">예측</button>
+            </div>
             <div id="predict-result" class="predict-result"></div>
+            <div class="ft-legend" aria-label="Failure Type 범례">
+                <span class="item"><span class="ft-badge ft-NONE">NONE</span>정상</span>
+                <span class="item"><span class="ft-badge ft-HDF">HDF</span>방열</span>
+                <span class="item"><span class="ft-badge ft-PWF">PWF</span>전력</span>
+                <span class="item"><span class="ft-badge ft-OSF">OSF</span>과부하</span>
+                <span class="item"><span class="ft-badge ft-TWF">TWF</span>공구마모</span>
+                <span class="item"><span class="ft-badge ft-RNF">RNF</span>랜덤</span>
+            </div>
         </div>
 
         <div class="chat-section" style="flex: 1;">
@@ -436,8 +539,34 @@
             return extraQuery ? `${base}&${extraQuery}` : base;
         }
 
+        const iframePlaceholder = document.getElementById('iframe-placeholder');
+        const iframePlaceholderMsg = document.getElementById('iframe-placeholder-msg');
+        const grafanaFrame = document.getElementById('grafana-frame');
+        let iframeLoadTimer = null;
+
+        function showIframePlaceholder(msg = 'Grafana 대시보드 로딩 중…', isError = false) {
+            iframePlaceholderMsg.textContent = msg;
+            iframePlaceholder.classList.toggle('error', isError);
+            iframePlaceholder.classList.remove('hidden');
+        }
+        function hideIframePlaceholder() { iframePlaceholder.classList.add('hidden'); }
+
+        grafanaFrame.addEventListener('load', () => {
+            if (iframeLoadTimer) { clearTimeout(iframeLoadTimer); iframeLoadTimer = null; }
+            // src 가 빈 문자열로 초기화 시 발생하는 첫 load 는 무시
+            if (grafanaFrame.src && grafanaFrame.src !== window.location.href) hideIframePlaceholder();
+        });
+        grafanaFrame.addEventListener('error', () => {
+            showIframePlaceholder('⚠️ Grafana 대시보드를 불러오지 못했습니다. 네트워크 또는 권한을 확인하세요.', true);
+        });
+
         function updateGrafanaFrame(extraQuery = "") {
-            document.getElementById('grafana-frame').src = buildGrafanaUrl(currentDashboardUid, extraQuery);
+            showIframePlaceholder();
+            if (iframeLoadTimer) clearTimeout(iframeLoadTimer);
+            iframeLoadTimer = setTimeout(() => {
+                showIframePlaceholder('⚠️ Grafana 응답이 지연됩니다. URL/세션을 확인하거나 새로고침해 주세요.', true);
+            }, 8000);
+            grafanaFrame.src = buildGrafanaUrl(currentDashboardUid, extraQuery);
         }
 
         function hideEmptyState() {
@@ -445,9 +574,14 @@
             if (el) el.remove();
         }
 
+        function isNearBottom(el, threshold = 60) {
+            return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+        }
+
         function addMessage(text, isUser, links = []) {
             hideEmptyState();
             const container = document.getElementById('chat-messages');
+            const stick = isUser || isNearBottom(container);
             const msg = document.createElement('div');
             msg.className = `message ${isUser ? 'user' : 'assistant'}`;
 
@@ -486,7 +620,7 @@
             }
 
             container.appendChild(msg);
-            container.scrollTop = container.scrollHeight;
+            if (stick) container.scrollTop = container.scrollHeight;
         }
 
         function setLoading(on) {
@@ -494,7 +628,7 @@
             document.getElementById('send-btn').disabled = on;
             if (on) {
                 const c = document.getElementById('chat-messages');
-                c.scrollTop = c.scrollHeight;
+                if (isNearBottom(c)) c.scrollTop = c.scrollHeight;
             }
         }
 
@@ -614,11 +748,83 @@
         }
         document.getElementById('predict-btn').addEventListener('click', runPredict);
 
+        // ratio 자동 계산 (avg + max 둘 다 입력 시, ratio 가 비어 있을 때만)
+        function maybeAutoComputeRatio() {
+            const avg = parseFloat(document.getElementById('pf-avg-temp').value);
+            const max = parseFloat(document.getElementById('pf-max-temp').value);
+            const ratioEl = document.getElementById('pf-ratio');
+            if (!ratioEl.dataset.userTouched && !isNaN(avg) && !isNaN(max) && avg > 0) {
+                ratioEl.value = (max / avg).toFixed(3);
+            }
+        }
+        document.getElementById('pf-avg-temp').addEventListener('input', maybeAutoComputeRatio);
+        document.getElementById('pf-max-temp').addEventListener('input', maybeAutoComputeRatio);
+        document.getElementById('pf-ratio').addEventListener('input', () => {
+            document.getElementById('pf-ratio').dataset.userTouched = '1';
+        });
+
+        // 자동 채우기: GET /api/robot/{id}/recent-features
+        async function autofillFromGold() {
+            const rid = document.getElementById('pf-robot').value.trim();
+            const result = document.getElementById('predict-result');
+            if (!rid) {
+                result.classList.add('show');
+                result.style.background = '#fff4e6';
+                result.innerHTML = '⚠️ 먼저 robot_id 를 입력하세요.';
+                return;
+            }
+            const btn = document.getElementById('autofill-btn');
+            btn.disabled = true;
+            const orig = btn.textContent;
+            btn.textContent = '불러오는 중…';
+            try {
+                const resp = await fetch(`/api/robot/${encodeURIComponent(rid)}/recent-features`);
+                if (!resp.ok) {
+                    let detail = resp.statusText;
+                    try { const j = await resp.json(); detail = j.detail || detail; } catch (_) {}
+                    result.classList.add('show');
+                    result.style.background = '#ffebee';
+                    result.innerHTML = `⚠️ 자동 채우기 실패: HTTP ${resp.status} — ${detail}`;
+                    return;
+                }
+                const d = await resp.json();
+                document.getElementById('pf-avg-temp').value  = d.avg_motor_temp;
+                document.getElementById('pf-max-temp').value  = d.max_motor_temp;
+                document.getElementById('pf-drain').value     = d.battery_drain;
+                document.getElementById('pf-hours').value     = d.active_hours;
+                const ratioEl = document.getElementById('pf-ratio');
+                ratioEl.value = d.max_temp_load_ratio;
+                delete ratioEl.dataset.userTouched;
+                result.classList.add('show');
+                result.style.background = '#e8f5e9';
+                result.innerHTML = `✓ ${d.robot_id} 의 ${d.data_date} 데이터로 채움 — 이제 [예측] 버튼을 누르세요.`;
+            } catch (e) {
+                result.classList.add('show');
+                result.style.background = '#ffebee';
+                result.innerHTML = `⚠️ 자동 채우기 실패: ${e.message}`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = orig;
+            }
+        }
+        document.getElementById('autofill-btn').addEventListener('click', autofillFromGold);
+
         loadStatus();
         updateGrafanaFrame();
 
+        // URL 의 robot_id 는 자동 챗 발송 대신 사용자 액션 칩으로 노출 (비용·의도 보존)
         if (robotId) {
-            setTimeout(() => sendChat(`${robotId}의 현재 상태를 분석해줘`), 500);
+            const c = document.getElementById('chat-messages');
+            const empty = document.getElementById('empty-state');
+            const chip = document.createElement('div');
+            chip.className = 'example';
+            chip.style.cssText = 'margin: 0 16px 12px; padding: 10px 14px; background: var(--primary-light); border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--primary-dark); font-weight: 600; text-align: center;';
+            chip.textContent = `▶ ${robotId} 현재 상태 분석 시작`;
+            chip.addEventListener('click', () => {
+                chip.remove();
+                sendChat(`${robotId}의 현재 상태를 분석해줘`);
+            });
+            (empty || c).insertAdjacentElement(empty ? 'beforebegin' : 'afterbegin', chip);
         }
     </script>
 </body>
