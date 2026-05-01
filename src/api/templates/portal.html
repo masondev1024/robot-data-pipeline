@@ -798,7 +798,8 @@
                 delete ratioEl.dataset.userTouched;
                 result.classList.add('show');
                 result.style.background = '#e8f5e9';
-                result.innerHTML = `✓ ${d.robot_id} 의 ${d.data_date} 데이터로 채움 — 이제 [예측] 버튼을 누르세요.`;
+                const srcTag = d.source === 'athena' ? ' (Athena 직접 조회)' : '';
+                result.innerHTML = `✓ ${d.robot_id} 의 ${d.data_date} 데이터로 채움${srcTag} — 이제 [예측] 버튼을 누르세요.`;
             } catch (e) {
                 result.classList.add('show');
                 result.style.background = '#ffebee';

@@ -338,13 +338,64 @@ async def predict_failure(request: Request, body: PredictRequest):
     }
 
 
+_ROBOT_ID_RE = re.compile(r"^ROBOT-\d{5}$")
+
+
+async def _athena_lookup_robot(robot_id: str, lookback_days: int = 7) -> dict | None:
+    """캐시 miss 시 Gold 테이블에서 직접 robot_id 최근 행 1건 조회. 없으면 None.
+
+    SQL injection 가드: caller 가 _ROBOT_ID_RE 통과 보장 전제. 내부에서도 한 번 더 검증.
+    """
+    if not _ROBOT_ID_RE.match(robot_id):
+        return None
+    database = os.environ.get("ATHENA_DATABASE", "robot_telemetry_db")
+    workgroup = os.environ.get("ATHENA_WORKGROUP", "robot-telemetry-workgroup")
+    output_location = os.environ.get(
+        "ATHENA_OUTPUT_LOCATION",
+        "s3://de-ai-06-smartfactory-bucket/project-athena-results/",
+    )
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
+    query = f"""
+SELECT robot_id, avg_motor_temp, max_motor_temp,
+       battery_drain, active_hours, dt
+FROM gold_robot_daily_stats
+WHERE dt >= DATE '{cutoff}' AND robot_id = '{robot_id}'
+ORDER BY dt DESC
+LIMIT 1
+"""
+    loop = asyncio.get_event_loop()
+    rows = await loop.run_in_executor(
+        None,
+        lambda: run_query(
+            query,
+            database=database,
+            workgroup=workgroup,
+            output_location=output_location,
+        ),
+    )
+    return rows[0] if rows else None
+
+
 @app.get("/api/robot/{robot_id}/recent-features")
 async def recent_features(robot_id: str):
-    if not _gold_cache:
-        raise HTTPException(status_code=503, detail="캐시가 아직 준비되지 않았습니다.")
-    row = _lookup_robot_features(robot_id)
+    if not _ROBOT_ID_RE.match(robot_id):
+        raise HTTPException(status_code=400, detail="robot_id 형식 오류 (예: ROBOT-00012)")
+
+    source = "cache"
+    row = _lookup_robot_features(robot_id) if _gold_cache else None
     if row is None:
-        raise HTTPException(status_code=404, detail=f"{robot_id} 가 오늘 Gold 데이터에 없습니다.")
+        # Athena fallback — 캐시(어제자 TOP 100) 외 robot_id 또는 ETL 누락 시 대안.
+        source = "athena"
+        try:
+            row = await _athena_lookup_robot(robot_id)
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Athena 조회 실패: {exc}")
+        if row is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"{robot_id} 가 최근 7일 Gold 데이터에 없습니다.",
+            )
+
     try:
         avg_t = float(row["avg_motor_temp"])
         max_t = float(row["max_motor_temp"])
@@ -356,6 +407,7 @@ async def recent_features(robot_id: str):
             "active_hours": int(float(row["active_hours"])),
             "max_temp_load_ratio": round(max_t / max(avg_t, 1.0), 4),
             "data_date": row.get("dt", _data_date),
+            "source": source,
         }
     except (KeyError, ValueError) as exc:
         raise HTTPException(status_code=500, detail=f"feature 추출 실패: {exc}")
