@@ -826,6 +826,13 @@
         }
         document.getElementById('autofill-btn').addEventListener('click', autofillFromGold);
 
+        // 입력 필드를 떠날 때 즉시 canonical 형태(`ROBOT-00037`)로 보정
+        // — 사용자가 robot-37 / 37 / [robot-37] 등으로 쳐도 Tab/blur 시 시각적으로 통일됨
+        document.getElementById('pf-robot').addEventListener('blur', (e) => {
+            const normalized = normalizeRobotId(e.target.value);
+            if (normalized && normalized !== e.target.value) e.target.value = normalized;
+        });
+
         loadStatus();
         updateGrafanaFrame();
 
