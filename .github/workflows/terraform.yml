@@ -33,6 +33,8 @@ jobs:
         run: terraform plan -no-color 2>&1
         working-directory: terraform/
         continue-on-error: true
+        env:
+          TF_VAR_slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
       - name: Post Plan Comment
         uses: actions/github-script@v7
         with:
@@ -65,3 +67,5 @@ jobs:
         working-directory: terraform/
       - run: terraform apply -auto-approve
         working-directory: terraform/
+        env:
+          TF_VAR_slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}

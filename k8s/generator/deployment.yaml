@@ -30,7 +30,7 @@ spec:
             - name: ROBOT_COUNT
               value: "1000"
             - name: TICK_INTERVAL_SECONDS
-              value: "0.5"
+              value: "1.0"
             - name: KINESIS_STREAM_NAME
               value: "robot-telemetry-stream"
             - name: KINESIS_ALERT_STREAM_NAME

@@ -14,6 +14,15 @@
 # 사전 조건: AWS 자격증명, kubectl + terraform + helm CLI.
 set -euo pipefail
 
+# .env 의 SLACK_WEBHOOK_URL → TF_VAR_ 자동 주입 (terraform plan/apply 가 webhook 변수 요구 시 fallback CHANGEME 회피)
+ENV_FILE="$(cd "$(dirname "$0")/.." && pwd)/.env"
+if [ -f "$ENV_FILE" ]; then
+  set -a; source "$ENV_FILE"; set +a
+  if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
+    export TF_VAR_slack_webhook_url="$SLACK_WEBHOOK_URL"
+  fi
+fi
+
 REGION="${AWS_REGION:-eu-west-1}"
 CLUSTER="${EKS_CLUSTER:-robot-telemetry-cluster}"
 

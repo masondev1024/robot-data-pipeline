@@ -41,7 +41,7 @@ variable "github_branch" {
 }
 
 variable "slack_webhook_url" {
-  description = "Slack Incoming Webhook URL (managed by AWS Secrets Manager)"
+  description = "Slack Incoming Webhook URL. 값은 TF_VAR_slack_webhook_url 환경변수 또는 -var 로 주입 (.env 가 source of truth). default 'CHANGEME' 는 미주입 시 fallback — git 에 실 URL 커밋 방지용 의도적 안전장치."
   type        = string
   sensitive   = true
   default     = "https://hooks.slack.com/services/CHANGEME"
@@ -55,9 +55,9 @@ variable "grafana_admin_password" {
 }
 
 variable "kds_main_shard_count" {
-  description = "Telemetry KDS shard count. 학습/비용 절감 기본 1. 운영 시 10 권장."
+  description = "Telemetry KDS shard count. 1000 robots × 1.0s tick = 1000 records/s 부하 기준 default 2 (한도 2000 RPS 의 50% 사용, read GetRecords 한도 10/s 도 KDF+Flink 합계와 정합). 부하 증감 시 조정."
   type        = number
-  default     = 1
+  default     = 2
 }
 
 variable "kds_alert_shard_count" {
