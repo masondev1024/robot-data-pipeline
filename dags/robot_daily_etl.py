@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 import boto3
 from airflow import DAG
-from airflow.operators.python import PythonOperator, ShortCircuitOperator
+from airflow.operators.python import PythonOperator
 
 from src.common.athena import fetch_rows, start_query, wait_for_query
 from src.common.bedrock import invoke_claude
@@ -28,7 +28,7 @@ default_args = {
 dag = DAG(
     dag_id="robot_daily_etl",
     default_args=default_args,
-    description="Bronze→Silver→Gold ETL + Bedrock 리포트 + 주간 ML 재학습",
+    description="Bronze→Silver→Gold ETL + Bedrock 리포트 (재학습은 weekly_ml_retrain DAG 로 분리)",
     schedule="0 15 * * *",  # 매일 00:00 KST (UTC 15:00). schedule_interval 은 Airflow 3 에서 제거 예정.
     start_date=datetime(2026, 1, 1),
     catchup=False,
@@ -273,15 +273,6 @@ LIMIT {BEDROCK_REPORT_TOP_N}
     )
 
 
-def _is_monday(**ctx):
-    return ctx["execution_date"].weekday() == 0  # 월요일만 실행
-
-
-def _retrain_model(**ctx):
-    from src.ml.train import main
-    main()
-
-
 quality_check = PythonOperator(
     task_id="quality_check",
     python_callable=_quality_check,
@@ -306,16 +297,4 @@ bedrock_report = PythonOperator(
     dag=dag,
 )
 
-check_monday = ShortCircuitOperator(
-    task_id="check_monday",
-    python_callable=_is_monday,
-    dag=dag,
-)
-
-retrain_model = PythonOperator(
-    task_id="retrain_ml_model",
-    python_callable=_retrain_model,
-    dag=dag,
-)
-
-quality_check >> bronze_to_silver >> silver_to_gold >> bedrock_report >> check_monday >> retrain_model
+quality_check >> bronze_to_silver >> silver_to_gold >> bedrock_report

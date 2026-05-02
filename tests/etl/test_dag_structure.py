@@ -21,18 +21,19 @@ def test_dag_has_no_import_errors():
 
 
 def test_dag_task_set():
-    """기대 task 6종이 모두 존재한다 (Phase 5: 주간 ML 재학습 추가)."""
+    """기대 task 4종이 모두 존재한다 (Phase 5b: ML 재학습은 weekly_ml_retrain DAG 로 분리)."""
     expected = {
         "quality_check",
         "bronze_to_silver",
         "silver_to_gold",
         "bedrock_report",
-        "check_monday",
-        "retrain_ml_model",
     }
     actual = set(dag.task_dict.keys())
     missing = expected - actual
     assert not missing, f"누락된 task: {missing}"
+    # ML retrain task 가 daily DAG 에 남아있지 않음을 확인
+    assert "retrain_ml_model" not in actual
+    assert "check_monday" not in actual
 
 
 def test_dag_topology_quality_first():
