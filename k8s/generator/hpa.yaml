@@ -3,13 +3,19 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: robot-telemetry-generator-hpa
   namespace: robot-telemetry
+  annotations:
+    # min/max=1 사유: generator 부하는 ROBOT_COUNT 환경변수로 결정되며 pod 수에 비례하지 않음.
+    # CPU 기반 HPA 가 KDS write throttle 의 retry CPU 사용분을 보고 scale-out 하면
+    # 부하가 더 늘어나 throttle 이 악화되는 양성 피드백 루프 형성 (2026-05-02 확인).
+    # HPA object 자체는 보존 — 향후 외부 메트릭(KDS lag/throttle) 기반 재설계 여지.
+    robot-telemetry/disabled: "permanent-min-max-1"
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
     name: robot-telemetry-generator
   minReplicas: 1
-  maxReplicas: 5
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:
