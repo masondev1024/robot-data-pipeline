@@ -223,7 +223,7 @@ ROBOT_COUNT 또는 shard 수를 만질 때:
 
 - Generator app: [src/generator/app.py](src/generator/app.py)
 - Generator k8s: [k8s/generator/deployment.yaml](k8s/generator/deployment.yaml), [k8s/generator/hpa.yaml](k8s/generator/hpa.yaml)
-- Flink 운영본: [flink/anomaly_detection.py](flink/anomaly_detection.py)
+- Flink 운영본: AWS Managed Flink Studio Notebook `de-ai-06-flink-studio-nb` (콘솔 only — 2026-05-02 부로 git mirror 폐기, ADR-010 REVISED 2 참조)
 - Lambda alert handler: [src/lambda/alert_handler.py](src/lambda/alert_handler.py)
 - KDS shard 변수: [terraform/variables.tf](terraform/variables.tf), [terraform/modules/data_pipeline/kinesis.tf](terraform/modules/data_pipeline/kinesis.tf)
 - Glue Bronze schema: [sql/bronze_ddl.sql](sql/bronze_ddl.sql)

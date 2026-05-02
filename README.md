@@ -67,7 +67,6 @@
 │   ├── ml/                 #   SageMaker train/deploy 엔트리
 │   └── common/             #   AWS client/Bedrock 헬퍼
 ├── dags/                   # Airflow DAG (Bronze→Silver→Gold + LLM 리포트)
-├── flink/                  # Flink Studio Notebook (Zeppelin) 자료
 ├── sql/                    # Athena DDL (Partition Projection)
 ├── grafana/dashboards/     # Robot Fleet · Anomaly · Pipeline Health
 ├── k8s/                    # EKS manifests (api/generator/monitoring/karpenter)
