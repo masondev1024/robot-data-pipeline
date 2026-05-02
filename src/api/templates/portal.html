@@ -670,9 +670,22 @@
             el.addEventListener('click', () => sendChat(el.dataset.q));
         });
 
+        // robot_id 정규화: 백엔드 regex `^ROBOT-\d{5}$`에 맞도록
+        // 대소문자/대괄호/en-em dash/zero-pad 자동 보정. 정규식과 무관한 문자열은 원본 유지.
+        function normalizeRobotId(raw) {
+            if (!raw) return '';
+            const cleaned = raw.toUpperCase()
+                .replace(/[‐-―]/g, '-')
+                .replace(/[\[\]\s]/g, '');
+            const m = cleaned.match(/^(?:ROBOT-)?(\d{1,5})$/);
+            return m ? `ROBOT-${m[1].padStart(5, '0')}` : cleaned;
+        }
+
         // Task 8.4: /api/predict 호출 + failure_type 뱃지 + recommended_action 표시
         async function runPredict() {
-            const robotId   = document.getElementById('pf-robot').value.trim();
+            const pfRobot   = document.getElementById('pf-robot');
+            const robotId   = normalizeRobotId(pfRobot.value);
+            if (robotId !== pfRobot.value) pfRobot.value = robotId;
             const avgTemp   = parseFloat(document.getElementById('pf-avg-temp').value);
             const maxTemp   = parseFloat(document.getElementById('pf-max-temp').value);
             const drain     = parseInt(document.getElementById('pf-drain').value, 10);
@@ -766,7 +779,9 @@
 
         // 자동 채우기: GET /api/robot/{id}/recent-features
         async function autofillFromGold() {
-            const rid = document.getElementById('pf-robot').value.trim();
+            const pfRobot = document.getElementById('pf-robot');
+            const rid = normalizeRobotId(pfRobot.value);
+            if (rid !== pfRobot.value) pfRobot.value = rid;
             const result = document.getElementById('predict-result');
             if (!rid) {
                 result.classList.add('show');
