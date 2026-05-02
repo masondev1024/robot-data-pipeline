@@ -3,7 +3,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -20,31 +23,64 @@
   "liveNow": false,
   "panels": [
     {
-      "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+      "datasource": {
+        "type": "grafana-athena-datasource",
+        "uid": "athena"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
       "id": 100,
       "options": {
         "colorMode": "background",
         "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "value_and_name"
       },
       "pluginVersion": "11.3.0",
       "targets": [
         {
-          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
-          "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+          "connectionArgs": {
+            "catalog": "AwsDataCatalog",
+            "database": "robot_telemetry_db",
+            "region": "eu-west-1",
+            "resultReuseEnabled": false,
+            "resultReuseMaxAgeInMinutes": 60
+          },
+          "datasource": {
+            "type": "grafana-athena-datasource",
+            "uid": "athena"
+          },
           "format": 1,
           "rawSQL": "SELECT COUNT(*) AS \"총 가동 로봇\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
           "refId": "A",
@@ -55,38 +91,72 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+      "datasource": {
+        "type": "grafana-athena-datasource",
+        "uid": "athena"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 1 },
-              { "color": "red", "value": 50 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 50
+              }
             ]
           },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
       "id": 101,
       "options": {
         "colorMode": "background",
         "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "value_and_name"
       },
       "pluginVersion": "11.3.0",
       "targets": [
         {
-          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
-          "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+          "connectionArgs": {
+            "catalog": "AwsDataCatalog",
+            "database": "robot_telemetry_db",
+            "region": "eu-west-1",
+            "resultReuseEnabled": false,
+            "resultReuseMaxAgeInMinutes": 60
+          },
+          "datasource": {
+            "type": "grafana-athena-datasource",
+            "uid": "athena"
+          },
           "format": 1,
           "rawSQL": "SELECT SUM(CASE WHEN anomaly_record_count > 0 THEN 1 ELSE 0 END) AS \"이상치 발생 로봇\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
           "refId": "A",
@@ -97,60 +167,115 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+      "datasource": {
+        "type": "grafana-athena-datasource",
+        "uid": "athena"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 1 },
-              { "color": "red", "value": 10 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 10
+              },
+              {
+                "color": "orange",
+                "value": 30
+              },
+              {
+                "color": "red",
+                "value": 50
+              }
             ]
           },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
       "id": 102,
       "options": {
         "colorMode": "background",
         "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "value_and_name"
       },
       "pluginVersion": "11.3.0",
       "targets": [
         {
-          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
-          "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+          "connectionArgs": {
+            "catalog": "AwsDataCatalog",
+            "database": "robot_telemetry_db",
+            "region": "eu-west-1",
+            "resultReuseEnabled": false,
+            "resultReuseMaxAgeInMinutes": 60
+          },
+          "datasource": {
+            "type": "grafana-athena-datasource",
+            "uid": "athena"
+          },
           "format": 1,
-          "rawSQL": "SELECT SUM(CASE WHEN max_motor_temp > 95 THEN 1 ELSE 0 END) AS \"위험 (95°C 초과)\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
+          "rawSQL": "SELECT COUNT(*) AS \"AI 점검 권장\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE) AND dominant_failure_type IS NOT NULL AND dominant_failure_type <> 'NONE'",
           "refId": "A",
           "table": "gold_robot_daily_stats"
         }
       ],
-      "title": "위험 (max_temp > 95°C)",
+      "title": "AI 점검 권장 (24h 내 고장 분류)",
       "type": "stat"
     },
     {
-      "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+      "datasource": {
+        "type": "grafana-athena-datasource",
+        "uid": "athena"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "orange", "value": 70 },
-              { "color": "yellow", "value": 85 },
-              { "color": "green", "value": 95 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 70
+              },
+              {
+                "color": "yellow",
+                "value": 85
+              },
+              {
+                "color": "green",
+                "value": 95
+              }
             ]
           },
           "unit": "percent",
@@ -159,21 +284,41 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
       "id": 103,
       "options": {
         "colorMode": "background",
         "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "value_and_name"
       },
       "pluginVersion": "11.3.0",
       "targets": [
         {
-          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
-          "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+          "connectionArgs": {
+            "catalog": "AwsDataCatalog",
+            "database": "robot_telemetry_db",
+            "region": "eu-west-1",
+            "resultReuseEnabled": false,
+            "resultReuseMaxAgeInMinutes": 60
+          },
+          "datasource": {
+            "type": "grafana-athena-datasource",
+            "uid": "athena"
+          },
           "format": 1,
           "rawSQL": "SELECT ROUND(100.0 * SUM(CASE WHEN anomaly_record_count = 0 AND max_motor_temp <= 95 THEN 1 ELSE 0 END) / COUNT(*), 1) AS \"정상 가동률\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
           "refId": "A",
@@ -184,34 +329,135 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+      "datasource": {
+        "type": "grafana-athena-datasource",
+        "uid": "athena"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": { "hideFrom": { "tooltip": false, "viz": false, "legend": false } },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            }
+          },
           "mappings": []
         },
         "overrides": [
-          { "matcher": { "id": "byName", "options": "Critical" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] },
-          { "matcher": { "id": "byName", "options": "High" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }] },
-          { "matcher": { "id": "byName", "options": "Medium" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } }] },
-          { "matcher": { "id": "byName", "options": "Normal" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] }
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Critical"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "High"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Medium"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "yellow"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Normal"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          }
         ]
       },
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 4 },
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 0,
+        "y": 4
+      },
       "id": 104,
       "options": {
-        "displayLabels": ["name", "percent"],
-        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "values": ["value", "percent"] },
+        "displayLabels": [
+          "name",
+          "percent"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
         "pieType": "donut",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true },
-        "tooltip": { "mode": "single", "sort": "none" }
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "pluginVersion": "11.3.0",
       "targets": [
         {
-          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
-          "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+          "connectionArgs": {
+            "catalog": "AwsDataCatalog",
+            "database": "robot_telemetry_db",
+            "region": "eu-west-1",
+            "resultReuseEnabled": false,
+            "resultReuseMaxAgeInMinutes": 60
+          },
+          "datasource": {
+            "type": "grafana-athena-datasource",
+            "uid": "athena"
+          },
           "format": 1,
           "rawSQL": "SELECT SUM(CASE WHEN anomaly_record_count > 100 OR max_motor_temp > 100 THEN 1 ELSE 0 END) AS \"Critical\", SUM(CASE WHEN (anomaly_record_count > 0 OR max_motor_temp > 95) AND NOT (anomaly_record_count > 100 OR max_motor_temp > 100) THEN 1 ELSE 0 END) AS \"High\", SUM(CASE WHEN max_motor_temp > 85 AND anomaly_record_count = 0 AND max_motor_temp <= 95 THEN 1 ELSE 0 END) AS \"Medium\", SUM(CASE WHEN max_motor_temp <= 85 AND anomaly_record_count = 0 THEN 1 ELSE 0 END) AS \"Normal\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
           "refId": "A",
@@ -222,10 +468,15 @@
       "type": "piechart"
     },
     {
-      "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+      "datasource": {
+        "type": "grafana-athena-datasource",
+        "uid": "athena"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "axisLabel": "이상치 발생 로봇 수",
             "axisPlacement": "auto",
@@ -236,24 +487,59 @@
             "pointSize": 5,
             "showPoints": "auto",
             "spanNulls": false,
-            "thresholdsStyle": { "mode": "off" }
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 9, "w": 16, "x": 8, "y": 4 },
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 16,
+        "y": 4
+      },
       "id": 105,
       "options": {
-        "legend": { "calcs": ["mean", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "single", "sort": "none" }
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "targets": [
         {
-          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
-          "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+          "connectionArgs": {
+            "catalog": "AwsDataCatalog",
+            "database": "robot_telemetry_db",
+            "region": "eu-west-1",
+            "resultReuseEnabled": false,
+            "resultReuseMaxAgeInMinutes": 60
+          },
+          "datasource": {
+            "type": "grafana-athena-datasource",
+            "uid": "athena"
+          },
           "format": 0,
           "rawSQL": "SELECT CAST(dt AS TIMESTAMP) AS time, SUM(CASE WHEN anomaly_record_count > 0 THEN 1 ELSE 0 END) AS \"이상치 로봇 수\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt >= CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '7' DAY AND anomaly_record_count IS NOT NULL GROUP BY dt ORDER BY dt ASC",
           "refId": "A",
@@ -264,54 +550,136 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+      "datasource": {
+        "type": "grafana-athena-datasource",
+        "uid": "athena"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {
             "align": "auto",
-            "cellOptions": { "type": "auto" },
+            "cellOptions": {
+              "type": "auto"
+            },
             "filterable": true,
             "inspect": false
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "위험도" },
+            "matcher": {
+              "id": "byName",
+              "options": "위험도"
+            },
             "properties": [
-              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } },
-              { "id": "thresholds", "value": { "mode": "absolute", "steps": [
-                { "color": "green", "value": null },
-                { "color": "yellow", "value": 90 },
-                { "color": "orange", "value": 110 },
-                { "color": "red", "value": 130 }
-              ]}}
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 90
+                    },
+                    {
+                      "color": "orange",
+                      "value": 110
+                    },
+                    {
+                      "color": "red",
+                      "value": 130
+                    }
+                  ]
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "최고 온도(°C)" },
-            "properties": [{ "id": "unit", "value": "celsius" }]
+            "matcher": {
+              "id": "byName",
+              "options": "최고 온도(°C)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "celsius"
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "최대 부하율" },
-            "properties": [{ "id": "unit", "value": "short" }]
+            "matcher": {
+              "id": "byName",
+              "options": "최대 부하율"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
           }
         ]
       },
-      "gridPos": { "h": 11, "w": 14, "x": 0, "y": 13 },
+      "gridPos": {
+        "h": 11,
+        "w": 14,
+        "x": 0,
+        "y": 13
+      },
       "id": 106,
       "options": {
         "cellHeight": "sm",
-        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
         "showHeader": true,
-        "sortBy": [{ "desc": true, "displayName": "위험도" }]
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "위험도"
+          }
+        ]
       },
       "pluginVersion": "11.3.0",
       "targets": [
         {
-          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
-          "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+          "connectionArgs": {
+            "catalog": "AwsDataCatalog",
+            "database": "robot_telemetry_db",
+            "region": "eu-west-1",
+            "resultReuseEnabled": false,
+            "resultReuseMaxAgeInMinutes": 60
+          },
+          "datasource": {
+            "type": "grafana-athena-datasource",
+            "uid": "athena"
+          },
           "format": 1,
           "rawSQL": "SELECT robot_id AS \"로봇 ID\", ROUND(max_motor_temp, 1) AS \"최고 온도(°C)\", battery_drain AS \"배터리 소모\", anomaly_record_count AS \"이상치 발생\", ROUND(max_temp_load_ratio, 2) AS \"최대 부하율\", ROUND(max_motor_temp + COALESCE(anomaly_record_count, 0) * 0.05 + battery_drain * 0.3 + COALESCE(max_temp_load_ratio, 0) * 5, 1) AS \"위험도\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE) ORDER BY \"위험도\" DESC LIMIT 15",
           "refId": "A",
@@ -322,45 +690,81 @@
       "type": "table"
     },
     {
-      "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+      "datasource": {
+        "type": "grafana-athena-datasource",
+        "uid": "athena"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "custom": {
             "axisLabel": "최고 온도 (°C)",
             "axisPlacement": "auto",
             "fillOpacity": 80,
             "gradientMode": "none",
-            "hideFrom": { "tooltip": false, "viz": false, "legend": false },
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
             "lineWidth": 1,
-            "thresholdsStyle": { "mode": "off" }
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 85 },
-              { "color": "orange", "value": 95 },
-              { "color": "red", "value": 100 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 95
+              },
+              {
+                "color": "orange",
+                "value": 105
+              },
+              {
+                "color": "red",
+                "value": 115
+              }
             ]
           },
           "unit": "celsius"
         },
         "overrides": []
       },
-      "gridPos": { "h": 11, "w": 10, "x": 14, "y": 13 },
+      "gridPos": {
+        "h": 11,
+        "w": 10,
+        "x": 14,
+        "y": 13
+      },
       "id": 107,
       "options": {
         "barRadius": 0,
         "barWidth": 0.85,
         "fullHighlight": false,
         "groupWidth": 0.7,
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
         "orientation": "horizontal",
         "showValue": "auto",
         "stacking": "none",
-        "tooltip": { "mode": "single", "sort": "none" },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0,
         "colorByField": "최고 온도"
@@ -368,8 +772,17 @@
       "pluginVersion": "11.3.0",
       "targets": [
         {
-          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
-          "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+          "connectionArgs": {
+            "catalog": "AwsDataCatalog",
+            "database": "robot_telemetry_db",
+            "region": "eu-west-1",
+            "resultReuseEnabled": false,
+            "resultReuseMaxAgeInMinutes": 60
+          },
+          "datasource": {
+            "type": "grafana-athena-datasource",
+            "uid": "athena"
+          },
           "format": 1,
           "rawSQL": "SELECT robot_id, ROUND(max_motor_temp, 1) AS \"최고 온도\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE) ORDER BY max_motor_temp DESC LIMIT 10",
           "refId": "A",
@@ -378,13 +791,127 @@
       ],
       "title": "Top 10 최고 온도 (어제)",
       "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "grafana-athena-datasource",
+        "uid": "athena"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            }
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "TWF": {
+                  "text": "TWF — 공구 마모",
+                  "color": "orange",
+                  "index": 0
+                },
+                "HDF": {
+                  "text": "HDF — 방열 부족",
+                  "color": "red",
+                  "index": 1
+                },
+                "PWF": {
+                  "text": "PWF — 전력 이상",
+                  "color": "purple",
+                  "index": 2
+                },
+                "OSF": {
+                  "text": "OSF — 과부하",
+                  "color": "yellow",
+                  "index": 3
+                },
+                "RNF": {
+                  "text": "RNF — 무작위 고장",
+                  "color": "blue",
+                  "index": 4
+                }
+              }
+            }
+          ],
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 8,
+        "y": 4
+      },
+      "id": 108,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "connectionArgs": {
+            "catalog": "AwsDataCatalog",
+            "database": "robot_telemetry_db",
+            "region": "eu-west-1",
+            "resultReuseEnabled": false,
+            "resultReuseMaxAgeInMinutes": 60
+          },
+          "datasource": {
+            "type": "grafana-athena-datasource",
+            "uid": "athena"
+          },
+          "format": 1,
+          "rawSQL": "SELECT dominant_failure_type AS \"고장 유형\", COUNT(*) AS \"로봇 수\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE) AND dominant_failure_type IS NOT NULL AND dominant_failure_type <> 'NONE' GROUP BY dominant_failure_type ORDER BY COUNT(*) DESC",
+          "refId": "A",
+          "table": "gold_robot_daily_stats"
+        }
+      ],
+      "title": "AI 분류 — 고장 유형 분포 (어제, 점검 대상만)",
+      "type": "piechart"
     }
   ],
   "refresh": "5m",
   "schemaVersion": 39,
-  "tags": ["robot-telemetry", "fleet"],
-  "templating": { "list": [] },
-  "time": { "from": "now-7d", "to": "now" },
+  "tags": [
+    "robot-telemetry",
+    "fleet"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "UTC",
   "title": "Robot Fleet Status",
