@@ -212,6 +212,19 @@ data "aws_iam_policy_document" "api_permissions" {
       "arn:aws:ssm:${var.aws_region}:*:parameter/robot-telemetry/grafana-url",
     ]
   }
+
+  # Portal Basic Auth credentials — BasicAuthMiddleware 가 1회 read & 캐시.
+  # CLAUDE.md §1.C: TF_VAR export 금지, Secrets Manager data source 직접 read.
+  statement {
+    sid    = "SecretsGetPortalBasicAuth"
+    effect = "Allow"
+    actions = [
+      "secretsmanager:GetSecretValue",
+    ]
+    resources = [
+      "arn:aws:secretsmanager:${var.aws_region}:*:secret:/robot-telemetry/portal-basic-auth-*",
+    ]
+  }
 }
 
 resource "aws_iam_role_policy" "api_permissions" {
