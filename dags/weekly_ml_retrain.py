@@ -42,6 +42,11 @@ ENDPOINT_NAME = "robot-failure-predictor"
 TRAIN_STAGING_PREFIX = f"{MODEL_PREFIX}/train-staging"  # weekly DAG 전용 staging (멱등)
 MIN_TRAINING_ROWS = 100  # 이 미만이면 학습 스킵 (overfitting 위험)
 
+# SageMaker SDK 의 source_dir 은 worker pod CWD 기준 상대경로로 해석됨.
+# DAG 는 /opt/airflow/dags/repo/dags/ 에 있고 worker CWD 는 /opt/airflow → 절대 경로 필요.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ML_SOURCE_DIR = os.path.join(_REPO_ROOT, "src", "ml")
+
 
 default_args = {
     "owner": "robot-telemetry",
@@ -246,7 +251,7 @@ def _train_xgboost(**ctx):
     session = sagemaker.Session()
     estimator = XGBoost(
         entry_point="train_entry.py",
-        source_dir="src/ml/",
+        source_dir=_ML_SOURCE_DIR,
         role=role_arn,
         instance_count=1,
         instance_type="ml.m5.large",
@@ -296,7 +301,7 @@ def _deploy_endpoint(**ctx):
         model_data=model_data,
         role=role_arn,
         entry_point="train_entry.py",
-        source_dir="src/ml/",
+        source_dir=_ML_SOURCE_DIR,
         framework_version="1.7-1",
     )
     _cleanup_existing_endpoint(ENDPOINT_NAME)  # 멱등성: 기존 endpoint+config 제거 후 deploy
