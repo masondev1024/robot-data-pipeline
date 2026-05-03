@@ -453,6 +453,23 @@ data "aws_iam_policy_document" "airflow_permissions" {
     ]
     resources = ["*"]
   }
+
+  # SageMaker SDK 가 .fit() 동안 CloudWatch /aws/sagemaker/TrainingJobs 로그를
+  # tail 함 → DescribeLogStreams + GetLogEvents 권한 필요. 없으면 training job
+  # 자체는 InProgress 인데 SDK 가 AccessDeniedException 으로 task 만 실패.
+  statement {
+    sid    = "SageMakerCloudWatchLogsRead"
+    effect = "Allow"
+    actions = [
+      "logs:DescribeLogStreams",
+      "logs:GetLogEvents",
+      "logs:FilterLogEvents",
+    ]
+    resources = [
+      "arn:aws:logs:${var.aws_region}:*:log-group:/aws/sagemaker/*",
+      "arn:aws:logs:${var.aws_region}:*:log-group:/aws/sagemaker/*:*",
+    ]
+  }
 }
 
 resource "aws_iam_role_policy" "airflow_permissions" {
