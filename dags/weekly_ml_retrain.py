@@ -232,6 +232,8 @@ skip_train_alert = PythonOperator(
 # ──────────────────────────────────────────────────────────────────────────────
 def _train_xgboost(**ctx):
     """Staging CSV 를 입력으로 XGBoost 학습 → model.tar.gz S3 URI 반환."""
+    # NOTE: sagemaker SDK(313MB) 는 worker pod 만 설치 (helm/airflow-values.yaml workers.env).
+    # top-level import 하면 scheduler/webserver 도 DAG parse 시 import 시도 → ModuleNotFoundError.
     import sagemaker
     from sagemaker.xgboost import XGBoost
 
