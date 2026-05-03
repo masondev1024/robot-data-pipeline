@@ -12,6 +12,7 @@ PARTITIONED BY (dt DATE)
 STORED AS PARQUET
 LOCATION 's3://de-ai-06-smartfactory-bucket/silver/'
 TBLPROPERTIES (
+    'classification'              = 'parquet',
     'parquet.compression'         = 'SNAPPY',
     'projection.enabled'          = 'true',
     'projection.dt.type'          = 'date',
