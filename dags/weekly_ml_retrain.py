@@ -297,12 +297,17 @@ def _deploy_endpoint(**ctx):
     model_data = meta["model_data_uri"]
     role_arn = os.environ["SAGEMAKER_ROLE_ARN"]
 
+    # default_bucket override — SDK 의 sagemaker-{region}-{account} 자동 버킷 회피.
+    # 권한은 datalake 버킷에만 있으므로 모든 SageMaker 부산물(source.tar.gz 등)을 여기로.
+    import sagemaker as _sm
+    session = _sm.Session(default_bucket=S3_BUCKET)
     model = XGBoostModel(
         model_data=model_data,
         role=role_arn,
         entry_point="train_entry.py",
         source_dir=_ML_SOURCE_DIR,
         framework_version="1.7-1",
+        sagemaker_session=session,
     )
     _cleanup_existing_endpoint(ENDPOINT_NAME)  # 멱등성: 기존 endpoint+config 제거 후 deploy
     model.deploy(
