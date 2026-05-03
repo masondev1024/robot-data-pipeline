@@ -109,7 +109,10 @@ data "aws_iam_policy_document" "firehose_delivery" {
       "kinesis:GetRecords",
       "kinesis:ListShards",
     ]
-    resources = [aws_kinesis_stream.main.arn]
+    resources = [
+      aws_kinesis_stream.main.arn,
+      aws_kinesis_stream.alert.arn,
+    ]
   }
 }
 
