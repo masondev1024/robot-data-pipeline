@@ -16,9 +16,9 @@ resource "aws_cloudwatch_metric_alarm" "firehose_delivery_errors" {
   namespace           = "AWS/Firehose"
   period              = "300"
   statistic           = "Average"
-  threshold           = "95"
+  threshold           = "0.95"
   treat_missing_data  = "notBreaching"
-  alarm_description   = "Firehose delivery to S3 success rate < 95% — Lambda 직접 invoke 로 Slack 알림."
+  alarm_description   = "Firehose DeliveryToS3.Success ratio < 0.95 (즉 < 95%) — Lambda 직접 invoke 로 Slack 알림. 메트릭은 0~1 ratio 라 threshold 도 ratio 단위."
   actions_enabled     = true
   alarm_actions       = [aws_lambda_function.alert.arn]
   ok_actions          = [aws_lambda_function.alert.arn]
