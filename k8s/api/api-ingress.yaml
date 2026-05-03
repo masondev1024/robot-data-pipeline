@@ -8,6 +8,8 @@ metadata:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    # /healthz 는 Basic Auth 면제 → ALB 가 401 받지 않고 200 으로 healthy 판정.
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
 spec:
   rules:
     - http:

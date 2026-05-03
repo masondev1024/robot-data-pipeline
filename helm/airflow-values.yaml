@@ -22,6 +22,9 @@ webserver:
     enabled: true
     role: Admin
     username: admin
+    # 초기 chart install 시 1회만 사용. 설치 후 Airflow UI 의 Security → List Users
+    # 에서 즉시 변경할 것. (chart 가 password rotation 미지원 → defaultUser 는
+    # bootstrap 용도만, 운영 비번은 UI/CLI 로 관리.)
     password: changeme123
     email: admin@admin.com
     firstName: admin
@@ -33,12 +36,19 @@ webserver:
       eks.amazonaws.com/role-arn: arn:aws:iam::827913617635:role/robot-telemetry-airflow-irsa
 
 # KubernetesExecutor가 만드는 worker pod에 IRSA 부여
+# workers.env: KubernetesExecutor task pod 에 추가 env 주입 (글로벌 env 와 병합).
+# 동일 env name 이 글로벌+worker 양쪽에 정의되면 K8s 가 마지막 값(worker) 사용 →
+# worker pod 의 _PIP_ADDITIONAL_REQUIREMENTS 는 boto3 + sagemaker 양쪽 모두 명시 필수.
 workers:
   serviceAccount:
     create: true
     name: airflow-worker
     annotations:
       eks.amazonaws.com/role-arn: arn:aws:iam::827913617635:role/robot-telemetry-airflow-irsa
+  env:
+    - name: _PIP_ADDITIONAL_REQUIREMENTS
+      # 글로벌 boto3 정의를 덮어써야 하므로 boto3 도 함께 명시 (둘 다 worker 에 설치).
+      value: "boto3==1.35.0 sagemaker>=2.200,<3"
 
 # Remote logging (S3) — KubernetesExecutor ephemeral pod 로그 수집 픽스.
 # Worker pod 가 task 실행 중 로그를 S3 에도 동시 업로드 → pod 삭제되어도 잔존 →
@@ -95,10 +105,13 @@ env:
   - name: PYTHONPATH
     value: "/opt/airflow/dags/repo"
   - name: _PIP_ADDITIONAL_REQUIREMENTS
-    # sagemaker SDK: weekly_ml_retrain DAG의 train_xgboost task가
-    # `from sagemaker.xgboost import XGBoost` 를 사용. scheduler는 DAG parsing,
-    # KubernetesExecutor worker pod는 task 실행 시점에 import 하므로 양쪽 다 필요.
-    value: "boto3==1.35.0 sagemaker>=2.200,<3"
+    # 글로벌은 boto3 만 (가벼움). sagemaker SDK(313MB)는 webserver startup probe
+    # timeout(CrashLoop) 사고 회귀 방지 위해 worker pod 만 격리 설치.
+    # 사고 회고: 2026-05-03 chart 1.21.0 점프 + sagemaker 글로벌 → webserver
+    # CrashLoop → helm rollback. 이후 worker-only 격리로 전환 (workers.env 참조).
+    # DAG 의 sagemaker import 는 task callable 함수 본문에서만 수행 → scheduler/
+    # webserver 가 DAG parse 시 ModuleNotFoundError 발생 안 함.
+    value: "boto3==1.35.0"
   - name: AWS_DEFAULT_REGION
     value: "eu-west-1"
   - name: S3_BUCKET_NAME
@@ -113,13 +126,27 @@ env:
     value: "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
   - name: DQ_SNS_TOPIC_ARN
     value: "arn:aws:sns:eu-west-1:827913617635:robot-anomaly-alerts"
+  - name: SAGEMAKER_ROLE_ARN
+    value: "arn:aws:iam::827913617635:role/robot-telemetry-sagemaker-role"
 
-# ALB Ingress — 비활성화 (port-forward 로 접근)
-# Why: 퍼블릭 ALB 노출 시 봇 스캔(/robots.txt) + 비용 발생 → 내부 접근만 허용
-# Access: kubectl port-forward -n airflow svc/airflow-webserver 8080:8080
+# ALB Ingress — DAG 사이클(트리거/로그/그래프)을 브라우저에서 보기 위해 노출.
+# Airflow 자체 로그인(admin/...) 이 1차 게이트. webserverSecretKey 는 K8s Secret 으로 분리.
+# 봇 스캔 대응: Airflow 는 /login 외 모든 경로 302 redirect → 로그인 안 된 봇은 진입 불가.
 ingress:
   web:
-    enabled: false
+    enabled: true
+    ingressClassName: alb
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+      alb.ingress.kubernetes.io/healthcheck-path: /health
+    path: /
+    pathType: Prefix
 
-# 세션 쿠키 서명 (dummy, 시연용 — 운영 시 Secret 분리)
-webserverSecretKey: "demo-only-secret-key-change-in-prod-32"
+# 세션 쿠키 서명 — 외부 K8s Secret 참조.
+# Step 0(사람): kubectl create secret generic airflow-webserver-secret-key \
+#   -n airflow --from-literal=webserver-secret-key="$(aws secretsmanager get-secret-value \
+#   --secret-id /robot-telemetry/airflow-webserver-secret --query SecretString --output text)"
+# Why CLAUDE.md §1.C: 민감값은 TF_VAR export 금지, Secrets Manager → K8s Secret 직접 read.
+webserverSecretKeySecretName: airflow-webserver-secret-key

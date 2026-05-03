@@ -66,6 +66,30 @@ jobs:
             exit 1
           fi
 
+      - name: Wait for Airflow ALB DNS (best-effort)
+        id: airflow-dns
+        continue-on-error: true
+        run: |
+          # Airflow 는 helm install 단계에서 생성됨. k8s-deploy 와 시점이 어긋날 수
+          # 있으므로 best-effort: 60초 대기 후 못 찾으면 SSM 갱신 skip.
+          DNS=""
+          ING=$(kubectl get ingress -n airflow -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+          if [ -z "$ING" ]; then
+            echo "Airflow ingress 미발견 (helm 미설치 or ingress.web.enabled=false). skip."
+            exit 0
+          fi
+          for i in $(seq 1 4); do
+            DNS=$(kubectl get ingress "$ING" -n airflow \
+              -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+            if [ -n "$DNS" ] && [ "$DNS" != "null" ]; then
+              echo "dns=$DNS" >> $GITHUB_OUTPUT
+              echo "Airflow ALB DNS 확정: $DNS"
+              break
+            fi
+            echo "[$i/4] Airflow ALB 대기 중... (15초)"
+            sleep 15
+          done
+
       - name: Store DNS values to SSM
         run: |
           aws ssm put-parameter \
@@ -81,3 +105,12 @@ jobs:
           echo "SSM 저장 완료:"
           echo "  /robot-telemetry/portal-url = http://${{ steps.api-dns.outputs.dns }}"
           echo "  /robot-telemetry/grafana-url = http://${{ steps.grafana-dns.outputs.dns }}"
+          AIRFLOW_DNS="${{ steps.airflow-dns.outputs.dns }}"
+          if [ -n "$AIRFLOW_DNS" ]; then
+            aws ssm put-parameter \
+              --name "/robot-telemetry/airflow-url" \
+              --value "http://$AIRFLOW_DNS" \
+              --type String \
+              --overwrite
+            echo "  /robot-telemetry/airflow-url = http://$AIRFLOW_DNS"
+          fi
