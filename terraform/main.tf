@@ -5,7 +5,6 @@ module "data_pipeline" {
   aws_region             = var.aws_region
   environment            = var.environment
   datalake_bucket_name   = var.s3_bucket_name
-  slack_webhook_url      = var.slack_webhook_url
   grafana_admin_password = var.grafana_admin_password
   kds_main_shard_count   = var.kds_main_shard_count
   kds_alert_shard_count  = var.kds_alert_shard_count

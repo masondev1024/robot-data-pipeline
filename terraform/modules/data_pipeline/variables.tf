@@ -26,12 +26,6 @@ variable "environment" {
   default = "dev"
 }
 
-variable "slack_webhook_url" {
-  description = "Slack Webhook URL for alert notifications (injected from .env)"
-  type        = string
-  sensitive   = true
-}
-
 variable "grafana_admin_password" {
   description = "Grafana admin password (Helm 수동 설치 후 사용. 현재 모듈 내 미참조)"
   type        = string

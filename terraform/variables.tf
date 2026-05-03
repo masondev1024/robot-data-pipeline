@@ -40,12 +40,10 @@ variable "github_branch" {
   default = "main"
 }
 
-variable "slack_webhook_url" {
-  description = "Slack Incoming Webhook URL. 값은 TF_VAR_slack_webhook_url 환경변수 또는 -var 로 주입 (.env 가 source of truth). default 'CHANGEME' 는 미주입 시 fallback — git 에 실 URL 커밋 방지용 의도적 안전장치."
-  type        = string
-  sensitive   = true
-  default     = "https://hooks.slack.com/services/CHANGEME"
-}
+# NOTE: slack_webhook_url 변수는 제거됨.
+# Lambda는 modules/data_pipeline/lambda.tf 의 aws_secretsmanager_secret_version
+# data source 로 /robot-telemetry/slack-webhook-url 에서 직접 읽는다 (single source of truth).
+# 사고 회귀 방지: TF_VAR 미export 시 default 'CHANGEME' apply silent failure 차단.
 
 variable "grafana_admin_password" {
   description = "Grafana admin password (managed by AWS Secrets Manager)"

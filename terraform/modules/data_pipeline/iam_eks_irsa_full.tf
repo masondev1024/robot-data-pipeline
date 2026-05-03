@@ -252,6 +252,12 @@ resource "aws_iam_role_policy" "lambda_alert_policy" {
         Resource = ["arn:aws:ssm:${var.aws_region}:*:parameter/robot-telemetry/portal-url"]
       },
       {
+        # Slack webhook URL Secrets Manager 조회 (lambda.tf data source용)
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = ["arn:aws:secretsmanager:${var.aws_region}:*:secret:/robot-telemetry/slack-webhook-url-*"]
+      },
+      {
         Effect   = "Allow"
         Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
         Resource = ["arn:aws:logs:*:*:*"]

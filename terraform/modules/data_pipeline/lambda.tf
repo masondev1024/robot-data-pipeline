@@ -4,6 +4,13 @@
 #   $ cd src/lambda && zip ../../terraform/modules/data_pipeline/lambda_alert.zip alert_handler.py
 # (archive_file data source가 빈 zip 생성하는 환경 이슈 우회)
 
+# Slack Webhook URL is sourced from AWS Secrets Manager (single source of truth).
+# 사고 회귀 방지: TF_VAR 미export → default 'CHANGEME' apply 사일런트 실패 방지
+# (CLAUDE.md §B: Slack Webhook URL 하드코딩 금지).
+data "aws_secretsmanager_secret_version" "slack_webhook" {
+  secret_id = "/robot-telemetry/slack-webhook-url"
+}
+
 # Lambda Function: Alert Handler
 resource "aws_lambda_function" "alert" {
   function_name    = "robot-anomaly-alert-lambda"
@@ -16,7 +23,7 @@ resource "aws_lambda_function" "alert" {
 
   environment {
     variables = {
-      SLACK_WEBHOOK_URL = var.slack_webhook_url
+      SLACK_WEBHOOK_URL = data.aws_secretsmanager_secret_version.slack_webhook.secret_string
     }
   }
 
