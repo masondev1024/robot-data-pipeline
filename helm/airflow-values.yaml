@@ -95,7 +95,10 @@ env:
   - name: PYTHONPATH
     value: "/opt/airflow/dags/repo"
   - name: _PIP_ADDITIONAL_REQUIREMENTS
-    value: "boto3==1.35.0"
+    # sagemaker SDK: weekly_ml_retrain DAG의 train_xgboost task가
+    # `from sagemaker.xgboost import XGBoost` 를 사용. scheduler는 DAG parsing,
+    # KubernetesExecutor worker pod는 task 실행 시점에 import 하므로 양쪽 다 필요.
+    value: "boto3==1.35.0 sagemaker>=2.200,<3"
   - name: AWS_DEFAULT_REGION
     value: "eu-west-1"
   - name: S3_BUCKET_NAME
