@@ -61,7 +61,10 @@ dag = DAG(
     description="주간 SageMaker XGBoost 재학습 + endpoint 재배포 (Thu 02:00 KST)",
     # 매주 수요일 17:00 UTC = 목요일 02:00 KST. daily ETL(15:00 UTC) 후 2시간 여유.
     schedule="0 17 * * 3",
-    start_date=datetime(2026, 1, 1),
+    # start_date 가 과거이면 catchup=False 여도 scheduler 가 missing slot 1개를
+    # 반복 trigger → 데이터 없던 시기(2026-04 이전) 의 weekly run 이 영구 fail
+    # 루프. 2026-05-04 이후로 옮겨 첫 정상 schedule = 5/6(수) 이 되도록 차단.
+    start_date=datetime(2026, 5, 4),
     catchup=False,
     tags=["robot-telemetry", "ml", "weekly"],
 )
