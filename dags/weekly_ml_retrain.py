@@ -87,6 +87,10 @@ wait_for_daily_etl = ExternalTaskSensor(
     timeout=60 * 60 * 2,  # 2시간 안에 안 끝나면 실패
     allowed_states=["success"],
     failed_states=["failed", "skipped"],
+    # target dag_run 자체가 없으면 (scheduler down 등으로 누락) 즉시 fail.
+    # 미설정 시 영원히 poke → 2h timeout 까지 worker slot 점유 + 진단 지연.
+    # 2026-05-04 회귀 — robot_daily_etl 4/22 run 누락으로 sensor 가 2h timeout.
+    check_existence=True,
     dag=dag,
 )
 
