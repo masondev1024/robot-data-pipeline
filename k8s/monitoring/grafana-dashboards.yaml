@@ -1385,7 +1385,7 @@ data:
                   }
                 ]
               },
-              "unit": "currencyKRW",
+              "unit": "none",
               "decimals": 0
             },
             "overrides": []
@@ -1431,7 +1431,7 @@ data:
               "table": "gold_robot_daily_stats"
             }
           ],
-          "title": "이번 주 AI 예방 절감액 (7일)",
+          "title": "이번 주 AI 예방 절감액 (₩, 7일)",
           "type": "stat"
         },
         {
@@ -1466,7 +1466,7 @@ data:
                   }
                 ]
               },
-              "unit": "currencyKRW",
+              "unit": "none",
               "decimals": 0
             },
             "overrides": []
@@ -1512,7 +1512,7 @@ data:
               "table": "gold_robot_daily_stats"
             }
           ],
-          "title": "이번 달 누적 절감액 (MTD)",
+          "title": "이번 달 누적 절감액 (₩, MTD)",
           "type": "stat"
         },
         {
@@ -1549,7 +1549,8 @@ data:
                   {
                     "id": "custom.cellOptions",
                     "value": {
-                      "type": "color-text"
+                      "type": "color-background",
+                      "mode": "basic"
                     }
                   },
                   {
@@ -1558,35 +1559,79 @@ data:
                       {
                         "type": "value",
                         "options": {
-                          "NONE": {
-                            "color": "green",
-                            "text": "NONE",
-                            "index": 0
-                          },
                           "TWF": {
                             "color": "yellow",
-                            "text": "TWF",
-                            "index": 1
-                          },
-                          "OSF": {
-                            "color": "orange",
-                            "text": "OSF",
-                            "index": 2
-                          },
-                          "PWF": {
-                            "color": "orange",
-                            "text": "PWF",
-                            "index": 3
+                            "text": "TWF · 공구마모",
+                            "index": 0
                           },
                           "HDF": {
                             "color": "red",
-                            "text": "HDF",
-                            "index": 4
+                            "text": "HDF · 방열부족",
+                            "index": 1
+                          },
+                          "PWF": {
+                            "color": "orange",
+                            "text": "PWF · 전력이상",
+                            "index": 2
+                          },
+                          "OSF": {
+                            "color": "dark-orange",
+                            "text": "OSF · 과부하",
+                            "index": 3
                           },
                           "RNF": {
                             "color": "purple",
-                            "text": "RNF",
-                            "index": 5
+                            "text": "RNF · 랜덤",
+                            "index": 4
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "긴급도"
+                },
+                "properties": [
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-background",
+                      "mode": "basic"
+                    }
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "🔴 긴급": {
+                            "color": "red",
+                            "text": "🔴 긴급",
+                            "index": 0
+                          },
+                          "🟠 높음": {
+                            "color": "orange",
+                            "text": "🟠 높음",
+                            "index": 1
+                          },
+                          "🟡 중간": {
+                            "color": "yellow",
+                            "text": "🟡 중간",
+                            "index": 2
+                          },
+                          "🟢 낮음": {
+                            "color": "green",
+                            "text": "🟢 낮음",
+                            "index": 3
                           }
                         }
                       }
@@ -1644,7 +1689,7 @@ data:
                 "properties": [
                   {
                     "id": "unit",
-                    "value": "currencyKRW"
+                    "value": "none"
                   },
                   {
                     "id": "decimals",
@@ -1685,38 +1730,12 @@ data:
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "우선순위"
+                  "options": "순위"
                 },
                 "properties": [
                   {
-                    "id": "custom.cellOptions",
-                    "value": {
-                      "type": "color-background"
-                    }
-                  },
-                  {
-                    "id": "thresholds",
-                    "value": {
-                      "mode": "absolute",
-                      "steps": [
-                        {
-                          "color": "green",
-                          "value": null
-                        },
-                        {
-                          "color": "yellow",
-                          "value": 50
-                        },
-                        {
-                          "color": "orange",
-                          "value": 100
-                        },
-                        {
-                          "color": "red",
-                          "value": 150
-                        }
-                      ]
-                    }
+                    "id": "custom.width",
+                    "value": 50
                   }
                 ]
               }
@@ -1755,7 +1774,7 @@ data:
                 "uid": "athena"
               },
               "format": 1,
-              "rawSQL": "WITH base AS (\n  SELECT\n    g.robot_id,\n    d.production_line,\n    d.station_type,\n    COALESCE(g.dominant_failure_type, 'NONE') AS failure_type,\n    g.max_motor_temp,\n    g.battery_drain,\n    g.max_temp_load_ratio,\n    -- RUL approx (days) — failure_type baseline + 고온 가중\n    CASE\n      WHEN g.dominant_failure_type IS NULL OR g.dominant_failure_type='NONE' THEN 7\n      WHEN g.dominant_failure_type='HDF' THEN CASE WHEN g.max_motor_temp>110 THEN 1 ELSE 2 END\n      WHEN g.dominant_failure_type='PWF' THEN 2\n      WHEN g.dominant_failure_type='OSF' THEN 3\n      WHEN g.dominant_failure_type='TWF' THEN 5\n      WHEN g.dominant_failure_type='RNF' THEN 7\n      ELSE 7\n    END AS rul_days,\n    -- 라인별 시간당 손실 (₩) — 학습용 임의값\n    CASE d.production_line\n      WHEN 'LINE-A' THEN 300000\n      WHEN 'LINE-B' THEN 250000\n      WHEN 'LINE-C' THEN 400000\n      WHEN 'LINE-D' THEN 150000\n      ELSE 200000\n    END AS hourly_loss\n  FROM robot_telemetry_db.gold_robot_daily_stats g\n  JOIN robot_telemetry_db.dim_robot_line d ON g.robot_id = d.robot_id\n  WHERE g.dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)\n)\nSELECT\n  ROW_NUMBER() OVER (ORDER BY priority_score DESC) AS \"순위\",\n  robot_id                         AS \"Robot\",\n  production_line || ' ' || station_type AS \"Line·공정\",\n  failure_type                     AS \"고장유형\",\n  rul_days                         AS \"잔여수명(d)\",\n  hourly_loss * 4                  AS \"잠재 손실(₩)\",\n  ROUND(priority_score, 1)         AS \"우선순위\"\nFROM (\n  SELECT *,\n    -- 우선순위 점수: AI 분류 100 + 고온/방전/load 가중\n    (CASE WHEN failure_type<>'NONE' THEN 100 ELSE 0 END)\n    + GREATEST(0, max_motor_temp - 80) * 2\n    + battery_drain * 1.5\n    + max_temp_load_ratio * 10 AS priority_score\n  FROM base\n)\nORDER BY priority_score DESC\nLIMIT 30",
+              "rawSQL": "WITH base AS (\n  SELECT\n    g.robot_id, d.production_line, d.station_type,\n    COALESCE(g.dominant_failure_type, 'NONE') AS failure_type,\n    g.max_motor_temp, g.battery_drain, g.max_temp_load_ratio,\n    CASE g.dominant_failure_type\n      WHEN 'HDF' THEN CASE WHEN g.max_motor_temp>110 THEN 1 ELSE 2 END\n      WHEN 'PWF' THEN 2 WHEN 'OSF' THEN 3 WHEN 'TWF' THEN 5 WHEN 'RNF' THEN 7 ELSE 7\n    END AS rul_days,\n    CASE d.production_line\n      WHEN 'LINE-A' THEN 300000 WHEN 'LINE-B' THEN 250000\n      WHEN 'LINE-C' THEN 400000 WHEN 'LINE-D' THEN 150000 ELSE 200000\n    END AS hourly_loss\n  FROM robot_telemetry_db.gold_robot_daily_stats g\n  JOIN robot_telemetry_db.dim_robot_line d ON g.robot_id = d.robot_id\n  WHERE g.dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)\n    AND COALESCE(g.dominant_failure_type, 'NONE') <> 'NONE'\n),\nscored AS (\n  SELECT *,\n    -- 정규화 점수 0~250 — 1337 같은 raw load_ratio 폭발 차단\n    LEAST(100, GREATEST(0, (max_motor_temp - 80) * 2))\n    + LEAST(100, GREATEST(0, battery_drain * 2))\n    + LEAST(50, max_temp_load_ratio * 5) AS priority_score\n  FROM base\n),\nper_type_top AS (\n  SELECT *,\n    ROW_NUMBER() OVER (PARTITION BY failure_type ORDER BY priority_score DESC) AS rn_in_type\n  FROM scored\n)\nSELECT\n  ROW_NUMBER() OVER (ORDER BY priority_score DESC) AS \"순위\",\n  robot_id                                           AS \"Robot\",\n  production_line || ' ' || station_type             AS \"Line·공정\",\n  failure_type                                       AS \"고장유형\",\n  rul_days                                           AS \"잔여수명(d)\",\n  hourly_loss * 4                                    AS \"잠재 손실(₩)\",\n  CASE\n    WHEN priority_score >= 200 THEN '🔴 긴급'\n    WHEN priority_score >= 130 THEN '🟠 높음'\n    WHEN priority_score >=  70 THEN '🟡 중간'\n    ELSE '🟢 낮음'\n  END                                                AS \"긴급도\"\nFROM per_type_top\nWHERE rn_in_type <= 6\nORDER BY priority_score DESC\nLIMIT 30",
               "refId": "A",
               "table": "gold_robot_daily_stats"
             }
@@ -1935,7 +1954,10 @@ data:
                 "stacking": {
                   "mode": "normal",
                   "group": "A"
-                }
+                },
+                "xTickLabelRotation": -45,
+                "xTickLabelSpacing": 100,
+                "xTickLabelMaxLength": 0
               },
               "mappings": []
             },
