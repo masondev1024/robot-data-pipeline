@@ -489,9 +489,8 @@ async def portal(request: Request, robot_id: str = ""):
 # ============================================================================
 # Work Orders — 정비 작업 큐 (PostgreSQL in-cluster)
 # ============================================================================
-import psycopg2  # noqa: E402
-from psycopg2 import pool as _pgpool  # noqa: E402
-from psycopg2.extras import RealDictCursor  # noqa: E402
+# psycopg2 는 lazy import — test env (pytest, psycopg2 미설치) 에서 module
+# collection 시 ImportError 회귀 방지. 운영 환경(api Dockerfile)엔 설치됨.
 from contextlib import contextmanager  # noqa: E402
 
 _PG_HOST = os.environ.get("POSTGRES_HOST", "postgres.robot-telemetry.svc.cluster.local")
@@ -500,13 +499,14 @@ _PG_USER = os.environ.get("POSTGRES_USER", "app_user")
 _PG_PASSWORD = os.environ.get("POSTGRES_PASSWORD", "")
 _PG_DATABASE = os.environ.get("POSTGRES_DB", "robot_telemetry")
 
-_pg_pool: _pgpool.SimpleConnectionPool | None = None
+_pg_pool = None  # SimpleConnectionPool, lazy init
 
 
-def _get_pg_pool() -> _pgpool.SimpleConnectionPool:
+def _get_pg_pool():
     """Lazy init — pod 부팅 직후 DB 미준비여도 첫 요청 시점까지 미루기."""
     global _pg_pool
     if _pg_pool is None:
+        from psycopg2 import pool as _pgpool
         _pg_pool = _pgpool.SimpleConnectionPool(
             1, 5,
             host=_PG_HOST, port=_PG_PORT,
@@ -518,6 +518,7 @@ def _get_pg_pool() -> _pgpool.SimpleConnectionPool:
 
 @contextmanager
 def _db_cursor():
+    from psycopg2.extras import RealDictCursor
     pool = _get_pg_pool()
     conn = pool.getconn()
     try:
