@@ -6,3 +6,4 @@ apscheduler
 pydantic
 slowapi
 pytz
+psycopg2-binary

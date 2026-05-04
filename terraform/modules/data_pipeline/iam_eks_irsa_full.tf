@@ -225,6 +225,10 @@ data "aws_iam_policy_document" "api_permissions" {
       "arn:aws:secretsmanager:${var.aws_region}:*:secret:/robot-telemetry/portal-basic-auth-*",
     ]
   }
+
+  # Work Order 정비 큐 DB — DE-AI-Project-Group policy에 dynamodb 권한 없어
+  # in-cluster Postgres (robot-telemetry/postgres) 로 전환. AWS IAM 권한 불필요
+  # (앱 → pod 내부 5432 ClusterIP 접근, K8s Secret 으로 인증).
 }
 
 resource "aws_iam_role_policy" "api_permissions" {

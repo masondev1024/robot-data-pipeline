@@ -487,6 +487,218 @@ async def portal(request: Request, robot_id: str = ""):
 
 
 # ============================================================================
+# Work Orders — 정비 작업 큐 (PostgreSQL in-cluster)
+# ============================================================================
+import psycopg2  # noqa: E402
+from psycopg2 import pool as _pgpool  # noqa: E402
+from psycopg2.extras import RealDictCursor  # noqa: E402
+from contextlib import contextmanager  # noqa: E402
+
+_PG_HOST = os.environ.get("POSTGRES_HOST", "postgres.robot-telemetry.svc.cluster.local")
+_PG_PORT = int(os.environ.get("POSTGRES_PORT", "5432"))
+_PG_USER = os.environ.get("POSTGRES_USER", "app_user")
+_PG_PASSWORD = os.environ.get("POSTGRES_PASSWORD", "")
+_PG_DATABASE = os.environ.get("POSTGRES_DB", "robot_telemetry")
+
+_pg_pool: _pgpool.SimpleConnectionPool | None = None
+
+
+def _get_pg_pool() -> _pgpool.SimpleConnectionPool:
+    """Lazy init — pod 부팅 직후 DB 미준비여도 첫 요청 시점까지 미루기."""
+    global _pg_pool
+    if _pg_pool is None:
+        _pg_pool = _pgpool.SimpleConnectionPool(
+            1, 5,
+            host=_PG_HOST, port=_PG_PORT,
+            user=_PG_USER, password=_PG_PASSWORD, dbname=_PG_DATABASE,
+            connect_timeout=5,
+        )
+    return _pg_pool
+
+
+@contextmanager
+def _db_cursor():
+    pool = _get_pg_pool()
+    conn = pool.getconn()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            yield cur
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        pool.putconn(conn)
+
+
+_VALID_STATUSES = {"pending", "in_progress", "done", "cancelled"}
+
+
+class WorkOrderCreate(BaseModel):
+    robot_id: str
+    production_line: str | None = None
+    station_type: str | None = None
+    failure_type: str | None = None
+    rul_days: int | None = None
+    hourly_loss_krw: int | None = None
+    priority_label: str | None = None
+    assignee: str | None = None
+    comments: str | None = None
+
+
+class WorkOrderUpdate(BaseModel):
+    status: str | None = None
+    assignee: str | None = None
+    comments: str | None = None
+
+
+def _serialize_wo(row: dict) -> dict:
+    """UUID/datetime → JSON-safe 변환."""
+    out = dict(row)
+    if "work_order_id" in out and out["work_order_id"] is not None:
+        out["work_order_id"] = str(out["work_order_id"])
+    for k in ("created_at", "updated_at"):
+        if k in out and out[k] is not None:
+            out[k] = out[k].isoformat()
+    return out
+
+
+@app.get("/api/work-orders")
+async def list_work_orders(status: str | None = None, limit: int = 100):
+    if status and status not in _VALID_STATUSES:
+        raise HTTPException(400, f"status must be one of {_VALID_STATUSES}")
+    if limit < 1 or limit > 500:
+        raise HTTPException(400, "limit must be 1-500")
+    with _db_cursor() as cur:
+        if status:
+            cur.execute(
+                "SELECT * FROM work_orders WHERE status=%s ORDER BY created_at DESC LIMIT %s",
+                (status, limit),
+            )
+        else:
+            cur.execute(
+                "SELECT * FROM work_orders ORDER BY created_at DESC LIMIT %s",
+                (limit,),
+            )
+        rows = cur.fetchall()
+    return {"items": [_serialize_wo(r) for r in rows], "count": len(rows)}
+
+
+@app.post("/api/work-orders", status_code=201)
+async def create_work_order(body: WorkOrderCreate):
+    if not _ROBOT_ID_RE.match(body.robot_id):
+        raise HTTPException(400, "robot_id 형식 오류 (예: ROBOT-00012)")
+    fields = body.dict()
+    with _db_cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO work_orders
+              (robot_id, production_line, station_type, failure_type,
+               rul_days, hourly_loss_krw, priority_label, assignee, comments)
+            VALUES
+              (%(robot_id)s, %(production_line)s, %(station_type)s, %(failure_type)s,
+               %(rul_days)s, %(hourly_loss_krw)s, %(priority_label)s, %(assignee)s, %(comments)s)
+            RETURNING *
+            """,
+            fields,
+        )
+        row = cur.fetchone()
+    return _serialize_wo(row)
+
+
+@app.patch("/api/work-orders/{work_order_id}")
+async def update_work_order(work_order_id: str, body: WorkOrderUpdate):
+    fields = {k: v for k, v in body.dict().items() if v is not None}
+    if not fields:
+        raise HTTPException(400, "업데이트할 필드 없음")
+    if "status" in fields and fields["status"] not in _VALID_STATUSES:
+        raise HTTPException(400, f"status must be one of {_VALID_STATUSES}")
+    set_clause = ", ".join(f"{k}=%({k})s" for k in fields.keys())
+    fields["work_order_id"] = work_order_id
+    with _db_cursor() as cur:
+        cur.execute(
+            f"UPDATE work_orders SET {set_clause} WHERE work_order_id=%(work_order_id)s::uuid RETURNING *",
+            fields,
+        )
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(404, "work_order_id not found")
+    return _serialize_wo(row)
+
+
+@app.get("/api/work-orders/recommendations")
+async def list_recommendations():
+    """A1 panel 113 과 동일 로직 — Top 30 작업 후보 (Athena, read-only).
+
+    portal /work-orders 페이지에서 "+ 작업 생성" 버튼으로 1건씩 명시 enqueue.
+    자동 생성 X — generator 가상 데이터 폭주 방지 (사용자 결정).
+    """
+    sql = """
+    WITH base AS (
+      SELECT g.robot_id, d.production_line, d.station_type,
+             COALESCE(g.dominant_failure_type, 'NONE') AS failure_type,
+             g.max_motor_temp, g.battery_drain, g.max_temp_load_ratio,
+             CASE g.dominant_failure_type
+               WHEN 'HDF' THEN CASE WHEN g.max_motor_temp>110 THEN 1 ELSE 2 END
+               WHEN 'PWF' THEN 2 WHEN 'OSF' THEN 3 WHEN 'TWF' THEN 5 WHEN 'RNF' THEN 7 ELSE 7
+             END AS rul_days,
+             CASE d.production_line
+               WHEN 'LINE-A' THEN 300000 WHEN 'LINE-B' THEN 250000
+               WHEN 'LINE-C' THEN 400000 WHEN 'LINE-D' THEN 150000 ELSE 200000
+             END AS hourly_loss
+      FROM gold_robot_daily_stats g
+      JOIN dim_robot_line d ON g.robot_id = d.robot_id
+      WHERE g.dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)
+        AND COALESCE(g.dominant_failure_type, 'NONE') <> 'NONE'
+    ),
+    scored AS (
+      SELECT *,
+        LEAST(100, GREATEST(0, (max_motor_temp - 80) * 2))
+        + LEAST(100, GREATEST(0, battery_drain * 2))
+        + LEAST(50, max_temp_load_ratio * 5) AS priority_score
+      FROM base
+    ),
+    per_type_top AS (
+      SELECT *,
+        ROW_NUMBER() OVER (PARTITION BY failure_type ORDER BY priority_score DESC) AS rn_in_type
+      FROM scored
+    )
+    SELECT robot_id, production_line, station_type, failure_type,
+           rul_days, hourly_loss * 4 AS potential_loss_krw,
+           CAST(priority_score AS INTEGER) AS priority_score,
+           CASE
+             WHEN priority_score >= 200 THEN '긴급'
+             WHEN priority_score >= 130 THEN '높음'
+             WHEN priority_score >=  70 THEN '중간'
+             ELSE '낮음'
+           END AS priority_label
+    FROM per_type_top
+    WHERE rn_in_type <= 6
+    ORDER BY priority_score DESC
+    LIMIT 30
+    """
+    try:
+        rows = await asyncio.to_thread(
+            run_query,
+            sql,
+            database=os.environ.get("ATHENA_DATABASE", "robot_telemetry_db"),
+            workgroup=os.environ.get("ATHENA_WORKGROUP", "robot-telemetry-workgroup"),
+            output_location=os.environ.get(
+                "ATHENA_OUTPUT_LOCATION",
+                "s3://de-ai-06-smartfactory-bucket/project-athena-results/",
+            ),
+        )
+    except Exception as exc:
+        raise HTTPException(502, f"Athena 추천 조회 실패: {exc}")
+    return {"items": rows, "count": len(rows)}
+
+
+@app.get("/work-orders", response_class=HTMLResponse)
+async def work_orders_page(request: Request):
+    return templates.TemplateResponse(request, "work_orders.html", {})
+
+
+# ============================================================================
 # ADR-013 — Bedrock Converse API + Tool Use
 # ============================================================================
 

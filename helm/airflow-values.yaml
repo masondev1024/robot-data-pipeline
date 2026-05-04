@@ -105,6 +105,13 @@ triggerer:
 # Airflow 환경변수
 # PYTHONPATH: GitSync가 repo root 전체를 /opt/airflow/dags/repo/ 로 가져오므로
 # DAG의 `from src.common.athena import ...` 가 동작하려면 repo root 추가 필수.
+# Step 0(사람): airflow-slack-webhook secret 사전 생성 필요
+#   aws secretsmanager get-secret-value \
+#     --secret-id /robot-telemetry/slack-webhook-url --region eu-west-1 \
+#     --query SecretString --output text \
+#   | kubectl create secret generic airflow-slack-webhook -n airflow \
+#     --from-file=url=/dev/stdin
+# Why CLAUDE.md §1.C: 민감값은 TF_VAR export 금지, Secrets Manager → K8s Secret 직접 read.
 env:
   - name: PYTHONPATH
     value: "/opt/airflow/dags/repo"
@@ -132,6 +139,15 @@ env:
     value: "arn:aws:sns:eu-west-1:827913617635:robot-anomaly-alerts"
   - name: SAGEMAKER_ROLE_ARN
     value: "arn:aws:iam::827913617635:role/robot-telemetry-sagemaker-role"
+
+# K8s Secret 참조 env (chart 의 `env:` 블록은 value-only 스키마라 valueFrom 불가).
+# `extraEnv` 는 templated string 으로 모든 airflow 컨테이너(webserver/scheduler/worker)에 주입.
+extraEnv: |
+  - name: SLACK_WEBHOOK_URL
+    valueFrom:
+      secretKeyRef:
+        name: airflow-slack-webhook
+        key: url
 
 # ALB Ingress — DAG 사이클(트리거/로그/그래프)을 브라우저에서 보기 위해 노출.
 # Airflow 자체 로그인(admin/...) 이 1차 게이트. webserverSecretKey 는 K8s Secret 으로 분리.

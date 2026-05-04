@@ -57,6 +57,14 @@ spec:
               value: "eu-west-1"
             # NOTE: GRAFANA_URL은 SSM /robot-telemetry/grafana-url 에서 런타임 조회 (Late-binding)
             # 환경변수 주입은 fallback 용도 — post-deploy job이 SSM 갱신 후 자동 사용
+            # Postgres (work_orders DB) 접속 — postgres svc DNS, secret 으로 인증.
+            - name: POSTGRES_HOST
+              value: "postgres.robot-telemetry.svc.cluster.local"
+            - name: POSTGRES_PORT
+              value: "5432"
+          envFrom:
+            - secretRef:
+                name: postgres-app-credentials  # POSTGRES_USER/PASSWORD/DB
           resources:
             requests:
               cpu: "200m"

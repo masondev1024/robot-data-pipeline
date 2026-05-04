@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>정비 작업 큐 — Robot Telemetry</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Pretendard", sans-serif;
+      background: #0f1419; color: #e8e8e8; font-size: 14px;
+    }
+    h1 { margin: 0 0 8px; font-size: 22px; }
+    h2 { margin: 24px 0 12px; font-size: 16px; color: #b8b8b8; }
+    .nav { margin-bottom: 16px; font-size: 13px; }
+    .nav a { color: #4ea1ff; text-decoration: none; margin-right: 16px; }
+    .nav a:hover { text-decoration: underline; }
+    .section { background: #1a1f26; border-radius: 8px; padding: 16px; margin-bottom: 24px; border: 1px solid #2a323d; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #2a323d; }
+    th { color: #93a1b1; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+    .tabs button {
+      padding: 6px 14px; background: #232a33; color: #b8b8b8; border: 1px solid #2a323d;
+      border-radius: 4px; cursor: pointer; font-size: 13px;
+    }
+    .tabs button.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .badge-TWF  { background: #443; color: #fc0; }
+    .badge-HDF  { background: #422; color: #f55; }
+    .badge-PWF  { background: #432; color: #f93; }
+    .badge-OSF  { background: #421; color: #f72; }
+    .badge-RNF  { background: #424; color: #c8f; }
+    .badge-pri-긴급 { background: #f44; color: #fff; }
+    .badge-pri-높음 { background: #fa3; color: #fff; }
+    .badge-pri-중간 { background: #fc3; color: #1a1a1a; }
+    .badge-pri-낮음 { background: #4c8; color: #fff; }
+    button.act {
+      padding: 4px 10px; margin-right: 4px; background: #2563eb; color: #fff;
+      border: none; border-radius: 3px; cursor: pointer; font-size: 12px;
+    }
+    button.act:hover { background: #1d4ed8; }
+    button.act.create { background: #16a34a; }
+    button.act.create:hover { background: #15803d; }
+    button.act.cancel { background: #6b7280; }
+    button.act.cancel:hover { background: #4b5563; }
+    .empty { color: #6b7785; padding: 24px; text-align: center; font-style: italic; }
+    .meta { color: #6b7785; font-size: 12px; margin-bottom: 8px; }
+    .toast {
+      position: fixed; bottom: 24px; right: 24px; padding: 10px 16px;
+      background: #16a34a; color: #fff; border-radius: 4px; font-size: 13px; opacity: 0; transition: opacity 0.2s;
+    }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="/">← 메인 포털</a>
+    <a href="#recommendations">추천 후보</a>
+    <a href="#queue">현재 작업 큐</a>
+  </div>
+  <h1>🔧 정비 작업 큐</h1>
+  <p class="meta">AI 추천을 검토 후 명시적으로 작업을 생성하고, 담당자 할당·진행 상태를 추적합니다.</p>
+
+  <section class="section" id="recommendations">
+    <h2>📋 AI 추천 작업 후보 (어제 기준 Top 30)</h2>
+    <div class="meta">우선순위 점수 + Line·공정·잠재 손실 통합 — 클릭 1회로 작업 큐에 enqueue.</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Robot</th><th>Line·공정</th><th>고장 유형</th>
+          <th class="num">잔여수명(d)</th><th class="num">잠재손실(만원)</th>
+          <th>긴급도</th><th>액션</th>
+        </tr>
+      </thead>
+      <tbody id="rec-tbody"><tr><td colspan="7" class="empty">로딩 중...</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="section" id="queue">
+    <h2>🛠 현재 작업 큐</h2>
+    <div class="tabs">
+      <button data-status="pending" class="active">대기 (<span id="cnt-pending">-</span>)</button>
+      <button data-status="in_progress">진행 중 (<span id="cnt-in_progress">-</span>)</button>
+      <button data-status="done">완료 (<span id="cnt-done">-</span>)</button>
+      <button data-status="cancelled">취소 (<span id="cnt-cancelled">-</span>)</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>WO</th><th>Robot</th><th>Line·공정</th><th>고장</th>
+          <th>긴급도</th><th>담당자</th><th>생성</th><th>액션</th>
+        </tr>
+      </thead>
+      <tbody id="queue-tbody"><tr><td colspan="8" class="empty">로딩 중...</td></tr></tbody>
+    </table>
+  </section>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const FAILURE_TYPE_LABEL = {
+      TWF: 'TWF·공구마모', HDF: 'HDF·방열부족', PWF: 'PWF·전력이상',
+      OSF: 'OSF·과부하', RNF: 'RNF·랜덤'
+    };
+
+    function toast(msg, color) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.background = color || '#16a34a';
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2200);
+    }
+
+    function badgeFT(ft) {
+      if (!ft) return '';
+      return `<span class="badge badge-${ft}">${FAILURE_TYPE_LABEL[ft] || ft}</span>`;
+    }
+
+    function badgePri(p) {
+      if (!p) return '';
+      return `<span class="badge badge-pri-${p}">${p}</span>`;
+    }
+
+    function fmtMan(krw) {
+      if (krw == null) return '-';
+      return Math.round(krw / 10000).toLocaleString();
+    }
+
+    function fmtDate(iso) {
+      if (!iso) return '-';
+      const d = new Date(iso);
+      const pad = n => String(n).padStart(2, '0');
+      return `${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    async function loadRecommendations() {
+      try {
+        const res = await fetch('/api/work-orders/recommendations');
+        if (!res.ok) throw new Error(res.status);
+        const data = await res.json();
+        const tbody = document.getElementById('rec-tbody');
+        if (!data.items.length) {
+          tbody.innerHTML = `<tr><td colspan="7" class="empty">추천 후보 없음</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = data.items.map(r => `
+          <tr>
+            <td>${r.robot_id}</td>
+            <td>${r.production_line || ''} ${r.station_type || ''}</td>
+            <td>${badgeFT(r.failure_type)}</td>
+            <td class="num">${r.rul_days}</td>
+            <td class="num">${fmtMan(r.potential_loss_krw)}</td>
+            <td>${badgePri(r.priority_label)}</td>
+            <td><button class="act create" data-rec='${JSON.stringify(r).replace(/'/g, "&apos;")}'>+ 작업 생성</button></td>
+          </tr>
+        `).join('');
+        tbody.querySelectorAll('button.create').forEach(btn => {
+          btn.onclick = () => createFromRec(JSON.parse(btn.dataset.rec.replace(/&apos;/g, "'")));
+        });
+      } catch (e) {
+        document.getElementById('rec-tbody').innerHTML =
+          `<tr><td colspan="7" class="empty">로드 실패: ${e}</td></tr>`;
+      }
+    }
+
+    async function createFromRec(rec) {
+      const body = {
+        robot_id: rec.robot_id,
+        production_line: rec.production_line,
+        station_type: rec.station_type,
+        failure_type: rec.failure_type,
+        rul_days: parseInt(rec.rul_days),
+        hourly_loss_krw: parseInt(rec.potential_loss_krw) / 4,
+        priority_label: rec.priority_label,
+      };
+      const res = await fetch('/api/work-orders', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+      });
+      if (res.ok) {
+        toast(`✓ ${rec.robot_id} 작업 생성 완료`);
+        loadQueue(currentStatus);
+        refreshCounts();
+      } else {
+        const err = await res.text();
+        toast(`✗ 실패: ${err}`, '#dc2626');
+      }
+    }
+
+    let currentStatus = 'pending';
+
+    async function loadQueue(status) {
+      currentStatus = status;
+      try {
+        const res = await fetch(`/api/work-orders?status=${status}`);
+        if (!res.ok) throw new Error(res.status);
+        const data = await res.json();
+        const tbody = document.getElementById('queue-tbody');
+        if (!data.items.length) {
+          tbody.innerHTML = `<tr><td colspan="8" class="empty">${status} 상태 작업 없음</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = data.items.map(wo => {
+          const actions = [];
+          if (wo.status === 'pending') {
+            actions.push(`<button class="act" onclick="moveStatus('${wo.work_order_id}','in_progress',true)">진행</button>`);
+            actions.push(`<button class="act cancel" onclick="moveStatus('${wo.work_order_id}','cancelled',false)">취소</button>`);
+          } else if (wo.status === 'in_progress') {
+            actions.push(`<button class="act" onclick="moveStatus('${wo.work_order_id}','done',false)">완료</button>`);
+            actions.push(`<button class="act cancel" onclick="moveStatus('${wo.work_order_id}','cancelled',false)">취소</button>`);
+          }
+          return `
+            <tr>
+              <td title="${wo.work_order_id}">${wo.work_order_id.slice(0,8)}</td>
+              <td>${wo.robot_id}</td>
+              <td>${wo.production_line || ''} ${wo.station_type || ''}</td>
+              <td>${badgeFT(wo.failure_type)}</td>
+              <td>${badgePri(wo.priority_label)}</td>
+              <td>${wo.assignee || '-'}</td>
+              <td>${fmtDate(wo.created_at)}</td>
+              <td>${actions.join('')}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (e) {
+        document.getElementById('queue-tbody').innerHTML =
+          `<tr><td colspan="8" class="empty">로드 실패: ${e}</td></tr>`;
+      }
+    }
+
+    async function moveStatus(id, status, askAssignee) {
+      const body = {status};
+      if (askAssignee) {
+        const a = prompt('담당자 이름?');
+        if (a === null) return;  // 취소
+        if (a) body.assignee = a;
+      }
+      const res = await fetch(`/api/work-orders/${id}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+      });
+      if (res.ok) {
+        toast(`✓ 상태 변경: ${status}`);
+        loadQueue(currentStatus);
+        refreshCounts();
+      } else {
+        toast(`✗ 실패: ${await res.text()}`, '#dc2626');
+      }
+    }
+
+    async function refreshCounts() {
+      for (const st of ['pending', 'in_progress', 'done', 'cancelled']) {
+        const r = await fetch(`/api/work-orders?status=${st}&limit=500`);
+        const d = await r.json();
+        document.getElementById(`cnt-${st}`).textContent = d.count;
+      }
+    }
+
+    document.querySelectorAll('.tabs button').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        loadQueue(btn.dataset.status);
+      };
+    });
+
+    loadRecommendations();
+    loadQueue('pending');
+    refreshCounts();
+  </script>
+</body>
+</html>
