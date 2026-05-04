@@ -39,6 +39,12 @@ spec:
               value: "eu-west-1"
             - name: SEED_CSV_PATH
               value: "/data/seed_data_sample.csv"
+            # Fault episode 진입 확률 상향: 0.0002 → 0.005 (25x).
+            # Why: 기본값은 100대 * 5s tick 환경에서 분당 0.24 episode 진입 → Flink WHERE
+            # 절(z>3 OR motor_temp>=85)을 거의 못 채워 OverAggregate→Sink 0 records.
+            # 0.005로 올리면 분당 6 episode → 알람 흐름 안정적 확인 가능.
+            - name: FAULT_ENTRY_PROB
+              value: "0.005"
           volumeMounts:
             - name: seed-data
               mountPath: /data
