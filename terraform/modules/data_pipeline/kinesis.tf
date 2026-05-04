@@ -31,8 +31,9 @@ resource "aws_kinesis_firehose_delivery_stream" "main" {
     prefix              = "bronze/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
     error_output_prefix = "bronze-dlq/!{firehose:error-output-type}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
 
-    buffering_size     = 64 # 최소값 (Parquet format conversion 필수)
-    buffering_interval = 60 # 테스트용: 1분마다 플러시 (시연 사각지대 최소화)
+    # 학습 환경 비용 최적화 — Bronze 신선도 5분/15분 trade-off (2026-05-04 drift sync)
+    buffering_size     = 128 # MB (Parquet conversion, 비용 최적화)
+    buffering_interval = 300 # 5분 — Firehose 호출 빈도 ↓, S3 PUT 비용 절감
     compression_format = "UNCOMPRESSED"
 
     # 시연용: timestamp 네임스페이스만 사용하므로 dynamic partitioning 비활성화.
@@ -90,9 +91,10 @@ resource "aws_kinesis_firehose_delivery_stream" "alert_archive" {
     prefix              = "silver_alerts/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
     error_output_prefix = "silver_alerts-dlq/!{firehose:error-output-type}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
 
-    # alert 빈도 낮음 → 짧은 buffer 로 시연 사각지대 최소화
-    buffering_size     = 64 # MB (Parquet conversion 최소값)
-    buffering_interval = 60 # seconds
+    # 학습 환경 비용 최적화 — Bronze 신선도 5분/15분 trade-off (2026-05-04 drift sync)
+    # alert 빈도 낮음 → 큰 buffer 로 S3 PUT 비용 ↓ (Parquet 압축 효율 ↑)
+    buffering_size     = 128 # MB (Parquet conversion, 비용 최적화)
+    buffering_interval = 300 # 5분 — main firehose 와 동일 (drift sync)
     compression_format = "UNCOMPRESSED"
 
     # bronze Firehose 와 동일: timestamp 네임스페이스만 사용
@@ -131,7 +133,8 @@ resource "aws_kinesis_firehose_delivery_stream" "alert_archive" {
   }
 
   tags = {
-    Name = "robot-anomaly-alert-archive-firehose"
+    Name  = "robot-anomaly-alert-archive-firehose"
+    Owner = "de-ai-06" # AWS 실측 정합 (2026-05-04 drift sync)
   }
 
   depends_on = [aws_iam_role_policy.firehose_delivery]
