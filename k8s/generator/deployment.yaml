@@ -28,9 +28,9 @@ spec:
             - name: PYTHONUNBUFFERED
               value: "1"
             - name: ROBOT_COUNT
-              value: "1000"
+              value: "100"
             - name: TICK_INTERVAL_SECONDS
-              value: "1.0"
+              value: "5.0"
             - name: KINESIS_STREAM_NAME
               value: "robot-telemetry-stream"
             - name: KINESIS_ALERT_STREAM_NAME
