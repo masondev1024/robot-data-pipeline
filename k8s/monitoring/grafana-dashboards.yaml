@@ -1361,6 +1361,168 @@ data:
           "fieldConfig": {
             "defaults": {
               "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 5000000
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 20000000
+                  },
+                  {
+                    "color": "green",
+                    "value": 50000000
+                  }
+                ]
+              },
+              "unit": "currencyKRW",
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 12,
+            "x": 0,
+            "y": 4
+          },
+          "id": 109,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value_and_name"
+          },
+          "pluginVersion": "11.3.0",
+          "targets": [
+            {
+              "connectionArgs": {
+                "catalog": "AwsDataCatalog",
+                "database": "robot_telemetry_db",
+                "region": "eu-west-1",
+                "resultReuseEnabled": false,
+                "resultReuseMaxAgeInMinutes": 60
+              },
+              "datasource": {
+                "type": "grafana-athena-datasource",
+                "uid": "athena"
+              },
+              "format": 1,
+              "rawSQL": "-- 절감액 = AI 예측 건수(7일) × 1건당 절감(4h × ₩300,000)\nSELECT COUNT(*) * 1200000 AS \"이번 주 AI 예방 절감액\"\nFROM robot_telemetry_db.gold_robot_daily_stats\nWHERE dt >= CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '7' DAY AS DATE)\n  AND dt <  CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE)\n  AND dominant_failure_type IS NOT NULL\n  AND dominant_failure_type <> 'NONE'",
+              "refId": "A",
+              "table": "gold_robot_daily_stats"
+            }
+          ],
+          "title": "이번 주 AI 예방 절감액 (7일)",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "grafana-athena-datasource",
+            "uid": "athena"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 20000000
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 80000000
+                  },
+                  {
+                    "color": "green",
+                    "value": 200000000
+                  }
+                ]
+              },
+              "unit": "currencyKRW",
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 12,
+            "x": 12,
+            "y": 4
+          },
+          "id": 110,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value_and_name"
+          },
+          "pluginVersion": "11.3.0",
+          "targets": [
+            {
+              "connectionArgs": {
+                "catalog": "AwsDataCatalog",
+                "database": "robot_telemetry_db",
+                "region": "eu-west-1",
+                "resultReuseEnabled": false,
+                "resultReuseMaxAgeInMinutes": 60
+              },
+              "datasource": {
+                "type": "grafana-athena-datasource",
+                "uid": "athena"
+              },
+              "format": 1,
+              "rawSQL": "-- 이번 달 누적 = current month-to-date 의 AI 예측 합 × ₩1,200,000\nSELECT COUNT(*) * 1200000 AS \"이번 달 누적 절감액\"\nFROM robot_telemetry_db.gold_robot_daily_stats\nWHERE dt >= date_trunc('month', CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE))\n  AND dt <  CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE)\n  AND dominant_failure_type IS NOT NULL\n  AND dominant_failure_type <> 'NONE'",
+              "refId": "A",
+              "table": "gold_robot_daily_stats"
+            }
+          ],
+          "title": "이번 달 누적 절감액 (MTD)",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "grafana-athena-datasource",
+            "uid": "athena"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
                 "mode": "palette-classic"
               },
               "custom": {
@@ -1439,7 +1601,7 @@ data:
             "h": 9,
             "w": 8,
             "x": 0,
-            "y": 4
+            "y": 8
           },
           "id": 104,
           "options": {
@@ -1534,7 +1696,7 @@ data:
             "h": 9,
             "w": 8,
             "x": 16,
-            "y": 4
+            "y": 8
           },
           "id": 105,
           "options": {
@@ -1670,7 +1832,7 @@ data:
             "h": 11,
             "w": 14,
             "x": 0,
-            "y": 13
+            "y": 17
           },
           "id": 106,
           "options": {
@@ -1769,7 +1931,7 @@ data:
             "h": 11,
             "w": 10,
             "x": 14,
-            "y": 13
+            "y": 17
           },
           "id": 107,
           "options": {
@@ -1874,7 +2036,7 @@ data:
             "h": 9,
             "w": 8,
             "x": 8,
-            "y": 4
+            "y": 8
           },
           "id": 108,
           "options": {
