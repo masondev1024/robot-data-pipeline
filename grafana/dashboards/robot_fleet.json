@@ -388,7 +388,7 @@
             "uid": "athena"
           },
           "format": 1,
-          "rawSQL": "-- 절감액 = AI 예측 건수(7일) × 1건당 절감 120만원, 한국어 단위 표기\nWITH calc AS (\n  SELECT COUNT(*) * 120 AS v\n  FROM robot_telemetry_db.gold_robot_daily_stats\n  WHERE dt >= CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '7' DAY AS DATE)\n    AND dt <  CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE)\n    AND dominant_failure_type IS NOT NULL\n    AND dominant_failure_type <> 'NONE'\n)\nSELECT\n  CASE\n    WHEN v >= 10000 AND v % 10000 = 0 THEN CAST(v / 10000 AS VARCHAR) || '억'\n    WHEN v >= 10000 THEN CAST(v / 10000 AS VARCHAR) || '억 ' || CAST(v % 10000 AS VARCHAR) || '만원'\n    WHEN v >  0      THEN CAST(v AS VARCHAR) || '만원'\n    ELSE '0'\n  END AS \"이번 주 AI 예방 절감액\"\nFROM calc",
+          "rawSQL": "-- 절감액(만원) = AI 예측 건수(7일) × 1건당 절감 120만원\n-- stat panel 은 numeric 만 표시하므로 정수 반환 (단위는 title 에 표시)\nSELECT COUNT(*) * 120 AS \"이번 주 AI 예방 절감액(만원)\"\nFROM robot_telemetry_db.gold_robot_daily_stats\nWHERE dt >= CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '7' DAY AS DATE)\n  AND dt <  CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE)\n  AND dominant_failure_type IS NOT NULL\n  AND dominant_failure_type <> 'NONE'",
           "refId": "A",
           "table": "gold_robot_daily_stats"
         }
@@ -456,7 +456,7 @@
             "uid": "athena"
           },
           "format": 1,
-          "rawSQL": "-- 이번 달 누적 = month-to-date 의 AI 예측 합 × 120만원\nWITH calc AS (\n  SELECT COUNT(*) * 120 AS v\n  FROM robot_telemetry_db.gold_robot_daily_stats\n  WHERE dt >= date_trunc('month', CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE))\n    AND dt <  CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE)\n    AND dominant_failure_type IS NOT NULL\n    AND dominant_failure_type <> 'NONE'\n)\nSELECT\n  CASE\n    WHEN v >= 10000 AND v % 10000 = 0 THEN CAST(v / 10000 AS VARCHAR) || '억'\n    WHEN v >= 10000 THEN CAST(v / 10000 AS VARCHAR) || '억 ' || CAST(v % 10000 AS VARCHAR) || '만원'\n    WHEN v >  0      THEN CAST(v AS VARCHAR) || '만원'\n    ELSE '0'\n  END AS \"이번 달 누적 절감액\"\nFROM calc",
+          "rawSQL": "-- 이번 달 누적(만원) = MTD AI 예측 합 × 120만원\n-- stat panel 은 numeric 만 표시하므로 정수 반환 (단위는 title 에 표시)\nSELECT COUNT(*) * 120 AS \"이번 달 누적 절감액(만원)\"\nFROM robot_telemetry_db.gold_robot_daily_stats\nWHERE dt >= date_trunc('month', CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE))\n  AND dt <  CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE)\n  AND dominant_failure_type IS NOT NULL\n  AND dominant_failure_type <> 'NONE'",
           "refId": "A",
           "table": "gold_robot_daily_stats"
         }
