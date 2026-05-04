@@ -63,3 +63,9 @@ variable "kds_alert_shard_count" {
   type        = number
   default     = 1
 }
+
+variable "eks_cluster_version" {
+  description = "EKS K8s version. 1.33 standard support 만료 ~2026-07. 만료 임박 시 1.34/1.35 등 새 standard 로 끌어올려서 Extended Support fee ($0.50/h, 월 $360) 회귀 차단."
+  type        = string
+  default     = "1.33"
+}

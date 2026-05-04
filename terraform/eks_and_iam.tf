@@ -54,7 +54,13 @@ resource "aws_iam_role_policy_attachment" "eks_ecr_policy" {
 resource "aws_eks_cluster" "main" {
   name     = var.eks_cluster_name
   role_arn = aws_iam_role.eks_cluster.arn
-  version  = "1.31" # Latest stable
+  version  = var.eks_cluster_version
+
+  # Standard support 만료 시 자동 EXTENDED 전환을 차단 — Extended Support fee
+  # ($0.50/h, 월 $360) 회귀 방지. 만료 시점에 plan 이 fail 하도록 명시.
+  upgrade_policy {
+    support_type = "STANDARD"
+  }
 
   vpc_config {
     subnet_ids = concat(aws_subnet.public[*].id, aws_subnet.app_private[*].id)
