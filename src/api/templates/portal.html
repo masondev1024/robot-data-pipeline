@@ -464,7 +464,8 @@
             color: var(--text-secondary);
             line-height: 1.5;
         }
-        .ft-legend .item { display: inline-flex; align-items: center; gap: 4px; }
+        .ft-legend .item { display: inline-flex; align-items: center; gap: 4px; cursor: help; }
+        .ft-legend .item:hover { color: var(--text); }
         .predict-btn {
             width: 100%;
             padding: 8px;
@@ -588,12 +589,12 @@
             </div>
             <div id="predict-result" class="predict-result"></div>
             <div class="ft-legend" aria-label="Failure Type 범례">
-                <span class="item"><span class="ft-badge ft-NONE">NONE</span>정상</span>
-                <span class="item"><span class="ft-badge ft-HDF">HDF</span>방열</span>
-                <span class="item"><span class="ft-badge ft-PWF">PWF</span>전력</span>
-                <span class="item"><span class="ft-badge ft-OSF">OSF</span>과부하</span>
-                <span class="item"><span class="ft-badge ft-TWF">TWF</span>공구마모</span>
-                <span class="item"><span class="ft-badge ft-RNF">RNF</span>랜덤</span>
+                <span class="item" title="정상 — 특별한 고장 신호 없음. RUL 충분, 정기 정비만 권장."><span class="ft-badge ft-NONE">NONE</span>정상</span>
+                <span class="item" title="HDF (Heat Dissipation Failure) — 방열판/팬 고장으로 누적 열에 의한 모터 손상. 평균 4시간 다운타임 회피 가능."><span class="ft-badge ft-HDF">HDF</span>방열</span>
+                <span class="item" title="PWF (Power Failure) — 모터/회로 전력 공급 이상. 가동 정지 위험 — 즉시 대응 필요."><span class="ft-badge ft-PWF">PWF</span>전력</span>
+                <span class="item" title="OSF (Overstrain Failure) — 과부하 누적으로 인한 기계 손상. 점진적 RUL 감소, 부하 재배분 권장."><span class="ft-badge ft-OSF">OSF</span>과부하</span>
+                <span class="item" title="TWF (Tool Wear Failure) — 공구 마모로 가공 정밀도 손실. 주기적 공구 교체로 손실 최소화."><span class="ft-badge ft-TWF">TWF</span>공구마모</span>
+                <span class="item" title="RNF (Random Failure) — 통계적 random 고장. 사전 예측 어려움, 발생 시 재가동 우선."><span class="ft-badge ft-RNF">RNF</span>랜덤</span>
             </div>
         </div>
 
@@ -1020,13 +1021,18 @@
             const empty = document.getElementById('empty-state');
             const chip = document.createElement('div');
             chip.className = 'example';
-            chip.style.cssText = 'margin: 0 16px 12px; padding: 10px 14px; background: var(--primary-light); border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--primary-dark); font-weight: 600; text-align: center;';
+            chip.style.cssText = 'margin: 0 16px 12px; padding: 10px 14px; background: var(--primary-light); border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--info); font-weight: 600; text-align: center;';
             chip.textContent = `▶ ${robotId} 현재 상태 분석 시작`;
             chip.addEventListener('click', () => {
                 chip.remove();
                 sendChat(`${robotId}의 현재 상태를 분석해줘`);
             });
             (empty || c).insertAdjacentElement(empty ? 'beforebegin' : 'afterbegin', chip);
+
+            // P1-#7: deep-link 진입 시 예측 패널 5개 필드 자동 채움
+            // — Athena 호출 1회 (사용자 [예측] 클릭 시 SageMaker 호출은 별도 트리거)
+            // 비용 안전: 자동 fill 만, 자동 예측 X
+            autofillFromGold();
         }
     </script>
 </body>
