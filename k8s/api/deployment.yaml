@@ -71,8 +71,10 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 10
           livenessProbe:
+            # /healthz 만 BasicAuthMiddleware 면제 (src/api/main.py:107 _BASIC_AUTH_EXEMPT_PATHS).
+            # path=/ 로 두면 401 받아 kubelet kill → CrashLoop → ALB 503 (회귀 9af8428).
             httpGet:
-              path: /
+              path: /healthz
               port: 8000
             initialDelaySeconds: 30
             periodSeconds: 30
