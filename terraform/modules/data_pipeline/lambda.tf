@@ -38,9 +38,12 @@ resource "aws_lambda_function" "alert" {
 # function_response_types: 실패한 개별 record만 재시도 (전체 batch 재처리 회피).
 # Lambda handler가 {"batchItemFailures": [{"itemIdentifier": <seq>}, ...]} 반환.
 resource "aws_lambda_event_source_mapping" "alert_kds" {
-  event_source_arn        = aws_kinesis_stream.alert.arn
-  function_name           = aws_lambda_function.alert.arn
-  starting_position       = "LATEST"
+  event_source_arn = aws_kinesis_stream.alert.arn
+  function_name    = aws_lambda_function.alert.arn
+  # TRIM_HORIZON: KDS down/up 사이클 후 mapping 재활성화 시 backlog 회수 보장.
+  # LATEST 였으면 2026-05-02 사고처럼 17건 alert backlog 가 skip 됐을 것.
+  # ForceNew 속성이라 라이브와 정합 (drift 회복 시 mapping 재생성 회피).
+  starting_position       = "TRIM_HORIZON"
   batch_size              = 10
   function_response_types = ["ReportBatchItemFailures"]
 
