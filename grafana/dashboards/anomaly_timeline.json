@@ -74,12 +74,12 @@
           },
           "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
           "format": 0,
-          "rawSQL": "SELECT DATE_TRUNC('hour', from_iso8601_timestamp(\"timestamp\")) AS event_hour, COUNT(*) AS anomaly_count FROM robot_telemetry_db.bronze_robot_telemetry WHERE ((year = date_format(current_date - interval '1' day, '%Y') AND month = date_format(current_date - interval '1' day, '%m') AND day = date_format(current_date - interval '1' day, '%d')) OR (year = date_format(current_date, '%Y') AND month = date_format(current_date, '%m') AND day = date_format(current_date, '%d'))) AND motor_temp >= 92.0 AND motor_temp / GREATEST(current_load, 1.0) > 2.5 AND from_iso8601_timestamp(\"timestamp\") > current_timestamp - INTERVAL '24' HOUR GROUP BY DATE_TRUNC('hour', from_iso8601_timestamp(\"timestamp\")) ORDER BY event_hour ASC",
+          "rawSQL": "-- ADR-009 Flink Z-Score(σ>3) + 다변량 룰 결과 (silver_alerts)\n-- 기존 SQL 은 Bronze 단순 임계값 (motor_temp>=92 AND temp/load>2.5) 으로\n-- §1.E 가드레일 위반이었음. silver_alerts 는 Flink 1분 tumbling 결과.\nSELECT DATE_TRUNC('hour', date_parse(window_end, '%Y-%m-%d %H:%i:%s')) AS event_hour,\n       COUNT(*) AS alert_count,\n       COUNT(DISTINCT robot_id) AS distinct_robots\nFROM robot_telemetry_db.silver_alerts\nWHERE ((year = date_format(current_date - INTERVAL '1' DAY, '%Y')\n        AND month = date_format(current_date - INTERVAL '1' DAY, '%m')\n        AND day = date_format(current_date - INTERVAL '1' DAY, '%d'))\n    OR (year = date_format(current_date, '%Y')\n        AND month = date_format(current_date, '%m')\n        AND day = date_format(current_date, '%d')))\n  AND date_parse(window_end, '%Y-%m-%d %H:%i:%s') > current_timestamp - INTERVAL '24' HOUR\nGROUP BY DATE_TRUNC('hour', date_parse(window_end, '%Y-%m-%d %H:%i:%s'))\nORDER BY event_hour ASC",
           "refId": "A",
-          "table": "bronze_robot_telemetry"
+          "table": "silver_alerts"
         }
       ],
-      "title": "Anomaly Detection Timeline (24h)",
+      "title": "Anomaly Detection Timeline (Flink 룰, 24h)",
       "type": "timeseries"
     }
   ],
