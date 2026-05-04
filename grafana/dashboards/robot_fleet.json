@@ -470,6 +470,95 @@
       },
       "fieldConfig": {
         "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false }},
+          "mappings": []
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "TWF" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#fc3" }}]},
+          { "matcher": { "id": "byName", "options": "HDF" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#f55" }}]},
+          { "matcher": { "id": "byName", "options": "PWF" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#f93" }}]},
+          { "matcher": { "id": "byName", "options": "OSF" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#f72" }}]},
+          { "matcher": { "id": "byName", "options": "RNF" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#c8f" }}]}
+        ]
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
+      "id": 115,
+      "options": {
+        "displayLabels": ["percent"],
+        "legend": { "displayMode": "list", "placement": "right", "showLegend": true, "values": ["value", "percent"] },
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
+          "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+          "format": 1,
+          "rawSQL": "-- 이번 주 dominant_failure_type 별 robot 건수 — gold daily 집계 7일\n-- 부품/유지보수 예산 배분 인사이트: 어떤 고장이 우세한가\nSELECT dominant_failure_type AS metric, COUNT(*) AS value\nFROM robot_telemetry_db.gold_robot_daily_stats\nWHERE dt >= CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '7' DAY AS DATE)\n  AND dt <  CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE)\n  AND dominant_failure_type IS NOT NULL AND dominant_failure_type <> 'NONE'\nGROUP BY dominant_failure_type\nORDER BY value DESC",
+          "refId": "A",
+          "table": "gold_robot_daily_stats"
+        }
+      ],
+      "title": "이번 주 고장 유형 분포 (7일)",
+      "type": "piechart"
+    },
+    {
+      "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "gradientMode": "opacity",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }]},
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 8 },
+      "id": 116,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false, "calcs": [] },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
+          "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+          "format": 1,
+          "rawSQL": "-- 24시간 시간대별 alert 건수 — silver_alerts hour 파티션 + 24h sliding\n-- 운영 시간대별 부하 패턴 인사이트: 언제 issue 가 몰리는가\nSELECT DATE_TRUNC('hour', date_parse(window_end, '%Y-%m-%d %H:%i:%s')) AS time, COUNT(*) AS alerts\nFROM robot_telemetry_db.silver_alerts\nWHERE (\n   (year = date_format(current_timestamp, '%Y') AND month = date_format(current_timestamp, '%m') AND day = date_format(current_timestamp, '%d'))\n OR (year = date_format(current_timestamp - INTERVAL '1' DAY, '%Y') AND month = date_format(current_timestamp - INTERVAL '1' DAY, '%m') AND day = date_format(current_timestamp - INTERVAL '1' DAY, '%d'))\n)\n  AND date_parse(window_end, '%Y-%m-%d %H:%i:%s') > current_timestamp - INTERVAL '24' HOUR\nGROUP BY DATE_TRUNC('hour', date_parse(window_end, '%Y-%m-%d %H:%i:%s'))\nORDER BY time ASC",
+          "refId": "A",
+          "table": "silver_alerts"
+        }
+      ],
+      "title": "시간대별 알람 추이 (24h)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-athena-datasource",
+        "uid": "athena"
+      },
+      "fieldConfig": {
+        "defaults": {
           "custom": {
             "align": "center",
             "cellOptions": { "type": "auto" }
@@ -740,19 +829,19 @@
               "options": "순위"
             },
             "properties": [
-              {
-                "id": "custom.width",
-                "value": 50
-              }
+              { "id": "custom.width", "value": 56 },
+              { "id": "custom.align", "value": "center" },
+              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "basic" }},
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#1a2733" }}
             ]
           }
         ]
       },
       "gridPos": {
-        "h": 11,
+        "h": 13,
         "w": 24,
         "x": 0,
-        "y": 8
+        "y": 12
       },
       "id": 113,
       "options": {
@@ -764,7 +853,7 @@
           ],
           "fields": ""
         },
-        "cellHeight": "sm"
+        "cellHeight": "lg"
       },
       "pluginVersion": "11.3.0",
       "targets": [
