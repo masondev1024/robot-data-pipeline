@@ -628,12 +628,15 @@
                 const resp = await fetch("/api/status");
                 const data = await resp.json();
                 if (data.cached_at && data.data_date) {
-                    const cachedTime = new Date(data.cached_at).toLocaleTimeString('ko-KR');
-                    // ML 분류 캐시는 D-1 ETL — 실시간 카드(stick bar)와 구분 위해 회색 처리
+                    const cachedAt = new Date(data.cached_at);
+                    const cachedTime = cachedAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+                    const todayDate  = cachedAt.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' });
+                    // 두 시간 축이 섞여 있어 사용자가 헷갈림 → 분석 기준일(D-1) 과
+                    // 포털/실시간 패널 갱신 시각을 명확히 분리해서 표기.
                     document.getElementById('status-info').innerHTML =
-                        `<span style="color:var(--text-tertiary)">🟡 ML 캐시</span> ` +
-                        `<span style="color:var(--text)">${data.data_date}</span> · ` +
-                        `<span style="color:var(--text-tertiary)">${cachedTime}</span>`;
+                        `<span style="color:var(--text-tertiary)">🟡 ML 분석 기준</span> ` +
+                        `<span style="color:var(--text)">${data.data_date} (D-1)</span> · ` +
+                        `<span style="color:var(--text-tertiary)">실시간 갱신 ${todayDate} ${cachedTime}</span>`;
                 }
             } catch (e) { console.error("Status load failed:", e); }
         }
