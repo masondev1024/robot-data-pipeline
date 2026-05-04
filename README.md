@@ -1,6 +1,6 @@
 # Robot Data Pipeline
 
-스마트 팩토리 로봇 10,000대의 실시간 텔레메트리를 수집·이상 탐지·AI 분석까지 처리하는 **엔터프라이즈급 데이터 플랫폼** — AWS 위에 Lambda Architecture(Speed + Batch) + Medallion(Bronze/Silver/Gold)로 구축.
+스마트 팩토리 로봇 1000대의 실시간 텔레메트리를 수집·이상 탐지·AI 분석까지 처리하는 **엔터프라이즈급 데이터 플랫폼** — AWS 위에 Lambda Architecture(Speed + Batch) + Medallion(Bronze/Silver/Gold)로 구축.
 
 > Kaggle AI4I 2020 Predictive Maintenance 데이터를 Seed로 한 가상 로봇 시뮬레이션부터, Slack 실시간 알림 · Grafana 운영 대시보드 · Bedrock(Claude Sonnet 4.5) 대화형 AI 분석까지 End-to-End. 발표 데드라인: 2026-05-01.
 
