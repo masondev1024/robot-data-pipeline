@@ -10,26 +10,39 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
-            --primary: #1976d2;
-            --primary-dark: #1565c0;
-            --primary-light: #e3f2fd;
-            --bg: #eef2f7;
-            --surface: #ffffff;
-            --border: #dde3ec;
-            --text: #1a1a1a;
-            --text-secondary: #5a6271;
-            --user-bg: linear-gradient(135deg, #1976d2, #1e88e5);
-            --assistant-bg: #f3f6fa;
-            --robot-card-bg: linear-gradient(135deg, #fff8e1, #ffecb3);
-            --robot-card-border: #ffb300;
-            --shadow-sm: 0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06);
-            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.04);
+            /* 다크 모드 통일 (work_orders.html 팔레트와 정합) */
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --primary-light: #1e3a5f;     /* 어두운 옅은 파랑 (hover 배경) */
+            --bg: #0f1419;
+            --surface: #1a1f26;
+            --surface-2: #232a33;          /* 한 단계 밝은 표면 (assistant bubble 등) */
+            --border: #2a323d;
+            --text: #e8e8e8;
+            --text-secondary: #93a1b1;
+            --text-tertiary: #6b7785;
+            --user-bg: linear-gradient(135deg, #2563eb, #3b82f6);
+            --assistant-bg: #232a33;
+            --robot-card-bg: linear-gradient(135deg, #2a2410, #3d3315);
+            --robot-card-border: #fa3;
+            --info: #4ea1ff;
+            --success: #16a34a;
+            --success-bg: #0a3d23;
+            --warning: #fa3;
+            --warning-bg: #3d2c0a;
+            --danger: #f44;
+            --danger-bg: #3d1818;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.25);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4), 0 2px 4px -1px rgba(0,0,0,0.25);
         }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Pretendard", "Noto Sans KR", Roboto, sans-serif;
             background: var(--bg);
             color: var(--text);
             -webkit-font-smoothing: antialiased;
+            display: grid;
+            grid-template-rows: auto auto 1fr;
+            min-height: 100vh;
         }
         header {
             background: var(--surface);
@@ -80,8 +93,77 @@
             grid-template-columns: 2fr 1fr;
             gap: 16px;
             padding: 16px;
-            height: calc(100vh - 64px);
+            min-height: 0;
         }
+        @media (max-width: 900px) {
+            .container { grid-template-columns: 1fr; }
+        }
+        /* 헤더 work-orders 진입로 (P0-#1) */
+        .work-orders-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 12px;
+            margin-right: 10px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.15s;
+        }
+        .work-orders-link:hover { background: var(--primary-light); border-color: var(--primary); color: var(--info); }
+        .work-orders-link .badge {
+            display: inline-block;
+            min-width: 22px;
+            padding: 1px 7px;
+            background: var(--warning);
+            color: #1a1a1a;
+            border-radius: 11px;
+            font-size: 11px;
+            font-weight: 700;
+            text-align: center;
+        }
+        .work-orders-link .badge.zero { background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); }
+        /* Stick bar — "지금 무엇을 해야 하는가" (P0-#4) */
+        .stick-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 20px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+            flex-wrap: wrap;
+        }
+        .stick-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 6px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+        }
+        .stick-item.urgent {
+            background: var(--danger-bg);
+            border-color: rgba(244, 67, 67, 0.4);
+            animation: pulseUrgent 1.6s infinite;
+        }
+        .stick-item.stale {
+            opacity: 0.6;
+        }
+        @keyframes pulseUrgent {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(244, 67, 67, 0.4); }
+            50%      { box-shadow: 0 0 0 4px rgba(244, 67, 67, 0); }
+        }
+        .stick-icon { font-size: 14px; }
+        .stick-label { color: var(--text-secondary); font-size: 12px; }
+        .stick-value { font-weight: 700; color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; }
+        .stick-hint { color: var(--text-tertiary); font-size: 11px; }
+        .stick-bar .as-of { margin-left: auto; color: var(--text-tertiary); font-size: 11px; }
         .grafana-section {
             background: var(--surface);
             border-radius: 10px;
@@ -98,7 +180,7 @@
             align-items: center;
             justify-content: center;
             gap: 10px;
-            background: linear-gradient(180deg, #f7f9fc 0%, #eef2f7 100%);
+            background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
             color: var(--text-secondary);
             font-size: 13px;
             transition: opacity 0.25s;
@@ -106,11 +188,11 @@
             z-index: 1;
         }
         .iframe-placeholder.hidden { opacity: 0; }
-        .iframe-placeholder.error { background: #fff8f6; color: #c62828; pointer-events: auto; }
+        .iframe-placeholder.error { background: var(--danger-bg); color: var(--danger); pointer-events: auto; }
         .iframe-placeholder .spinner {
             width: 28px;
             height: 28px;
-            border: 3px solid #d6dde7;
+            border: 3px solid var(--border);
             border-top-color: var(--primary);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
@@ -130,7 +212,7 @@
             border-bottom: 1px solid var(--border);
             font-size: 14px;
             font-weight: 600;
-            background: linear-gradient(180deg, var(--surface) 0%, #fafbfc 100%);
+            background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
             display: flex;
             align-items: center;
             gap: 8px;
@@ -146,7 +228,7 @@
             scroll-behavior: smooth;
         }
         .chat-messages::-webkit-scrollbar { width: 6px; }
-        .chat-messages::-webkit-scrollbar-thumb { background: #c9d1de; border-radius: 3px; }
+        .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
         .message {
             padding: 12px 14px;
             border-radius: 14px;
@@ -174,13 +256,14 @@
         .message.assistant .md-content p { margin: 0 0 6px; }
         .message.assistant .md-content p:last-child { margin-bottom: 0; }
         .message.assistant .md-content code {
-            background: #e7ebf2;
+            background: var(--surface);
             padding: 1px 5px;
             border-radius: 3px;
             font-size: 12.5px;
             font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
+            color: var(--info);
         }
-        .message.assistant .md-content strong { color: var(--primary-dark); font-weight: 600; }
+        .message.assistant .md-content strong { color: var(--info); font-weight: 600; }
         .message.assistant .md-content ul,
         .message.assistant .md-content ol { padding-left: 22px; margin: 4px 0; }
         .message.assistant .md-content li { margin: 2px 0; }
@@ -190,7 +273,7 @@
             gap: 6px;
             margin-top: 10px;
             padding-top: 10px;
-            border-top: 1px dashed #d0d7e2;
+            border-top: 1px dashed var(--border);
         }
         .link-button {
             padding: 10px 12px;
@@ -206,13 +289,13 @@
             align-items: center;
             gap: 8px;
             font-weight: 500;
-            color: #6d4c00;
+            color: var(--warning);
         }
         .link-button::before { content: "📊"; font-size: 16px; }
         .link-button:hover {
-            background: linear-gradient(135deg, #ffe082, #ffca28);
+            background: linear-gradient(135deg, #3d3315, #5a4621);
             transform: translateX(2px);
-            box-shadow: 0 2px 4px rgba(255,179,0,0.25);
+            box-shadow: 0 2px 4px rgba(255,179,51,0.35);
         }
         .link-button:active { transform: translateX(1px) scale(0.99); }
         .chat-input-area {
@@ -220,7 +303,7 @@
             border-top: 1px solid var(--border);
             display: flex;
             gap: 8px;
-            background: #fafbfc;
+            background: var(--surface-2);
         }
         .chat-input-area input {
             flex: 1;
@@ -250,7 +333,7 @@
         }
         .chat-input-area button:hover { background: var(--primary-dark); }
         .chat-input-area button:active { transform: scale(0.97); }
-        .chat-input-area button:disabled { background: #b0bcca; cursor: not-allowed; }
+        .chat-input-area button:disabled { background: var(--border); color: var(--text-tertiary); cursor: not-allowed; }
         .typing {
             display: none;
             align-self: flex-start;
@@ -265,7 +348,7 @@
         .typing .dot {
             width: 7px;
             height: 7px;
-            background: #98a3b3;
+            background: var(--text-secondary);
             border-radius: 50%;
             animation: typingBounce 1.2s infinite;
         }
@@ -295,10 +378,10 @@
             border-radius: 8px;
             cursor: pointer;
             font-size: 12.5px;
-            color: var(--primary-dark);
+            color: var(--info);
             transition: all 0.15s;
         }
-        .empty-state .example:hover { background: #c5dafc; }
+        .empty-state .example:hover { background: #2a4870; }
 
         /* Task 8.4: 예측 점검 패널 */
         .predict-section {
@@ -334,7 +417,7 @@
             min-width: 0;
         }
         .predict-form label .lbl-text { display: flex; justify-content: space-between; gap: 6px; }
-        .predict-form label .hint { font-size: 10.5px; color: #98a3b3; font-weight: 400; }
+        .predict-form label .hint { font-size: 10.5px; color: var(--text-tertiary); font-weight: 400; }
         .predict-form input {
             padding: 7px 9px;
             border: 1px solid var(--border);
@@ -342,16 +425,17 @@
             font-size: 12px;
             min-width: 0;
             color: var(--text);
+            background: var(--surface-2);
         }
-        .predict-form input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(25,118,210,0.10); }
-        .predict-form input[readonly] { background: #f3f6fa; color: var(--text-secondary); }
+        .predict-form input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.18); }
+        .predict-form input[readonly] { background: var(--bg); color: var(--text-secondary); }
         .predict-form .full { grid-column: 1 / -1; }
         .predict-actions { display: flex; gap: 6px; }
         .autofill-btn {
             flex: 0 0 auto;
             padding: 8px 12px;
-            background: #fff;
-            color: var(--primary);
+            background: var(--surface-2);
+            color: var(--info);
             border: 1px solid var(--primary);
             border-radius: 6px;
             cursor: pointer;
@@ -361,12 +445,12 @@
             transition: all 0.15s;
         }
         .autofill-btn:hover { background: var(--primary-light); }
-        .autofill-btn:disabled { color: #98a3b3; border-color: #c9d1de; cursor: not-allowed; }
+        .autofill-btn:disabled { color: var(--text-tertiary); border-color: var(--border); cursor: not-allowed; }
         .autofill-btn::before { content: "🤖 "; }
         .ft-legend {
             margin-top: 10px;
             padding-top: 10px;
-            border-top: 1px dashed #d0d7e2;
+            border-top: 1px dashed var(--border);
             display: flex;
             flex-wrap: wrap;
             gap: 4px 6px;
@@ -388,7 +472,7 @@
             min-height: 36px;
         }
         .predict-btn:hover { background: var(--primary-dark); }
-        .predict-btn:disabled { background: #b0bcca; cursor: not-allowed; }
+        .predict-btn:disabled { background: var(--border); color: var(--text-tertiary); cursor: not-allowed; }
         .predict-result {
             margin-top: 10px;
             padding: 10px 12px;
@@ -422,12 +506,37 @@
     <header>
         <a class="header-title" href="/" title="홈으로 새로고침">Robot Telemetry Portal</a>
         <div class="header-info" id="status-info">Loading...</div>
+        <a class="work-orders-link" href="/work-orders" title="정비 작업 큐 (대기 건수)">
+            🔧 정비 큐 <span class="badge zero" id="header-pending-badge">-</span>
+        </a>
         <div class="dashboard-tabs">
             <button class="dashboard-tab active" data-uid="robot-fleet-001">Fleet</button>
             <button class="dashboard-tab" data-uid="anomaly-timeline-001">Anomaly</button>
             <button class="dashboard-tab" data-uid="pipeline-health-001">Pipeline</button>
         </div>
     </header>
+
+    <div class="stick-bar" id="stick-bar" aria-label="Fleet 실시간 요약">
+        <div class="stick-item" id="sb-alerts-item">
+            <span class="stick-icon">🚨</span>
+            <span class="stick-label">긴급 로봇</span>
+            <span class="stick-value" id="sb-alerts">-</span>
+            <span class="stick-hint">실시간 6분</span>
+        </div>
+        <div class="stick-item" id="sb-pending-item">
+            <span class="stick-icon">📋</span>
+            <span class="stick-label">대기 작업</span>
+            <span class="stick-value" id="sb-pending">-</span>
+            <span class="stick-hint">정비 큐 →</span>
+        </div>
+        <div class="stick-item" id="sb-last-alert-item">
+            <span class="stick-icon">⏰</span>
+            <span class="stick-label">마지막 alert</span>
+            <span class="stick-value" id="sb-last-alert">-</span>
+            <span class="stick-hint">Flink Z-Score 룰</span>
+        </div>
+        <span class="as-of" id="sb-as-of"></span>
+    </div>
 
     <div class="container">
         <div class="grafana-section">
@@ -520,10 +629,68 @@
                 const data = await resp.json();
                 if (data.cached_at && data.data_date) {
                     const cachedTime = new Date(data.cached_at).toLocaleTimeString('ko-KR');
-                    document.getElementById('status-info').textContent =
-                        `${data.data_date} 데이터 · ${cachedTime} 갱신`;
+                    // ML 분류 캐시는 D-1 ETL — 실시간 카드(stick bar)와 구분 위해 회색 처리
+                    document.getElementById('status-info').innerHTML =
+                        `<span style="color:var(--text-tertiary)">🟡 ML 캐시</span> ` +
+                        `<span style="color:var(--text)">${data.data_date}</span> · ` +
+                        `<span style="color:var(--text-tertiary)">${cachedTime}</span>`;
                 }
             } catch (e) { console.error("Status load failed:", e); }
+        }
+
+        // P0-#4: stick bar — 60초 주기 fleet-summary 폴링
+        async function loadFleetSummary() {
+            try {
+                const r = await fetch('/api/fleet-summary');
+                if (!r.ok) return;
+                const d = await r.json();
+
+                // 긴급 로봇 (실시간 6분)
+                const sbAlerts = document.getElementById('sb-alerts');
+                const alertsItem = document.getElementById('sb-alerts-item');
+                const n = d.alert_robots_6min;
+                sbAlerts.textContent = (n === null || n === undefined) ? '?' : n;
+                alertsItem.classList.toggle('urgent', n != null && n > 0);
+
+                // 대기 작업
+                const sbPending = document.getElementById('sb-pending');
+                const pending = d.pending_work_orders;
+                sbPending.textContent = (pending === null || pending === undefined) ? '?' : pending;
+                // 헤더 badge 도 동기화
+                const hb = document.getElementById('header-pending-badge');
+                if (pending === null || pending === undefined) {
+                    hb.textContent = '?';
+                    hb.classList.add('zero');
+                } else {
+                    hb.textContent = pending;
+                    hb.classList.toggle('zero', pending === 0);
+                }
+
+                // 마지막 alert (UTC 문자열을 KST 로컬 'X분 전' 표시)
+                const sbLast = document.getElementById('sb-last-alert');
+                const lastItem = document.getElementById('sb-last-alert-item');
+                if (d.last_alert_ts) {
+                    // Athena 는 UTC + 'YYYY-MM-DD HH:mm:ss[.fff]' 포맷 — Date 인식 위해 ISO 변환
+                    const iso = d.last_alert_ts.replace(' ', 'T').split('.')[0] + 'Z';
+                    const ts = new Date(iso);
+                    const minAgo = Math.floor((Date.now() - ts.getTime()) / 60000);
+                    if (minAgo < 0) sbLast.textContent = '방금';
+                    else if (minAgo < 60) sbLast.textContent = `${minAgo}분 전`;
+                    else if (minAgo < 1440) sbLast.textContent = `${Math.floor(minAgo / 60)}시간 전`;
+                    else sbLast.textContent = `${Math.floor(minAgo / 1440)}일 전`;
+                    // Flink 적재 stale 감지 — 30분 초과 시 카드 흐리게
+                    lastItem.classList.toggle('stale', minAgo > 30);
+                } else {
+                    sbLast.textContent = '없음';
+                    lastItem.classList.add('stale');
+                }
+
+                // as-of 시각
+                if (d.as_of) {
+                    const t = new Date(d.as_of).toLocaleTimeString('ko-KR');
+                    document.getElementById('sb-as-of').textContent = `갱신: ${t}`;
+                }
+            } catch (e) { console.error('fleet-summary failed:', e); }
         }
 
         document.querySelectorAll('.dashboard-tab').forEach(tab => {
@@ -834,6 +1001,8 @@
         });
 
         loadStatus();
+        loadFleetSummary();
+        setInterval(loadFleetSummary, 60_000);  // 60초 = 백엔드 캐시 TTL 정합
         updateGrafanaFrame();
 
         // URL 의 robot_id 는 자동 챗 발송 대신 사용자 액션 칩으로 노출 (비용·의도 보존)

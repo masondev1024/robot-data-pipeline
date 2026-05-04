@@ -700,6 +700,99 @@ async def work_orders_page(request: Request):
 
 
 # ============================================================================
+# Fleet summary — 포털 헤더 stick bar 통합 데이터 (실시간 alert + 대기 작업)
+# ============================================================================
+_fleet_summary_cache = {"data": None, "ts": 0.0}
+_FLEET_SUMMARY_TTL_SEC = 60  # Athena 비용 + Postgres 부하 조절. 60초면 인지 가능 신선도.
+
+
+@app.get("/api/fleet-summary")
+async def fleet_summary():
+    """포털 stick bar 통합 요약 — 60초 메모리 캐시.
+
+    - alert_robots_6min: silver_alerts 6분 sliding distinct robot_id (Flink Z-Score 룰)
+    - last_alert_ts:    silver_alerts 24h MAX(window_end) — Flink 적재 stale 감지용
+    - pending_work_orders: 정비 큐 대기 건수
+    """
+    import time
+    now = time.time()
+    cached = _fleet_summary_cache.get("data")
+    if cached and (now - _fleet_summary_cache["ts"] < _FLEET_SUMMARY_TTL_SEC):
+        return cached
+
+    database = os.environ.get("ATHENA_DATABASE", "robot_telemetry_db")
+    workgroup = os.environ.get("ATHENA_WORKGROUP", "robot-telemetry-workgroup")
+    output_location = os.environ.get(
+        "ATHENA_OUTPUT_LOCATION",
+        "s3://de-ai-06-smartfactory-bucket/project-athena-results/",
+    )
+
+    # 6분 윈도우 = Firehose buffer(5분) + 안전 마진 1분 (CLAUDE.md §1.A)
+    alert_query = """
+SELECT COUNT(DISTINCT robot_id) AS alert_robots
+FROM silver_alerts
+WHERE (
+    (year = date_format(current_timestamp, '%Y') AND month = date_format(current_timestamp, '%m')
+     AND day = date_format(current_timestamp, '%d') AND hour = date_format(current_timestamp, '%H'))
+ OR (year = date_format(current_timestamp - INTERVAL '1' HOUR, '%Y') AND month = date_format(current_timestamp - INTERVAL '1' HOUR, '%m')
+     AND day = date_format(current_timestamp - INTERVAL '1' HOUR, '%d') AND hour = date_format(current_timestamp - INTERVAL '1' HOUR, '%H'))
+)
+AND date_parse(window_end, '%Y-%m-%d %H:%i:%s') > current_timestamp - INTERVAL '6' MINUTE
+"""
+    last_alert_query = """
+SELECT MAX(date_parse(window_end, '%Y-%m-%d %H:%i:%s')) AS last_alert_ts
+FROM silver_alerts
+WHERE (
+    (year = date_format(current_timestamp, '%Y') AND month = date_format(current_timestamp, '%m')
+     AND day = date_format(current_timestamp, '%d'))
+ OR (year = date_format(current_timestamp - INTERVAL '1' DAY, '%Y') AND month = date_format(current_timestamp - INTERVAL '1' DAY, '%m')
+     AND day = date_format(current_timestamp - INTERVAL '1' DAY, '%d'))
+)
+"""
+    loop = asyncio.get_event_loop()
+
+    async def _athena(q):
+        return await loop.run_in_executor(
+            None,
+            lambda: run_query(q, database=database, workgroup=workgroup, output_location=output_location),
+        )
+
+    alert_robots_6min: int | None = None
+    last_alert_ts: str | None = None
+    try:
+        rows = await _athena(alert_query)
+        if rows:
+            alert_robots_6min = int(float(rows[0].get("alert_robots", 0) or 0))
+    except Exception:
+        pass  # Athena 일시 실패 시 None 반환 — 클라이언트가 회색 표시
+    try:
+        rows = await _athena(last_alert_query)
+        if rows and rows[0].get("last_alert_ts"):
+            last_alert_ts = str(rows[0]["last_alert_ts"])
+    except Exception:
+        pass
+
+    pending_count: int | None = None
+    try:
+        with _db_cursor() as cur:
+            cur.execute("SELECT COUNT(*) AS cnt FROM work_orders WHERE status = 'pending'")
+            row = cur.fetchone()
+            pending_count = int(row["cnt"]) if row else 0
+    except Exception:
+        pass  # Postgres 미가동 시 None — 클라이언트가 회색 표시
+
+    data = {
+        "alert_robots_6min": alert_robots_6min,
+        "last_alert_ts": last_alert_ts,
+        "pending_work_orders": pending_count,
+        "as_of": datetime.now(timezone.utc).isoformat(),
+    }
+    _fleet_summary_cache["data"] = data
+    _fleet_summary_cache["ts"] = now
+    return data
+
+
+# ============================================================================
 # ADR-013 — Bedrock Converse API + Tool Use
 # ============================================================================
 
