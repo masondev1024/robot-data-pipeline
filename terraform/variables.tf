@@ -53,9 +53,9 @@ variable "grafana_admin_password" {
 }
 
 variable "kds_main_shard_count" {
-  description = "Telemetry KDS shard count. 1000 robots × 1.0s tick = 1000 records/s 부하 기준 default 2 (한도 2000 RPS 의 50% 사용, read GetRecords 한도 10/s 도 KDF+Flink 합계와 정합). 부하 증감 시 조정."
+  description = "Telemetry KDS shard count. 학습 환경 100 robots × 5s tick = 20 rec/s, 4 KB/s 부하 → 1 shard (1000 RPS, 1 MB/s 한도) 의 ~2% 사용으로 충분. 2 shard 운영 시 Firehose buffer flush 가 shard 간 staggered → 5분 sliding window distinct robot count 가 jitter (2026-05-04 사고). 부하 증가 시 (>500 rec/s) 만 2+ 로 복귀."
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "kds_alert_shard_count" {
