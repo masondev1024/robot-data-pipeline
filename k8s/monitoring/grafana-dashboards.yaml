@@ -1379,7 +1379,7 @@ data:
           },
           "gridPos": {
             "h": 4,
-            "w": 12,
+            "w": 6,
             "x": 0,
             "y": 4
           },
@@ -1420,6 +1420,73 @@ data:
           ],
           "title": "이번 주 AI 예방 절감액 (만원, 7일)",
           "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "grafana-athena-datasource",
+            "uid": "athena"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "semi-dark-green", "value": null },
+                  { "color": "super-light-yellow", "value": 50 },
+                  { "color": "orange", "value": 200 },
+                  { "color": "red", "value": 500 }
+                ]
+              },
+              "unit": "short",
+              "min": 0
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 6,
+            "y": 4
+          },
+          "id": 114,
+          "options": {
+            "displayMode": "gradient",
+            "minVizHeight": 16,
+            "minVizWidth": 8,
+            "namePlacement": "left",
+            "orientation": "horizontal",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "showUnfilled": true,
+            "valueMode": "color"
+          },
+          "pluginVersion": "11.3.0",
+          "targets": [
+            {
+              "connectionArgs": {
+                "catalog": "AwsDataCatalog",
+                "database": "robot_telemetry_db",
+                "region": "eu-west-1",
+                "resultReuseEnabled": false,
+                "resultReuseMaxAgeInMinutes": 60
+              },
+              "datasource": {
+                "type": "grafana-athena-datasource",
+                "uid": "athena"
+              },
+              "format": 1,
+              "rawSQL": "-- 오늘 line 별 alert 건수 (실시간 24h sliding) — silver_alerts × dim_robot_line\n-- §1.E hour 파티션 프루닝 (today + yesterday 일부) + 24h sliding window_end\nSELECT d.production_line AS metric, COUNT(*) AS value\nFROM robot_telemetry_db.silver_alerts a\nJOIN robot_telemetry_db.dim_robot_line d ON a.robot_id = d.robot_id\nWHERE (\n  (year = date_format(current_timestamp, '%Y')\n   AND month = date_format(current_timestamp, '%m')\n   AND day = date_format(current_timestamp, '%d'))\n  OR (year = date_format(current_timestamp - INTERVAL '1' DAY, '%Y')\n   AND month = date_format(current_timestamp - INTERVAL '1' DAY, '%m')\n   AND day = date_format(current_timestamp - INTERVAL '1' DAY, '%d'))\n)\n  AND date_parse(a.window_end, '%Y-%m-%d %H:%i:%s') > current_timestamp - INTERVAL '24' HOUR\nGROUP BY d.production_line\nORDER BY d.production_line",
+              "refId": "A",
+              "table": "silver_alerts"
+            }
+          ],
+          "title": "오늘 라인별 알람 건수 (24h)",
+          "type": "bargauge"
         },
         {
           "datasource": {
@@ -1665,23 +1732,31 @@ data:
                   "options": "잠재 손실"
                 },
                 "properties": [
-                  {
-                    "id": "custom.align",
-                    "value": "right"
-                  },
-                  {
-                    "id": "custom.cellOptions",
-                    "value": {
-                      "type": "color-text"
-                    }
-                  },
-                  {
-                    "id": "color",
-                    "value": {
-                      "mode": "fixed",
-                      "fixedColor": "#fc3"
-                    }
-                  }
+                  { "id": "custom.align", "value": "center" },
+                  { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "basic" }},
+                  { "id": "color", "value": { "mode": "fixed", "fixedColor": "#5c4022" }}
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Robot"
+                },
+                "properties": [
+                  { "id": "custom.align", "value": "center" },
+                  { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "basic" }},
+                  { "id": "color", "value": { "mode": "fixed", "fixedColor": "#243447" }}
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Line·공정"
+                },
+                "properties": [
+                  { "id": "custom.align", "value": "center" },
+                  { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "basic" }},
+                  { "id": "color", "value": { "mode": "fixed", "fixedColor": "#2d2447" }}
                 ]
               },
               {
