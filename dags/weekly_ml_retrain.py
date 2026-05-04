@@ -3,7 +3,7 @@
 Phase 5 분리: 기존 robot_daily_etl 의 ShortCircuitOperator 패턴(`check_monday`)을
 ExternalTaskSensor 기반 별도 DAG 로 떼어내 의존성·재시도·sensor 학습용 토폴로지 강화.
 
-스케줄: 매주 월요일 KST 02:00 (UTC 일요일 17:00).
+스케줄: 매주 목요일 KST 02:00 (UTC 수요일 17:00).
        robot_daily_etl 이 KST 00:00(UTC 15:00) 시작 → ~2시간 여유 후 그날 Gold 파티션이
        확실히 적재된 상태에서 학습 시작.
 
@@ -58,9 +58,9 @@ default_args = {
 dag = DAG(
     dag_id="weekly_ml_retrain",
     default_args=default_args,
-    description="주간 SageMaker XGBoost 재학습 + endpoint 재배포 (Mon 02:00 KST)",
-    # 매주 월요일 02:00 KST = 일요일 17:00 UTC. daily ETL(15:00 UTC) 후 2시간 여유.
-    schedule="0 17 * * 0",
+    description="주간 SageMaker XGBoost 재학습 + endpoint 재배포 (Thu 02:00 KST)",
+    # 매주 수요일 17:00 UTC = 목요일 02:00 KST. daily ETL(15:00 UTC) 후 2시간 여유.
+    schedule="0 17 * * 3",
     start_date=datetime(2026, 1, 1),
     catchup=False,
     tags=["robot-telemetry", "ml", "weekly"],
@@ -70,9 +70,9 @@ dag = DAG(
 # ──────────────────────────────────────────────────────────────────────────────
 # 1. ExternalTaskSensor — daily ETL 의 silver_to_gold 완료 대기
 # ──────────────────────────────────────────────────────────────────────────────
-# weekly_ml_retrain 의 logical date = 일요일 17:00 UTC
-# robot_daily_etl       의 logical date = 같은 일요일 15:00 UTC (cron 0 15 * * *)
-# → 같은 calendar day, 시간만 2시간 차이 → execution_delta = +2h.
+# weekly_ml_retrain 의 logical date = 수요일 17:00 UTC
+# robot_daily_etl       의 logical date = 같은 수요일 15:00 UTC (cron 0 15 * * *)
+# → 같은 calendar day (UTC), 시간만 2시간 차이 → execution_delta = +2h.
 # (Airflow logical date 비교: target_dttm = self_dttm - execution_delta)
 WAIT_EXECUTION_DELTA = timedelta(hours=2)
 
