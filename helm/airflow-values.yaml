@@ -61,6 +61,10 @@ config:
     remote_base_log_folder: "s3://de-ai-06-smartfactory-bucket/airflow-logs/"
     remote_log_conn_id: ""
     encrypt_s3_logs: "False"
+  webserver:
+    # ALB 노출 + Airflow 자체 로그인 wall 있어 봇 스캔 위험은 사실상 0.
+    # /robots.txt 등 스캔 경고만 노이즈 — 끔.
+    warn_deployment_exposure: "False"
 
 # DAG sync — GitSync sidecar가 60초마다 main 브랜치 pull
 dags:
