@@ -1373,15 +1373,15 @@ data:
                   },
                   {
                     "color": "orange",
-                    "value": 5000000
+                    "value": 500
                   },
                   {
                     "color": "yellow",
-                    "value": 20000000
+                    "value": 2000
                   },
                   {
                     "color": "green",
-                    "value": 50000000
+                    "value": 5000
                   }
                 ]
               },
@@ -1426,12 +1426,12 @@ data:
                 "uid": "athena"
               },
               "format": 1,
-              "rawSQL": "-- 절감액 = AI 예측 건수(7일) × 1건당 절감(4h × ₩300,000)\nSELECT COUNT(*) * 1200000 AS \"이번 주 AI 예방 절감액\"\nFROM robot_telemetry_db.gold_robot_daily_stats\nWHERE dt >= CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '7' DAY AS DATE)\n  AND dt <  CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE)\n  AND dominant_failure_type IS NOT NULL\n  AND dominant_failure_type <> 'NONE'",
+              "rawSQL": "-- 절감액 = AI 예측 건수(7일) × 1건당 절감(120 만원 = 4h × ₩300,000 / 10,000)\nSELECT COUNT(*) * 120 AS \"이번 주 AI 예방 절감액\"\nFROM robot_telemetry_db.gold_robot_daily_stats\nWHERE dt >= CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '7' DAY AS DATE)\n  AND dt <  CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE)\n  AND dominant_failure_type IS NOT NULL\n  AND dominant_failure_type <> 'NONE'",
               "refId": "A",
               "table": "gold_robot_daily_stats"
             }
           ],
-          "title": "이번 주 AI 예방 절감액 (₩, 7일)",
+          "title": "이번 주 AI 예방 절감액 (만원, 7일)",
           "type": "stat"
         },
         {
@@ -1454,15 +1454,15 @@ data:
                   },
                   {
                     "color": "orange",
-                    "value": 20000000
+                    "value": 2000
                   },
                   {
                     "color": "yellow",
-                    "value": 80000000
+                    "value": 8000
                   },
                   {
                     "color": "green",
-                    "value": 200000000
+                    "value": 20000
                   }
                 ]
               },
@@ -1507,12 +1507,12 @@ data:
                 "uid": "athena"
               },
               "format": 1,
-              "rawSQL": "-- 이번 달 누적 = current month-to-date 의 AI 예측 합 × ₩1,200,000\nSELECT COUNT(*) * 1200000 AS \"이번 달 누적 절감액\"\nFROM robot_telemetry_db.gold_robot_daily_stats\nWHERE dt >= date_trunc('month', CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE))\n  AND dt <  CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE)\n  AND dominant_failure_type IS NOT NULL\n  AND dominant_failure_type <> 'NONE'",
+              "rawSQL": "-- 이번 달 누적 = current month-to-date 의 AI 예측 합 × 120 만원\nSELECT COUNT(*) * 120 AS \"이번 달 누적 절감액\"\nFROM robot_telemetry_db.gold_robot_daily_stats\nWHERE dt >= date_trunc('month', CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE))\n  AND dt <  CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE)\n  AND dominant_failure_type IS NOT NULL\n  AND dominant_failure_type <> 'NONE'",
               "refId": "A",
               "table": "gold_robot_daily_stats"
             }
           ],
-          "title": "이번 달 누적 절감액 (₩, MTD)",
+          "title": "이번 달 누적 절감액 (만원, MTD)",
           "type": "stat"
         },
         {
@@ -1684,7 +1684,7 @@ data:
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "잠재 손실(₩)"
+                  "options": "잠재 손실(만원)"
                 },
                 "properties": [
                   {
@@ -1712,15 +1712,15 @@ data:
                         },
                         {
                           "color": "yellow",
-                          "value": 800000
+                          "value": 80
                         },
                         {
                           "color": "orange",
-                          "value": 1200000
+                          "value": 120
                         },
                         {
                           "color": "red",
-                          "value": 1600000
+                          "value": 160
                         }
                       ]
                     }
@@ -1774,7 +1774,7 @@ data:
                 "uid": "athena"
               },
               "format": 1,
-              "rawSQL": "WITH base AS (\n  SELECT\n    g.robot_id, d.production_line, d.station_type,\n    COALESCE(g.dominant_failure_type, 'NONE') AS failure_type,\n    g.max_motor_temp, g.battery_drain, g.max_temp_load_ratio,\n    CASE g.dominant_failure_type\n      WHEN 'HDF' THEN CASE WHEN g.max_motor_temp>110 THEN 1 ELSE 2 END\n      WHEN 'PWF' THEN 2 WHEN 'OSF' THEN 3 WHEN 'TWF' THEN 5 WHEN 'RNF' THEN 7 ELSE 7\n    END AS rul_days,\n    CASE d.production_line\n      WHEN 'LINE-A' THEN 300000 WHEN 'LINE-B' THEN 250000\n      WHEN 'LINE-C' THEN 400000 WHEN 'LINE-D' THEN 150000 ELSE 200000\n    END AS hourly_loss\n  FROM robot_telemetry_db.gold_robot_daily_stats g\n  JOIN robot_telemetry_db.dim_robot_line d ON g.robot_id = d.robot_id\n  WHERE g.dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)\n    AND COALESCE(g.dominant_failure_type, 'NONE') <> 'NONE'\n),\nscored AS (\n  SELECT *,\n    -- 정규화 점수 0~250 — 1337 같은 raw load_ratio 폭발 차단\n    LEAST(100, GREATEST(0, (max_motor_temp - 80) * 2))\n    + LEAST(100, GREATEST(0, battery_drain * 2))\n    + LEAST(50, max_temp_load_ratio * 5) AS priority_score\n  FROM base\n),\nper_type_top AS (\n  SELECT *,\n    ROW_NUMBER() OVER (PARTITION BY failure_type ORDER BY priority_score DESC) AS rn_in_type\n  FROM scored\n)\nSELECT\n  ROW_NUMBER() OVER (ORDER BY priority_score DESC) AS \"순위\",\n  robot_id                                           AS \"Robot\",\n  production_line || ' ' || station_type             AS \"Line·공정\",\n  failure_type                                       AS \"고장유형\",\n  rul_days                                           AS \"잔여수명(d)\",\n  hourly_loss * 4                                    AS \"잠재 손실(₩)\",\n  CASE\n    WHEN priority_score >= 200 THEN '🔴 긴급'\n    WHEN priority_score >= 130 THEN '🟠 높음'\n    WHEN priority_score >=  70 THEN '🟡 중간'\n    ELSE '🟢 낮음'\n  END                                                AS \"긴급도\"\nFROM per_type_top\nWHERE rn_in_type <= 6\nORDER BY priority_score DESC\nLIMIT 30",
+              "rawSQL": "WITH base AS (\n  SELECT\n    g.robot_id, d.production_line, d.station_type,\n    COALESCE(g.dominant_failure_type, 'NONE') AS failure_type,\n    g.max_motor_temp, g.battery_drain, g.max_temp_load_ratio,\n    CASE g.dominant_failure_type\n      WHEN 'HDF' THEN CASE WHEN g.max_motor_temp>110 THEN 1 ELSE 2 END\n      WHEN 'PWF' THEN 2 WHEN 'OSF' THEN 3 WHEN 'TWF' THEN 5 WHEN 'RNF' THEN 7 ELSE 7\n    END AS rul_days,\n    CASE d.production_line\n      WHEN 'LINE-A' THEN 300000 WHEN 'LINE-B' THEN 250000\n      WHEN 'LINE-C' THEN 400000 WHEN 'LINE-D' THEN 150000 ELSE 200000\n    END AS hourly_loss\n  FROM robot_telemetry_db.gold_robot_daily_stats g\n  JOIN robot_telemetry_db.dim_robot_line d ON g.robot_id = d.robot_id\n  WHERE g.dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)\n    AND COALESCE(g.dominant_failure_type, 'NONE') <> 'NONE'\n),\nscored AS (\n  SELECT *,\n    -- 정규화 점수 0~250 — 1337 같은 raw load_ratio 폭발 차단\n    LEAST(100, GREATEST(0, (max_motor_temp - 80) * 2))\n    + LEAST(100, GREATEST(0, battery_drain * 2))\n    + LEAST(50, max_temp_load_ratio * 5) AS priority_score\n  FROM base\n),\nper_type_top AS (\n  SELECT *,\n    ROW_NUMBER() OVER (PARTITION BY failure_type ORDER BY priority_score DESC) AS rn_in_type\n  FROM scored\n)\nSELECT\n  ROW_NUMBER() OVER (ORDER BY priority_score DESC) AS \"순위\",\n  robot_id                                           AS \"Robot\",\n  production_line || ' ' || station_type             AS \"Line·공정\",\n  failure_type                                       AS \"고장유형\",\n  rul_days                                           AS \"잔여수명(d)\",\n  (hourly_loss * 4) / 10000                          AS \"잠재 손실(만원)\",\n  CASE\n    WHEN priority_score >= 200 THEN '🔴 긴급'\n    WHEN priority_score >= 130 THEN '🟠 높음'\n    WHEN priority_score >=  70 THEN '🟡 중간'\n    ELSE '🟢 낮음'\n  END                                                AS \"긴급도\"\nFROM per_type_top\nWHERE rn_in_type <= 6\nORDER BY priority_score DESC\nLIMIT 30",
               "refId": "A",
               "table": "gold_robot_daily_stats"
             }
