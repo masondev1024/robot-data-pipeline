@@ -1107,12 +1107,12 @@ data:
                 "uid": "athena"
               },
               "format": 1,
-              "rawSQL": "-- 실시간 KPI: 최근 15분 안에 record 보낸 distinct robot_id\n-- 5분 윈도우는 generator 부분 sampling 으로 ~48 만 잡혀 100대 운영 상태와 어긋남\n-- Bronze partition 2개(현재/직전 hour)만 스캔하여 비용 최소화\nSELECT COUNT(DISTINCT robot_id) AS \"총 가동 로봇 (15분)\"\nFROM robot_telemetry_db.bronze_robot_telemetry\nWHERE (\n    (year = date_format(current_timestamp, '%Y') AND month = date_format(current_timestamp, '%m')\n     AND day = date_format(current_timestamp, '%d') AND hour = date_format(current_timestamp, '%H'))\n OR (year = date_format(current_timestamp - INTERVAL '1' HOUR, '%Y') AND month = date_format(current_timestamp - INTERVAL '1' HOUR, '%m')\n     AND day = date_format(current_timestamp - INTERVAL '1' HOUR, '%d') AND hour = date_format(current_timestamp - INTERVAL '1' HOUR, '%H'))\n)\nAND from_iso8601_timestamp(\"timestamp\") > current_timestamp - INTERVAL '15' MINUTE",
+              "rawSQL": "-- 실시간 KPI: 최근 10분 안에 record 보낸 distinct robot_id\n-- ⚠️ Root cause (5분 윈도우에서 ~48만 잡힌 이유):\n--   Firehose 300s buffer + 2-shard staggered flush. KDS 2 shard 가 독립적으로\n--   ~5분 0초 / ~5분 15초 시점에 flush → 5분 윈도우는 한 shard 분만 잡고\n--   다른 shard 는 buffer 안에 머무름. shard hash 경계로 ~52/48 binary split.\n--   증거: CloudWatch IncomingRecords=6000/5min (100×12 OK), 15분 윈도우=100,\n--   MD5 hash 가 shard 경계와 정확히 일치. generator drop 아님.\n-- 10분 윈도우 = Firehose 5분 buffer + flush stagger 안전 마진. 6분도 가능.\n-- Bronze partition 2개(현재/직전 hour)만 스캔하여 비용 최소화\nSELECT COUNT(DISTINCT robot_id) AS \"총 가동 로봇 (10분)\"\nFROM robot_telemetry_db.bronze_robot_telemetry\nWHERE (\n    (year = date_format(current_timestamp, '%Y') AND month = date_format(current_timestamp, '%m')\n     AND day = date_format(current_timestamp, '%d') AND hour = date_format(current_timestamp, '%H'))\n OR (year = date_format(current_timestamp - INTERVAL '1' HOUR, '%Y') AND month = date_format(current_timestamp - INTERVAL '1' HOUR, '%m')\n     AND day = date_format(current_timestamp - INTERVAL '1' HOUR, '%d') AND hour = date_format(current_timestamp - INTERVAL '1' HOUR, '%H'))\n)\nAND from_iso8601_timestamp(\"timestamp\") > current_timestamp - INTERVAL '10' MINUTE",
               "refId": "A",
               "table": "bronze_robot_telemetry"
             }
           ],
-          "title": "총 가동 로봇 (실시간 15분)",
+          "title": "총 가동 로봇 (실시간 10분)",
           "type": "stat"
         },
         {
@@ -1183,12 +1183,12 @@ data:
                 "uid": "athena"
               },
               "format": 1,
-              "rawSQL": "-- ADR-009 Flink Z-Score(σ>3) + 다변량 룰의 직접 결과 (silver_alerts)\n-- 기존 SQL 은 gold.anomaly_record_count (Airflow ETL 단순 집계) 였어 이름과 무관했음\n-- silver_alerts 는 Flink 1분 tumbling → KDS alert → Firehose 적재 (~1분 지연)\nSELECT COUNT(DISTINCT robot_id) AS \"이상치 발생 로봇\"\nFROM robot_telemetry_db.silver_alerts\nWHERE (\n    (year = date_format(current_timestamp, '%Y') AND month = date_format(current_timestamp, '%m')\n     AND day = date_format(current_timestamp, '%d') AND hour = date_format(current_timestamp, '%H'))\n OR (year = date_format(current_timestamp - INTERVAL '1' HOUR, '%Y') AND month = date_format(current_timestamp - INTERVAL '1' HOUR, '%m')\n     AND day = date_format(current_timestamp - INTERVAL '1' HOUR, '%d') AND hour = date_format(current_timestamp - INTERVAL '1' HOUR, '%H'))\n)\nAND date_parse(window_end, '%Y-%m-%d %H:%i:%s') > current_timestamp - INTERVAL '15' MINUTE",
+              "rawSQL": "-- ADR-009 Flink Z-Score(σ>3) + 다변량 룰의 직접 결과 (silver_alerts)\n-- 기존 SQL 은 gold.anomaly_record_count (Airflow ETL 단순 집계) 였어 이름과 무관했음\n-- silver_alerts 는 Flink 1분 tumbling → KDS alert → Firehose 적재 (~1분 지연)\nSELECT COUNT(DISTINCT robot_id) AS \"이상치 발생 로봇\"\nFROM robot_telemetry_db.silver_alerts\nWHERE (\n    (year = date_format(current_timestamp, '%Y') AND month = date_format(current_timestamp, '%m')\n     AND day = date_format(current_timestamp, '%d') AND hour = date_format(current_timestamp, '%H'))\n OR (year = date_format(current_timestamp - INTERVAL '1' HOUR, '%Y') AND month = date_format(current_timestamp - INTERVAL '1' HOUR, '%m')\n     AND day = date_format(current_timestamp - INTERVAL '1' HOUR, '%d') AND hour = date_format(current_timestamp - INTERVAL '1' HOUR, '%H'))\n)\nAND date_parse(window_end, '%Y-%m-%d %H:%i:%s') > current_timestamp - INTERVAL '10' MINUTE",
               "refId": "A",
               "table": "silver_alerts"
             }
           ],
-          "title": "이상치 발생 로봇 (Flink 룰, 실시간 15분)",
+          "title": "이상치 발생 로봇 (Flink 룰, 실시간 10분)",
           "type": "stat"
         },
         {
@@ -1345,12 +1345,12 @@ data:
                 "uid": "athena"
               },
               "format": 1,
-              "rawSQL": "-- 실시간 정상 가동률 = (가동 로봇 - Flink 이상치 로봇) / 가동 로봇 × 100\n-- Bronze 15분 distinct vs silver_alerts 15분 distinct\nWITH active AS (\n  SELECT COUNT(DISTINCT robot_id) AS total\n  FROM robot_telemetry_db.bronze_robot_telemetry\n  WHERE (\n      (year = date_format(current_timestamp, '%Y') AND month = date_format(current_timestamp, '%m')\n       AND day = date_format(current_timestamp, '%d') AND hour = date_format(current_timestamp, '%H'))\n   OR (year = date_format(current_timestamp - INTERVAL '1' HOUR, '%Y') AND month = date_format(current_timestamp - INTERVAL '1' HOUR, '%m')\n       AND day = date_format(current_timestamp - INTERVAL '1' HOUR, '%d') AND hour = date_format(current_timestamp - INTERVAL '1' HOUR, '%H'))\n  )\n  AND from_iso8601_timestamp(\"timestamp\") > current_timestamp - INTERVAL '15' MINUTE\n),\nalerted AS (\n  SELECT COUNT(DISTINCT robot_id) AS alert_robots\n  FROM robot_telemetry_db.silver_alerts\n  WHERE (\n      (year = date_format(current_timestamp, '%Y') AND month = date_format(current_timestamp, '%m')\n       AND day = date_format(current_timestamp, '%d') AND hour = date_format(current_timestamp, '%H'))\n   OR (year = date_format(current_timestamp - INTERVAL '1' HOUR, '%Y') AND month = date_format(current_timestamp - INTERVAL '1' HOUR, '%m')\n       AND day = date_format(current_timestamp - INTERVAL '1' HOUR, '%d') AND hour = date_format(current_timestamp - INTERVAL '1' HOUR, '%H'))\n  )\n  AND date_parse(window_end, '%Y-%m-%d %H:%i:%s') > current_timestamp - INTERVAL '15' MINUTE\n)\nSELECT ROUND(100.0 * (active.total - COALESCE(alerted.alert_robots, 0)) / NULLIF(active.total, 0), 1) AS \"정상 가동률\"\nFROM active, alerted",
+              "rawSQL": "-- 실시간 정상 가동률 = (가동 로봇 - Flink 이상치 로봇) / 가동 로봇 × 100\n-- Bronze 15분 distinct vs silver_alerts 15분 distinct\nWITH active AS (\n  SELECT COUNT(DISTINCT robot_id) AS total\n  FROM robot_telemetry_db.bronze_robot_telemetry\n  WHERE (\n      (year = date_format(current_timestamp, '%Y') AND month = date_format(current_timestamp, '%m')\n       AND day = date_format(current_timestamp, '%d') AND hour = date_format(current_timestamp, '%H'))\n   OR (year = date_format(current_timestamp - INTERVAL '1' HOUR, '%Y') AND month = date_format(current_timestamp - INTERVAL '1' HOUR, '%m')\n       AND day = date_format(current_timestamp - INTERVAL '1' HOUR, '%d') AND hour = date_format(current_timestamp - INTERVAL '1' HOUR, '%H'))\n  )\n  AND from_iso8601_timestamp(\"timestamp\") > current_timestamp - INTERVAL '10' MINUTE\n),\nalerted AS (\n  SELECT COUNT(DISTINCT robot_id) AS alert_robots\n  FROM robot_telemetry_db.silver_alerts\n  WHERE (\n      (year = date_format(current_timestamp, '%Y') AND month = date_format(current_timestamp, '%m')\n       AND day = date_format(current_timestamp, '%d') AND hour = date_format(current_timestamp, '%H'))\n   OR (year = date_format(current_timestamp - INTERVAL '1' HOUR, '%Y') AND month = date_format(current_timestamp - INTERVAL '1' HOUR, '%m')\n       AND day = date_format(current_timestamp - INTERVAL '1' HOUR, '%d') AND hour = date_format(current_timestamp - INTERVAL '1' HOUR, '%H'))\n  )\n  AND date_parse(window_end, '%Y-%m-%d %H:%i:%s') > current_timestamp - INTERVAL '10' MINUTE\n)\nSELECT ROUND(100.0 * (active.total - COALESCE(alerted.alert_robots, 0)) / NULLIF(active.total, 0), 1) AS \"정상 가동률\"\nFROM active, alerted",
               "refId": "A",
               "table": "bronze_robot_telemetry"
             }
           ],
-          "title": "정상 가동률 (실시간 15분, %)",
+          "title": "정상 가동률 (실시간 10분, %)",
           "type": "stat"
         },
         {
