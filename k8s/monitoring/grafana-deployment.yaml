@@ -55,9 +55,9 @@ spec:
             # 같은-사이트 cookie 정책 완화 — portal iframe 안에서 dashboard 접근 시 cookie 전달
             - name: GF_SECURITY_COOKIE_SAMESITE
               value: "disabled"
-            # SPA bootstrap appUrl 정정 — 미설정 시 localhost:3000 으로 박혀 클라이언트 라우팅/API 호출이 전부 깨짐("Page not found")
-            - name: GF_SERVER_ROOT_URL
-              value: "http://k8s-monitori-grafanai-2ac32d9244-945675115.eu-west-1.elb.amazonaws.com/"
+            # SPA bootstrap appUrl — ALB DNS 는 cluster 재생성마다 바뀌므로 manifest 에 박지 않음.
+            # post-deploy.yml 이 ALB DNS 확정 후 `kubectl set env` 로 GF_SERVER_ROOT_URL 주입.
+            # 미주입 상태(첫 부팅 직후) fallback: localhost — portal iframe 정상 응답 못 함.
             - name: GF_SERVER_SERVE_FROM_SUB_PATH
               value: "false"
             - name: AWS_REGION

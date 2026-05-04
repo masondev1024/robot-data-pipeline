@@ -15,6 +15,9 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
@@ -114,3 +117,33 @@ jobs:
               --overwrite
             echo "  /robot-telemetry/airflow-url = http://$AIRFLOW_DNS"
           fi
+
+      # Grafana SPA bootstrap URL 을 새 ALB DNS 로 주입 (deployment 매니페스트에는 박지 않음 — 클러스터 재생성 시 DNS 가 바뀌므로)
+      - name: Patch Grafana GF_SERVER_ROOT_URL
+        run: |
+          ROOT_URL="http://${{ steps.grafana-dns.outputs.dns }}/"
+          kubectl set env deployment/grafana -n monitoring \
+            "GF_SERVER_ROOT_URL=$ROOT_URL"
+          kubectl rollout status deployment/grafana -n monitoring --timeout=180s
+          echo "Grafana GF_SERVER_ROOT_URL = $ROOT_URL"
+
+      # CloudWatch dashboard 패널의 LoadBalancer dimension 을 새 API ALB ARN suffix 로 치환
+      - name: Patch Grafana dashboards LoadBalancer ARN
+        run: |
+          ALB_ARN=$(aws elbv2 describe-load-balancers \
+            --query "LoadBalancers[?DNSName=='${{ steps.api-dns.outputs.dns }}'].LoadBalancerArn" \
+            --output text)
+          if [ -z "$ALB_ARN" ]; then
+            echo "ALB ARN 추출 실패 — DNS=${{ steps.api-dns.outputs.dns }}"
+            exit 1
+          fi
+          # ARN 형식: arn:aws:elasticloadbalancing:region:acct:loadbalancer/app/<name>/<suffix>
+          ARN_SUFFIX=$(echo "$ALB_ARN" | sed -E 's|^.*loadbalancer/||')
+          echo "API ALB ARN suffix = $ARN_SUFFIX"
+
+          # ConfigMap 의 dashboard JSON 에서 placeholder 치환 + apply + grafana 재시작
+          sed "s|__API_ALB_ARN_SUFFIX__|${ARN_SUFFIX}|g" \
+            k8s/monitoring/grafana-dashboards.yaml > /tmp/grafana-dashboards.rendered.yaml
+          kubectl apply -f /tmp/grafana-dashboards.rendered.yaml
+          kubectl rollout restart deployment/grafana -n monitoring
+          kubectl rollout status deployment/grafana -n monitoring --timeout=180s
