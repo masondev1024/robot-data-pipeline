@@ -930,13 +930,88 @@
               "mode": "normal",
               "group": "A"
             },
-            "xTickLabelRotation": -45,
-            "xTickLabelSpacing": 100,
-            "xTickLabelMaxLength": 0
+            "xTickLabelMaxLength": 0,
+            "xField": "라인"
           },
           "mappings": []
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "TWF (공구마모)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "yellow"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "HDF (방열부족)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "PWF (전력이상)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "OSF (과부하)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "dark-orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RNF (랜덤)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -974,7 +1049,7 @@
             "uid": "athena"
           },
           "format": 1,
-          "rawSQL": "SELECT\n  d.production_line                              AS line,\n  COALESCE(g.dominant_failure_type, 'NONE')     AS failure_type,\n  COUNT(*)                                       AS cnt\nFROM robot_telemetry_db.gold_robot_daily_stats g\nJOIN robot_telemetry_db.dim_robot_line d ON g.robot_id = d.robot_id\nWHERE g.dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)\n  AND g.dominant_failure_type IS NOT NULL\n  AND g.dominant_failure_type <> 'NONE'\nGROUP BY 1, 2\nORDER BY 1, 2",
+          "rawSQL": "SELECT\n  d.production_line AS \"라인\",\n  SUM(CASE WHEN g.dominant_failure_type = 'TWF' THEN 1 ELSE 0 END) AS \"TWF (공구마모)\",\n  SUM(CASE WHEN g.dominant_failure_type = 'HDF' THEN 1 ELSE 0 END) AS \"HDF (방열부족)\",\n  SUM(CASE WHEN g.dominant_failure_type = 'PWF' THEN 1 ELSE 0 END) AS \"PWF (전력이상)\",\n  SUM(CASE WHEN g.dominant_failure_type = 'OSF' THEN 1 ELSE 0 END) AS \"OSF (과부하)\",\n  SUM(CASE WHEN g.dominant_failure_type = 'RNF' THEN 1 ELSE 0 END) AS \"RNF (랜덤)\"\nFROM robot_telemetry_db.gold_robot_daily_stats g\nJOIN robot_telemetry_db.dim_robot_line d ON g.robot_id = d.robot_id\nWHERE g.dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)\n  AND g.dominant_failure_type IS NOT NULL\n  AND g.dominant_failure_type <> 'NONE'\nGROUP BY d.production_line\nORDER BY d.production_line",
           "refId": "A",
           "table": "gold_robot_daily_stats"
         }
