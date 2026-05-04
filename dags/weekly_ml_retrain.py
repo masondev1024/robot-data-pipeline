@@ -58,9 +58,10 @@ default_args = {
 dag = DAG(
     dag_id="weekly_ml_retrain",
     default_args=default_args,
-    description="주간 SageMaker XGBoost 재학습 + endpoint 재배포 (Thu 02:00 KST)",
-    # 매주 수요일 17:00 UTC = 목요일 02:00 KST. daily ETL(15:00 UTC) 후 2시간 여유.
-    schedule="0 17 * * 3",
+    description="주간 SageMaker XGBoost 재학습 + endpoint 재배포 (Thu 00:00 KST)",
+    # 매주 수요일 15:00 UTC = 목요일 00:00 KST. daily ETL(15:00 UTC) 과 동시 시작이지만
+    # 아래 ExternalTaskSensor 가 silver_to_gold 완료를 기다리므로 dependency 안전.
+    schedule="0 15 * * 3",
     # start_date 가 과거이면 catchup=False 여도 scheduler 가 missing slot 1개를
     # 반복 trigger → 데이터 없던 시기(2026-04 이전) 의 weekly run 이 영구 fail
     # 루프. 2026-05-04 이후로 옮겨 첫 정상 schedule = 5/6(수) 이 되도록 차단.
