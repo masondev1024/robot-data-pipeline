@@ -65,6 +65,10 @@ config:
     # ALB 노출 + Airflow 자체 로그인 wall 있어 봇 스캔 위험은 사실상 0.
     # /robots.txt 등 스캔 경고만 노이즈 — 끔.
     warn_deployment_exposure: "False"
+  # REST API basic_auth 활성화 — default 는 session 인증만 받아 curl 401.
+  # 학습용 manual backfill (예: robot_daily_etl 누락 run trigger) 에 필요.
+  api:
+    auth_backends: "airflow.providers.fab.auth_manager.api.auth.backend.basic_auth,airflow.providers.fab.auth_manager.api.auth.backend.session"
 
 # DAG sync — GitSync sidecar가 60초마다 main 브랜치 pull
 dags:
