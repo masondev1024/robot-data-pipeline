@@ -184,7 +184,10 @@ resource "aws_glue_schema" "telemetry" {
   # 기존 v1 송신자도 v2 schema 로 검증 가능.
   compatibility = "BACKWARD"
   schema_definition = jsonencode({
-    type = "object"
+    # description: 라이브 schema version v2 에 박혀있는 값과 일치 (Glue Schema 는 version
+    # immutable 이라 description 제거 불가 → 코드에 명시 박아 영구 drift 해소).
+    description = "v2 with failure_type"
+    type        = "object"
     properties = {
       robot_id      = { type = "string" }
       pos_x         = { type = "number" }

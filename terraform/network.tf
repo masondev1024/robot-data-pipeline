@@ -60,18 +60,23 @@ resource "aws_subnet" "db_private" {
   }
 }
 
-# NAT Gateways
+# NAT Gateways — single-NAT cost-saving 패턴 (dev/demo).
+# 비용절감플랜/up.sh 가 1개 NAT 만 만들고 두 AZ 가 공유. multi-AZ 복원력은
+# 포기하지만 비용 ~50% 절감 + production 전환 시 count=2 로 되돌리면 됨.
 resource "aws_eip" "nat" {
-  count = 2
+  count = 1
+  tags = {
+    Name = "${var.project_name}-eip-a"
+  }
 }
 
 resource "aws_nat_gateway" "nat" {
-  count         = 2
+  count         = 1
   allocation_id = aws_eip.nat[count.index].id
   subnet_id     = aws_subnet.public[count.index].id
 
   tags = {
-    Name = "${var.project_name}-nat-gw-${count.index == 0 ? "a" : "b"}"
+    Name = "${var.project_name}-nat-gw-a"
   }
 }
 
@@ -99,9 +104,10 @@ resource "aws_route_table" "app" {
   count  = 2
   vpc_id = aws_vpc.main.id
 
+  # single-NAT 패턴: 두 AZ 모두 nat[0] 공유 (count=1 NAT 와 일관).
   route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.nat[count.index].id
+    nat_gateway_id = aws_nat_gateway.nat[0].id
   }
 
   tags = {
@@ -167,15 +173,6 @@ resource "aws_vpc_endpoint" "s3" {
   }
 }
 
-resource "aws_vpc_endpoint" "kinesis" {
-  vpc_id              = aws_vpc.main.id
-  service_name        = "com.amazonaws.${var.aws_region}.kinesis-streams"
-  vpc_endpoint_type   = "Interface"
-  subnet_ids          = aws_subnet.app_private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoints.id]
-  private_dns_enabled = true
-
-  tags = {
-    Name = "${var.project_name}-kinesis-endpoint"
-  }
-}
+# Kinesis VPC endpoint — single-NAT cost-saving 패턴에서 제거.
+# KDS 트래픽이 NAT GW egress 로 흘러도 dev/demo 규모에선 비용 차이 미미.
+# Production 전환 시 endpoint 다시 추가 (Interface endpoint 약 $7~15/월).
