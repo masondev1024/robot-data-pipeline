@@ -1107,12 +1107,12 @@ data:
                 "uid": "athena"
               },
               "format": 1,
-              "rawSQL": "SELECT COUNT(*) AS \"총 가동 로봇\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
+              "rawSQL": "-- 실시간 KPI: 최근 15분 안에 record 보낸 distinct robot_id\n-- 5분 윈도우는 generator 부분 sampling 으로 ~48 만 잡혀 100대 운영 상태와 어긋남\n-- Bronze partition 2개(현재/직전 hour)만 스캔하여 비용 최소화\nSELECT COUNT(DISTINCT robot_id) AS \"총 가동 로봇 (15분)\"\nFROM robot_telemetry_db.bronze_robot_telemetry\nWHERE (\n    (year = date_format(current_timestamp, '%Y') AND month = date_format(current_timestamp, '%m')\n     AND day = date_format(current_timestamp, '%d') AND hour = date_format(current_timestamp, '%H'))\n OR (year = date_format(current_timestamp - INTERVAL '1' HOUR, '%Y') AND month = date_format(current_timestamp - INTERVAL '1' HOUR, '%m')\n     AND day = date_format(current_timestamp - INTERVAL '1' HOUR, '%d') AND hour = date_format(current_timestamp - INTERVAL '1' HOUR, '%H'))\n)\nAND from_iso8601_timestamp(\"timestamp\") > current_timestamp - INTERVAL '15' MINUTE",
               "refId": "A",
-              "table": "gold_robot_daily_stats"
+              "table": "bronze_robot_telemetry"
             }
           ],
-          "title": "총 가동 로봇",
+          "title": "총 가동 로봇 (실시간 15분)",
           "type": "stat"
         },
         {
@@ -1183,12 +1183,12 @@ data:
                 "uid": "athena"
               },
               "format": 1,
-              "rawSQL": "SELECT SUM(CASE WHEN anomaly_record_count > 0 THEN 1 ELSE 0 END) AS \"이상치 발생 로봇\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
+              "rawSQL": "-- ADR-009 Flink Z-Score(σ>3) + 다변량 룰의 직접 결과 (silver_alerts)\n-- 기존 SQL 은 gold.anomaly_record_count (Airflow ETL 단순 집계) 였어 이름과 무관했음\n-- silver_alerts 는 Flink 1분 tumbling → KDS alert → Firehose 적재 (~1분 지연)\nSELECT COUNT(DISTINCT robot_id) AS \"이상치 발생 로봇\"\nFROM robot_telemetry_db.silver_alerts\nWHERE (\n    (year = date_format(current_timestamp, '%Y') AND month = date_format(current_timestamp, '%m')\n     AND day = date_format(current_timestamp, '%d') AND hour = date_format(current_timestamp, '%H'))\n OR (year = date_format(current_timestamp - INTERVAL '1' HOUR, '%Y') AND month = date_format(current_timestamp - INTERVAL '1' HOUR, '%m')\n     AND day = date_format(current_timestamp - INTERVAL '1' HOUR, '%d') AND hour = date_format(current_timestamp - INTERVAL '1' HOUR, '%H'))\n)\nAND date_parse(window_end, '%Y-%m-%d %H:%i:%s') > current_timestamp - INTERVAL '15' MINUTE",
               "refId": "A",
-              "table": "gold_robot_daily_stats"
+              "table": "silver_alerts"
             }
           ],
-          "title": "이상치 발생 로봇 (Flink 룰)",
+          "title": "이상치 발생 로봇 (Flink 룰, 실시간 15분)",
           "type": "stat"
         },
         {
@@ -1268,7 +1268,7 @@ data:
               "table": "gold_robot_daily_stats"
             }
           ],
-          "title": "AI 점검 권장 (24h 내 고장 분류)",
+          "title": "AI 점검 권장 (어제 ML 분류, D-1)",
           "type": "stat"
         },
         {
@@ -1345,12 +1345,12 @@ data:
                 "uid": "athena"
               },
               "format": 1,
-              "rawSQL": "SELECT ROUND(100.0 * SUM(CASE WHEN anomaly_record_count = 0 AND max_motor_temp <= 95 THEN 1 ELSE 0 END) / COUNT(*), 1) AS \"정상 가동률\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
+              "rawSQL": "-- 실시간 정상 가동률 = (가동 로봇 - Flink 이상치 로봇) / 가동 로봇 × 100\n-- Bronze 15분 distinct vs silver_alerts 15분 distinct\nWITH active AS (\n  SELECT COUNT(DISTINCT robot_id) AS total\n  FROM robot_telemetry_db.bronze_robot_telemetry\n  WHERE (\n      (year = date_format(current_timestamp, '%Y') AND month = date_format(current_timestamp, '%m')\n       AND day = date_format(current_timestamp, '%d') AND hour = date_format(current_timestamp, '%H'))\n   OR (year = date_format(current_timestamp - INTERVAL '1' HOUR, '%Y') AND month = date_format(current_timestamp - INTERVAL '1' HOUR, '%m')\n       AND day = date_format(current_timestamp - INTERVAL '1' HOUR, '%d') AND hour = date_format(current_timestamp - INTERVAL '1' HOUR, '%H'))\n  )\n  AND from_iso8601_timestamp(\"timestamp\") > current_timestamp - INTERVAL '15' MINUTE\n),\nalerted AS (\n  SELECT COUNT(DISTINCT robot_id) AS alert_robots\n  FROM robot_telemetry_db.silver_alerts\n  WHERE (\n      (year = date_format(current_timestamp, '%Y') AND month = date_format(current_timestamp, '%m')\n       AND day = date_format(current_timestamp, '%d') AND hour = date_format(current_timestamp, '%H'))\n   OR (year = date_format(current_timestamp - INTERVAL '1' HOUR, '%Y') AND month = date_format(current_timestamp - INTERVAL '1' HOUR, '%m')\n       AND day = date_format(current_timestamp - INTERVAL '1' HOUR, '%d') AND hour = date_format(current_timestamp - INTERVAL '1' HOUR, '%H'))\n  )\n  AND date_parse(window_end, '%Y-%m-%d %H:%i:%s') > current_timestamp - INTERVAL '15' MINUTE\n)\nSELECT ROUND(100.0 * (active.total - COALESCE(alerted.alert_robots, 0)) / NULLIF(active.total, 0), 1) AS \"정상 가동률\"\nFROM active, alerted",
               "refId": "A",
-              "table": "gold_robot_daily_stats"
+              "table": "bronze_robot_telemetry"
             }
           ],
-          "title": "정상 가동률 (%)",
+          "title": "정상 가동률 (실시간 15분, %)",
           "type": "stat"
         },
         {
