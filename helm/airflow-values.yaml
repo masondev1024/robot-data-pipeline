@@ -34,6 +34,26 @@ webserver:
     name: airflow-webserver
     annotations:
       eks.amazonaws.com/role-arn: arn:aws:iam::827913617635:role/robot-telemetry-airflow-irsa
+  # Probe 여유 — _PIP_ADDITIONAL_REQUIREMENTS=boto3 다운그레이드 install + Airflow
+  # 2.10.5 providers preload 가 콜드스타트 시 ~60s 이상 소요 → chart default 60s
+  # startupProbe 로는 부족해 connection refused 후 SIGTERM 무한 루프 회귀.
+  # 2026-05-05: down/up 사이클 후 webserver 75분 CrashLoop. failureThreshold 30
+  # × periodSeconds 10 = 최대 5분 허용으로 완화. liveness 도 한 번 응답 늦으면
+  # kill 되지 않게 30s × 10 = 5분 여유.
+  startupProbe:
+    failureThreshold: 30
+    periodSeconds: 10
+    timeoutSeconds: 20
+  livenessProbe:
+    initialDelaySeconds: 15
+    failureThreshold: 10
+    periodSeconds: 30
+    timeoutSeconds: 10
+  readinessProbe:
+    initialDelaySeconds: 15
+    failureThreshold: 10
+    periodSeconds: 30
+    timeoutSeconds: 10
 
 # KubernetesExecutor가 만드는 worker pod에 IRSA 부여
 # workers.env: KubernetesExecutor task pod 에 추가 env 주입 (글로벌 env 와 병합).
