@@ -52,10 +52,12 @@ DE_SKILLS_LEARNING_JOURNAL.md
 프로젝트 정보/
 requirements.txt
 terraform/tfplan
-
+학습자료/
+비용절감플랜/
 # 로컬 AI 도구 / 세션 산출물 (공개 X)
 .claude/
 CLAUDE.md
 docs/superpowers/
 # 발표 자료 (로컬 빌드 도구, git 추적 X)
 presentation/
+
