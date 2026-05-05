@@ -54,6 +54,7 @@ requirements.txt
 terraform/tfplan
 학습자료/
 비용절감플랜/
+docs/plan/
 # 로컬 AI 도구 / 세션 산출물 (공개 X)
 .claude/
 CLAUDE.md
