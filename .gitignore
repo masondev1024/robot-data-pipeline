@@ -7,9 +7,9 @@ out/
 next-env.d.ts
 tsconfig.tsbuildinfo
 
-# phase execution outputs
-phases/**/phase*-output.json
-phases/**/step*-output.json
+# phase execution outputs (어느 위치든)
+**/phases/**/phase*-output.json
+**/phases/**/step*-output.json
 
 # 환경변수 — 절대 커밋 금지
 .env
@@ -53,7 +53,9 @@ DE_SKILLS_LEARNING_JOURNAL.md
 requirements.txt
 terraform/tfplan
 
-# Claude Code 세션 lock (매 세션마다 갱신)
-.claude/scheduled_tasks.lock
-# Claude Code 로컬 권한 캐시 — 사용자별 누적, 공유 의미 없음
-.claude/settings.local.json
+# 로컬 AI 도구 / 세션 산출물 (공개 X)
+.claude/
+CLAUDE.md
+docs/superpowers/
+# 발표 자료 (로컬 빌드 도구, git 추적 X)
+presentation/
