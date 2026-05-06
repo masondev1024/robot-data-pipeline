@@ -17,6 +17,17 @@ resource "aws_ecr_repository" "api" {
   }
 }
 
+# Custom Airflow image — _PIP_ADDITIONAL_REQUIREMENTS 매 콜드스타트 install 을 image baked-in
+# 으로 옮겨 webserver/scheduler 콜드스타트 ~94s → ~30s 단축. Dockerfile: docker/airflow/.
+resource "aws_ecr_repository" "airflow" {
+  name                 = "${var.project_name}-airflow"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+}
+
 # GitHub Actions OIDC Role
 resource "aws_iam_openid_connect_provider" "github" {
   url             = "https://token.actions.githubusercontent.com"
