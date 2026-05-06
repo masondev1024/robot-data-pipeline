@@ -33,7 +33,7 @@ variable "grafana_admin_password" {
 }
 
 variable "kds_main_shard_count" {
-  description = "Telemetry KDS shard count. root variables.tf 가 100 robots × 5s tick 학습 부하 기준 default 1 를 전달 (1 shard 한도 1000 RPS 의 ~2% 사용). 2+ 시 Firehose flush stagger 회귀 위험."
+  description = "Telemetry KDS shard count. root variables.tf 가 100 robots × 2s tick 학습 부하 기준 default 1 를 전달 (1 shard 한도 1000 RPS 의 ~5% 사용). 2+ 시 Firehose flush stagger 회귀 위험."
   type        = number
   default     = 1
 }
