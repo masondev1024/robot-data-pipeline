@@ -1,11 +1,10 @@
 name: k8s-deploy
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'k8s/**'
-      - 'src/**'
+  # 비용 셧다운 운영 모델: cluster 가 down 일 때 push trigger 가 매번 fail 누적
+  # (예: OpenTelemetry Operator 다운 → conversion webhook endpoint 없음 → exit 1).
+  # 재개 시 up.sh 후 GitHub UI Actions 탭에서 "Run workflow" 로 수동 실행.
+  workflow_dispatch: {}
 
 permissions:
   id-token: write
