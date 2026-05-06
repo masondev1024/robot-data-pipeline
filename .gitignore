@@ -57,7 +57,8 @@ terraform/tfplan
 # 로컬 AI 도구 / 세션 산출물 (공개 X)
 .claude/
 CLAUDE.md
-docs/superpowers/
+# 설계/운영 문서 — 로컬 보존, GitHub 미노출
+docs/
 # 발표 자료 (로컬 빌드 도구, git 추적 X)
 presentation/
 

@@ -59,11 +59,11 @@
 
 ## 핵심 의사결정 3가지
 
-1. **Lambda Architecture + Medallion** — 실시간 알림(Speed) 과 일별 리포트(Batch) 의 SLA 가 다르기 때문에 단일 처리 경로 대신 두 레이어로 분리. Bronze 는 Firehose 의 raw Parquet, Silver/Gold 는 Airflow 야간 집계로 비용/지연 최적화. ([ADR-001](docs/ADR.md))
+1. **Lambda Architecture + Medallion** — 실시간 알림(Speed) 과 일별 리포트(Batch) 의 SLA 가 다르기 때문에 단일 처리 경로 대신 두 레이어로 분리. Bronze 는 Firehose 의 raw Parquet, Silver/Gold 는 Airflow 야간 집계로 비용/지연 최적화. (ADR-001)
 
-2. **EU inference profile (Bedrock Sonnet 4.5)** — `eu-west-1` 단일 리전 배포 원칙 유지하면서 Claude 3.5 Sonnet 미배포 이슈를 EU profile (`eu.anthropic.claude-sonnet-4-5-20250929-v1:0`) 로 해소. IRSA 에 `bedrock:InvokeModel` Resource `*` 부여, IAM 변경 없음. ([ADR-004](docs/ADR.md))
+2. **EU inference profile (Bedrock Sonnet 4.5)** — `eu-west-1` 단일 리전 배포 원칙 유지하면서 Claude 3.5 Sonnet 미배포 이슈를 EU profile (`eu.anthropic.claude-sonnet-4-5-20250929-v1:0`) 로 해소. IRSA 에 `bedrock:InvokeModel` Resource `*` 부여, IAM 변경 없음. (ADR-004)
 
-3. **Slack 알림은 Lambda urllib POST 직접 호출** — SNS HTTPS 구독은 Slack Webhook 의 `SubscribeURL` GET 정책과 충돌(PendingConfirmation 영구 고착)하므로, Lambda direct POST 로 우회. SNS Topic 자체는 향후 fan-out (이메일·PagerDuty) 대비 idle 보존. ([ADR-007a](docs/ADR.md))
+3. **Slack 알림은 Lambda urllib POST 직접 호출** — SNS HTTPS 구독은 Slack Webhook 의 `SubscribeURL` GET 정책과 충돌(PendingConfirmation 영구 고착)하므로, Lambda direct POST 로 우회. SNS Topic 자체는 향후 fan-out (이메일·PagerDuty) 대비 idle 보존. (ADR-007a)
 
 ---
 
@@ -79,11 +79,11 @@ LLM 을 단순 호출 1회로 끝내지 않고, **probabilistic system 을 deter
 | 실시간 챗 ([src/api/main.py](src/api/main.py)) | **Claude Sonnet 4.5** + Prompt Caching | 분석 깊이 우선, system prompt 캐시로 비용 보전 |
 | 시계열 예측 (정형) | SageMaker XGBoost (multi-class) | weekly retrain ([dags/weekly_ml_retrain.py](dags/weekly_ml_retrain.py)) |
 
-### 2. Prompt Caching ([ADR-012](docs/ADR.md))
+### 2. Prompt Caching (ADR-012)
 
 `src/common/bedrock.py` 의 `system` 블록을 `cache_control: ephemeral` 로 마킹 → 시스템 프롬프트(역할/citation 규칙/edge case 처리, ~1.5K tokens)가 5분간 캐시 → `cache_read_input_tokens` 메트릭으로 적중률 추적.
 
-### 3. Tool Use — Conversational Agent ([ADR-013](docs/ADR.md))
+### 3. Tool Use — Conversational Agent (ADR-013)
 
 `invoke_model` → **Bedrock Converse API** 로 마이그레이션, LLM 이 직접 도구를 선택해 호출:
 - `predict_robot_failure(robot_id)` — SageMaker XGBoost endpoint 호출
@@ -91,7 +91,7 @@ LLM 을 단순 호출 1회로 끝내지 않고, **probabilistic system 을 deter
 
 LLM 이 SQL 결과를 보고 "추가 ML 예측 필요" 판단 시 자체적으로 tool 호출 → 자연어 종합. 단순 chatbot 이 아니라 agent 패턴.
 
-### 4. Eval-Driven Development ([ADR-011](docs/ADR.md))
+### 4. Eval-Driven Development (ADR-011)
 
 `evals/` 에 30개 골든 QA + LLM-as-judge (Opus 가 relevance/accuracy/grounding 1-5점 채점) → GitHub Actions `eval.yml` workflow_dispatch 로 회귀 검증. **LLM 출력은 비결정적이라는 사실을 코드가 아닌 데이터로 검증.**
 
@@ -126,7 +126,6 @@ LLM 이 SQL 결과를 보고 "추가 ML 예측 필요" 판단 시 자체적으�
 ├── helm/                   # Airflow Helm values (custom ECR image)
 ├── docker/airflow/         # Airflow custom image Dockerfile (PIP baked-in)
 ├── terraform/              # IaC — root + modules/data_pipeline/
-├── docs/                   # PRD · ARCHITECTURE · ADR · UI_GUIDE · research
 ├── evals/                  # LLM 회귀 검증 (golden QA + LLM-as-judge)
 ├── tests/                  # pytest (generator/api/dags/lambda/common)
 ├── scripts/                # 운영 자동화 (load_demo.sh, dlq_alarm_e2e.sh 등)
@@ -164,8 +163,6 @@ kubectl apply -f k8s/ --recursive                    # EKS 워크로드
 ```
 
 > `terraform` workflow 의 `apply` job 은 backend(S3) 미설정으로 GitHub Actions runner state 가 매 push 마다 빈 상태 → 의도적으로 `workflow_dispatch` 만으로 격하. 인프라 변경은 로컬에서 직접 `terraform apply`.
-
-자세한 운영 가이드: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), 의사결정 기록: [docs/ADR.md](docs/ADR.md), UI 사용법: [docs/UI_GUIDE.md](docs/UI_GUIDE.md), Phase 0~8 완료 기록: [docs/plan/archive/phases-0-8.md](docs/plan/archive/phases-0-8.md).
 
 ---
 
