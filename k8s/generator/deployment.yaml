@@ -39,12 +39,16 @@ spec:
               value: "eu-west-1"
             - name: SEED_CSV_PATH
               value: "/data/seed_data_sample.csv"
-            # Fault episode 진입 확률 상향: 0.0002 → 0.005 (25x).
-            # Why: 기본값은 100대 * 2s tick 환경에서 분당 0.6 episode 진입 → Flink WHERE
-            # 절(z>3 OR motor_temp>=85)을 거의 못 채워 OverAggregate→Sink 0 records.
-            # 0.005로 올리면 분당 15 episode → 알람 흐름 안정적 확인 가능.
+            # Fault episode 진입 확률: 0.0002 (default) → 0.0005 (2.5x).
+            # Why: 100대 * 2s tick * fault duration 180s 기준 ground truth P(fault) 산식
+            #   P = entry_rate/s × duration / (1 + entry_rate/s × duration)
+            #   0.005 → P ≈ 31% (ground truth 자체가 이미 31% 라 Flink strict threshold
+            #     걸어도 6분 sliding distinct ~30-40% 로 떠 portal "21/100" 같은 과탐 발생)
+            #   0.0005 → P ≈ 4.3% (목표 3-5% detection 정합)
+            # 분당 episode = 100 * 30 tick/min * 0.0005 = 1.5 episode/min
+            # 더 낮추면 (0.0002 default) 분당 0.6 episode 로 Flink Sink "0 records" 회귀 위험.
             - name: FAULT_ENTRY_PROB
-              value: "0.005"
+              value: "0.0005"
           volumeMounts:
             - name: seed-data
               mountPath: /data
