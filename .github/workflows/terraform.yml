@@ -1,9 +1,10 @@
 name: terraform
 
 on:
-  push:
-    branches: [main]
-    paths: ['terraform/**']
+  # apply 는 backend(S3) 설정이 없어 GitHub Actions runner state 가 매번 비어있음
+  # → 이미 존재하는 리소스 재생성 시도로 매 push fail. 로컬에서 직접 terraform
+  # apply 하는 현재 운영 모델에 맞춰 push trigger 제거. 정말 필요할 때만 수동 실행.
+  workflow_dispatch: {}
   pull_request:
     paths: ['terraform/**']
 
@@ -51,7 +52,7 @@ jobs:
         run: exit 1
 
   apply:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: production
     steps:
