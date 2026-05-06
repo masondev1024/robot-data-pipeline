@@ -489,6 +489,10 @@
             display: none;
         }
         .predict-result.show { display: block; }
+        .predict-result.success { background: var(--success-bg); color: #86efac; border: 1px solid var(--success); }
+        .predict-result.warning { background: var(--warning-bg); color: #fcd34d; border: 1px solid var(--warning); }
+        .predict-result.error   { background: var(--danger-bg);  color: #fca5a5; border: 1px solid var(--danger); }
+        .predict-result.info    { background: #0a2540;           color: #93c5fd; border: 1px solid var(--info); }
         .ft-badge {
             display: inline-block;
             padding: 3px 9px;
@@ -859,6 +863,13 @@
         }
 
         // Task 8.4: /api/predict 호출 + failure_type 뱃지 + recommended_action 표시
+        // predict-result 영역 상태 토글 (다크모드 가독성 — inline light bg 회피)
+        function setResultStatus(el, kind, html) {
+            el.classList.remove('success', 'warning', 'error', 'info');
+            el.classList.add('show', kind);
+            el.innerHTML = html;
+        }
+
         async function runPredict() {
             const pfRobot   = document.getElementById('pf-robot');
             const robotId   = normalizeRobotId(pfRobot.value);
@@ -871,9 +882,7 @@
             const result    = document.getElementById('predict-result');
 
             if (!robotId || isNaN(avgTemp) || isNaN(maxTemp) || isNaN(drain) || isNaN(hours) || isNaN(ratio)) {
-                result.classList.add('show');
-                result.style.background = '#fff4e6';
-                result.innerHTML = '⚠️ 모든 필드를 채워주세요.';
+                setResultStatus(result, 'warning', '⚠️ 모든 필드를 채워주세요.');
                 return;
             }
 
@@ -896,18 +905,15 @@
                 let payload = null;
                 try { payload = await resp.json(); } catch (_) { /* non-JSON body */ }
                 if (!resp.ok) {
-                    result.classList.add('show');
                     const detail = payload && payload.detail;
                     if (resp.status === 503 && detail && detail.reason === 'endpoint_offline') {
-                        result.style.background = '#e3f2fd';
-                        result.innerHTML = `
+                        setResultStatus(result, 'info', `
                             <div style="font-weight:600;">🛈 예측 모델 일시 오프라인</div>
                             <div style="margin-top:6px;color:var(--text-secondary);">${detail.message}</div>
-                            <div style="margin-top:4px;font-size:12px;color:var(--text-secondary);">endpoint=${detail.endpoint}</div>`;
+                            <div style="margin-top:4px;font-size:12px;color:var(--text-secondary);">endpoint=${detail.endpoint}</div>`);
                     } else {
-                        result.style.background = '#ffebee';
                         const msg = (detail && (typeof detail === 'string' ? detail : detail.message)) || resp.statusText;
-                        result.innerHTML = `⚠️ 예측 실패: HTTP ${resp.status}: ${msg}`;
+                        setResultStatus(result, 'error', `⚠️ 예측 실패: HTTP ${resp.status}: ${msg}`);
                     }
                     return;
                 }
@@ -919,19 +925,15 @@
                     .slice(0, 3)
                     .map(([k, v]) => `${k}=${(v * 100).toFixed(1)}%`)
                     .join(' · ');
-                result.classList.add('show');
-                result.style.background = ft === 'NONE' ? '#e8f5e9' : '#fff8e1';
-                result.innerHTML = `
+                setResultStatus(result, ft === 'NONE' ? 'success' : 'warning', `
                     <div><span class="ft-badge ft-${ft}">${ft}</span>
                     <span class="risk-${data.risk_level}">[${data.risk_level.toUpperCase()}]</span>
                     fault_prob=${(data.fault_probability * 100).toFixed(1)}%</div>
                     <div style="margin-top:6px;color:var(--text-secondary);">${distLine}</div>
                     <div style="margin-top:6px;">${data.recommended_action}</div>
-                `;
+                `);
             } catch (e) {
-                result.classList.add('show');
-                result.style.background = '#ffebee';
-                result.innerHTML = `⚠️ 예측 실패: ${e.message}`;
+                setResultStatus(result, 'error', `⚠️ 예측 실패: ${e.message}`);
             } finally {
                 btn.disabled = false;
                 btn.textContent = '예측';
@@ -961,9 +963,7 @@
             if (rid !== pfRobot.value) pfRobot.value = rid;
             const result = document.getElementById('predict-result');
             if (!rid) {
-                result.classList.add('show');
-                result.style.background = '#fff4e6';
-                result.innerHTML = '⚠️ 먼저 robot_id 를 입력하세요.';
+                setResultStatus(result, 'warning', '⚠️ 먼저 robot_id 를 입력하세요.');
                 return;
             }
             const btn = document.getElementById('autofill-btn');
@@ -975,9 +975,7 @@
                 if (!resp.ok) {
                     let detail = resp.statusText;
                     try { const j = await resp.json(); detail = j.detail || detail; } catch (_) {}
-                    result.classList.add('show');
-                    result.style.background = '#ffebee';
-                    result.innerHTML = `⚠️ 자동 채우기 실패: HTTP ${resp.status} — ${detail}`;
+                    setResultStatus(result, 'error', `⚠️ 자동 채우기 실패: HTTP ${resp.status} — ${detail}`);
                     return;
                 }
                 const d = await resp.json();
@@ -988,14 +986,10 @@
                 const ratioEl = document.getElementById('pf-ratio');
                 ratioEl.value = d.max_temp_load_ratio;
                 delete ratioEl.dataset.userTouched;
-                result.classList.add('show');
-                result.style.background = '#e8f5e9';
                 const srcTag = d.source === 'athena' ? ' (Athena 직접 조회)' : '';
-                result.innerHTML = `✓ ${d.robot_id} 의 ${d.data_date} 데이터로 채움${srcTag} — 이제 [예측] 버튼을 누르세요.`;
+                setResultStatus(result, 'success', `✓ ${d.robot_id} 의 ${d.data_date} 데이터로 채움${srcTag} — 이제 [예측] 버튼을 누르세요.`);
             } catch (e) {
-                result.classList.add('show');
-                result.style.background = '#ffebee';
-                result.innerHTML = `⚠️ 자동 채우기 실패: ${e.message}`;
+                setResultStatus(result, 'error', `⚠️ 자동 채우기 실패: ${e.message}`);
             } finally {
                 btn.disabled = false;
                 btn.textContent = orig;
