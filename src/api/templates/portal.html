@@ -516,7 +516,11 @@
 <body>
     <header>
         <a class="header-title" href="/" title="홈으로 새로고침">Robot Telemetry Portal</a>
-        <div class="header-info" id="status-info">Loading...</div>
+        <div class="header-info" id="status-info">
+            <span style="color:var(--text-tertiary)">🟡 ML 분석 기준</span>
+            <span style="color:var(--text)" id="status-data-date">…</span>
+            <span style="color:var(--text-tertiary)"> · 실시간 갱신 <span id="status-as-of">…</span></span>
+        </div>
         <a class="work-orders-link" href="/work-orders" title="정비 작업 큐 (대기 건수)">
             🔧 정비 큐 <span class="badge zero" id="header-pending-badge">-</span>
         </a>
@@ -635,19 +639,13 @@
         marked.setOptions({ breaks: true, gfm: true });
 
         async function loadStatus() {
+            // ML 분석 기준일 (D-1) 만 표시 — 매일 KST 01:00 cron 1회 갱신이라 polling 불요.
+            // 실시간 갱신 시각은 loadFleetSummary 가 60초마다 별도 element 갱신.
             try {
                 const resp = await fetch("/api/status");
                 const data = await resp.json();
-                if (data.cached_at && data.data_date) {
-                    const cachedAt = new Date(data.cached_at);
-                    const cachedTime = cachedAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-                    const todayDate  = cachedAt.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' });
-                    // 두 시간 축이 섞여 있어 사용자가 헷갈림 → 분석 기준일(D-1) 과
-                    // 포털/실시간 패널 갱신 시각을 명확히 분리해서 표기.
-                    document.getElementById('status-info').innerHTML =
-                        `<span style="color:var(--text-tertiary)">🟡 ML 분석 기준</span> ` +
-                        `<span style="color:var(--text)">${data.data_date} (D-1)</span> · ` +
-                        `<span style="color:var(--text-tertiary)">실시간 갱신 ${todayDate} ${cachedTime}</span>`;
+                if (data.data_date) {
+                    document.getElementById('status-data-date').textContent = `${data.data_date} (D-1)`;
                 }
             } catch (e) { console.error("Status load failed:", e); }
         }
@@ -699,10 +697,12 @@
                     lastItem.classList.add('stale');
                 }
 
-                // as-of 시각
+                // as-of 시각 — stick bar + 헤더 "실시간 갱신" 둘 다 60초 polling 시점으로 갱신
                 if (d.as_of) {
                     const t = new Date(d.as_of).toLocaleTimeString('ko-KR');
                     document.getElementById('sb-as-of').textContent = `갱신: ${t}`;
+                    const headerAsOf = document.getElementById('status-as-of');
+                    if (headerAsOf) headerAsOf.textContent = t;
                 }
             } catch (e) { console.error('fleet-summary failed:', e); }
         }
