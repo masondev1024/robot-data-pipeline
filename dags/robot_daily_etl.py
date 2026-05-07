@@ -220,6 +220,33 @@ GROUP BY s.robot_id
     _run_athena_query(query)
 
 
+def _refresh_api_cache(**ctx):
+    """robot-telemetry-api 의 Gold 캐시 즉시 재조회 트리거.
+    Why: API pod 의 _gold_cache 는 startup + 매일 KST 01:00 cron 에만 갱신되어,
+    pod 가 daily_etl 종료 전에 띄워졌을 경우 '(데이터 없음)' 으로 굳어 다음 cron 까지 stale.
+    2026-05-07 사고 — 09:32 KST pod 시작 / 09:49 KST gold 적재 / 챗봇은 빈 응답.
+    cluster-internal DNS 로 POST. /api/refresh 는 BasicAuth 면제 + rate limit 5/min."""
+    import urllib.request
+    import urllib.error
+
+    api_url = os.environ.get(
+        "ROBOT_API_REFRESH_URL",
+        "http://robot-telemetry-api.robot-telemetry.svc.cluster.local/api/refresh",
+    )
+    req = urllib.request.Request(api_url, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+            print(f"[cache_refresh] {payload}")
+            if payload.get("rows_after", 0) == 0:
+                # gold partition 이 비어있는 비정상 — 경고만, fail 시키진 않음 (DAG 자체는 성공).
+                print("[cache_refresh] WARN — rows_after=0, 적재 직후인데 캐시 비어있음")
+    except urllib.error.URLError as e:
+        # API 가 다운돼 있어도 ETL 자체는 끝났으므로 fail 시키지 않는다 — 다음 pod 재시작이나
+        # KST 01:00 cron 이 자연 복구. 단 로그로 표시.
+        print(f"[cache_refresh] WARN — refresh 호출 실패: {e}. 다음 cron 까지 stale 가능.")
+
+
 def _bedrock_report(**ctx):
     """Gold 데이터 기반 Bedrock 정비 리포트 생성 후 S3에 저장."""
     execution_date = ctx["execution_date"]
@@ -297,4 +324,13 @@ bedrock_report = PythonOperator(
     dag=dag,
 )
 
-quality_check >> bronze_to_silver >> silver_to_gold >> bedrock_report
+cache_refresh = PythonOperator(
+    task_id="cache_refresh",
+    python_callable=_refresh_api_cache,
+    dag=dag,
+    # silver_to_gold 직후가 의미적으로 맞지만 bedrock_report 가 같은 gold 데이터를 쓰므로
+    # 둘 다 끝난 뒤 마지막에 한 번만 호출. bedrock_report 실패 시 cache_refresh 도 skip 되는데
+    # 이 경우 ETL 자체는 silver_to_gold 까지 성공했으므로 retry 또는 다음 cron 으로 자연 복구.
+)
+
+quality_check >> bronze_to_silver >> silver_to_gold >> bedrock_report >> cache_refresh

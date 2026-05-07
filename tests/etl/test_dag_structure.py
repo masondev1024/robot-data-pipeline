@@ -57,6 +57,15 @@ def test_dag_topology_bedrock_after_gold():
     assert "silver_to_gold" in upstreams
 
 
+def test_dag_topology_cache_refresh_last():
+    """cache_refresh 가 bedrock_report 다음에 실행된다 (2026-05-07 stale cache 회귀 차단)."""
+    cache = dag.get_task("cache_refresh")
+    upstreams = {t.task_id for t in cache.upstream_list}
+    assert "bedrock_report" in upstreams
+    # cache_refresh 가 leaf task 인지 — downstream 0 개
+    assert len(cache.downstream_list) == 0
+
+
 def test_dag_no_cycles():
     """DAG에 순환 참조가 없어야 한다 (Airflow가 자체 검증)."""
     # DagBag 검증을 우회하지 않고 Airflow의 검증을 그대로 활용

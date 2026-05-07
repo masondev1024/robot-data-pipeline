@@ -104,7 +104,11 @@ SageMaker XGBoost multi:softprob 모델이 분류하는 6가지 실패 카테고
 
 
 _basic_auth_creds: tuple[str, str] | None = None
-_BASIC_AUTH_EXEMPT_PATHS = {"/healthz"}
+# /api/refresh — Airflow daily_etl 의 cache_refresh task 가 cluster-internal 로 POST.
+# BasicAuth 면제 사유: cluster-internal traffic only (ALB 미경유), rate limit 으로 abuse 방어,
+# 트리거하는 액션이 "Athena 재쿼리" 1회 뿐이라 data exposure 없음. 외부 ALB 통한 호출은
+# rate limit 통과해도 캐시를 강제 빌드만 시킬 뿐 응답에 데이터가 안 들어감.
+_BASIC_AUTH_EXEMPT_PATHS = {"/healthz", "/api/refresh"}
 
 
 def _get_basic_auth_creds() -> tuple[str, str] | None:
@@ -254,6 +258,23 @@ async def status():
         "data_date": _data_date,
         "cached_at": _cache_updated_at,
         "cache_ready": _cache_ready,
+    }
+
+
+@app.post("/api/refresh")
+@limiter.limit("5/minute")
+async def refresh(request: Request):
+    """Gold 캐시 강제 재조회. Airflow daily_etl 의 마지막 task 가 호출해서
+    pod startup 시점에 5/6 파티션이 비어있어 '(데이터 없음)' 으로 굳었던
+    회귀(2026-05-07) 차단. BasicAuth 면제 — exempt paths 주석 참조."""
+    rows_before = 0 if not _gold_cache or _gold_cache == "(데이터 없음)" else _gold_cache.count("\n")
+    await refresh_cache()
+    rows_after = 0 if not _gold_cache or _gold_cache == "(데이터 없음)" else _gold_cache.count("\n")
+    return {
+        "data_date": _data_date,
+        "cached_at": _cache_updated_at,
+        "rows_before": rows_before,
+        "rows_after": rows_after,
     }
 
 
