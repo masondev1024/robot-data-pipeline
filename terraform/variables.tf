@@ -53,15 +53,27 @@ variable "grafana_admin_password" {
 }
 
 variable "kds_main_shard_count" {
-  description = "Telemetry KDS shard count. 학습 환경 100 robots × 2s tick = 50 rec/s, 10 KB/s 부하 → 1 shard (1000 RPS, 1 MB/s 한도) 의 ~5% 사용으로 충분. 2 shard 운영 시 Firehose buffer flush 가 shard 간 staggered → 5분 sliding window distinct robot count 가 jitter (2026-05-04 사고). 부하 증가 시 (>500 rec/s) 만 2+ 로 복귀."
+  description = "Telemetry KDS shard count. 1000 robots × 1Hz peak = 1000 rec/s 송신. 4 shard = 4000 rec/s 한계 → peak 25% 사용. 한 shard 분포 편향 30~60% 시도 한 shard 300~600 rec/s, 안전 마진 40%+. 2 shard 도 가능하나 Firehose flush stagger (2026-05-04 사고) 안전 마진 위해 4. apply 후 OpenShardCount=4 명시 검증 필수 (CLAUDE.md 가드레일, 2026-05-05 사고)."
+  type        = number
+  default     = 4
+}
+
+variable "kds_alert_shard_count" {
+  description = "Anomaly alert KDS shard count. 1000 robots 환경에서도 분당 ~15 episode → 0.25 rec/s. 1 shard (1000 rec/s 한계) 충분."
   type        = number
   default     = 1
 }
 
-variable "kds_alert_shard_count" {
-  description = "Anomaly alert KDS shard count. 학습/비용 절감 기본 1. 운영 시 2 권장."
+variable "generator_replicas" {
+  description = "Generator StatefulSet replicas. 1단계 HPA 잠금이라 10 고정. POD_TOTAL_REPLICAS env 와 동기화 필요 — Downward API reconciler 구현 후 동적 변경."
   type        = number
-  default     = 1
+  default     = 10
+}
+
+variable "generator_total_robots" {
+  description = "총 robot 수. 각 pod 이 ceil(total / replicas) 만큼 담당 (StatefulSet ordinal 슬라이싱)."
+  type        = number
+  default     = 1000
 }
 
 variable "eks_cluster_version" {

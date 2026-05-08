@@ -23,21 +23,28 @@ SEED_CSV = os.path.join(os.path.dirname(__file__), '../../data/seed_data_sample.
 
 class TestLoadProfiles:
     def test_returns_correct_count(self):
-        """ROBOT_COUNT개 프로필을 반환한다."""
-        profiles = load_profiles(SEED_CSV, 100)
+        """id_range 만큼 프로필을 반환한다."""
+        profiles = load_profiles(SEED_CSV, (0, 100))
         assert len(profiles) == 100
 
     def test_cycles_when_count_exceeds_csv(self):
-        """CSV 행 수(200)보다 robot_count가 크면 순환한다."""
-        profiles = load_profiles(SEED_CSV, 300)
+        """CSV 행 수(200)보다 id_range 가 크면 순환한다."""
+        profiles = load_profiles(SEED_CSV, (0, 300))
         assert len(profiles) == 300
         # 순환 확인: 프로필 0과 프로필 200는 같은 robot_id가 아닌 다른 ID
         assert profiles[0]["robot_id"] == "ROBOT-00001"
         assert profiles[200]["robot_id"] == "ROBOT-00201"
 
+    def test_id_range_offset_slicing(self):
+        """StatefulSet ordinal 기반 슬라이싱: (300, 400) → ROBOT-00301~ROBOT-00400."""
+        profiles = load_profiles(SEED_CSV, (300, 400))
+        assert len(profiles) == 100
+        assert profiles[0]["robot_id"] == "ROBOT-00301"
+        assert profiles[-1]["robot_id"] == "ROBOT-00400"
+
     def test_profile_schema(self):
         """각 프로필이 필수 필드를 모두 갖는다."""
-        profiles = load_profiles(SEED_CSV, 1)
+        profiles = load_profiles(SEED_CSV, (0, 1))
         p = profiles[0]
         required = {"robot_id", "pos_x", "pos_y", "motor_temp_base",
                     "load_base", "drain_factor", "is_faulty", "battery"}
@@ -45,7 +52,7 @@ class TestLoadProfiles:
 
     def test_robot_id_format(self):
         """robot_id가 ROBOT-XXXXX 형식(5자리 패딩)이다."""
-        profiles = load_profiles(SEED_CSV, 10)
+        profiles = load_profiles(SEED_CSV, (0, 10))
         for p in profiles:
             assert p["robot_id"].startswith("ROBOT-"), f"Bad id: {p['robot_id']}"
             suffix = p["robot_id"][6:]
@@ -53,23 +60,60 @@ class TestLoadProfiles:
 
     def test_motor_temp_base_range(self):
         """motor_temp_base가 60~100°C 범위내이다."""
-        profiles = load_profiles(SEED_CSV, 200)
+        profiles = load_profiles(SEED_CSV, (0, 200))
         for p in profiles:
             assert 60.0 <= p["motor_temp_base"] <= 100.0, \
                 f"motor_temp_base out of range: {p['motor_temp_base']}"
 
     def test_load_base_range(self):
         """load_base가 0~100 범위내이다."""
-        profiles = load_profiles(SEED_CSV, 200)
+        profiles = load_profiles(SEED_CSV, (0, 200))
         for p in profiles:
             assert 0 <= p["load_base"] <= 100, \
                 f"load_base out of range: {p['load_base']}"
 
     def test_faulty_robots_exist(self):
         """is_faulty=True인 로봇이 1대 이상 있다 (5% 비율)."""
-        profiles = load_profiles(SEED_CSV, 200)
+        profiles = load_profiles(SEED_CSV, (0, 200))
         faulty = [p for p in profiles if p["is_faulty"]]
         assert len(faulty) > 0, "No faulty robots found in 200 profiles"
+
+
+class TestResolveRobotIdRange:
+    def test_pod_zero_first_slice(self, monkeypatch):
+        """generator-0 → (0, 100) for total=1000, replicas=10."""
+        from app import _resolve_robot_id_range
+        monkeypatch.setenv("POD_NAME", "robot-telemetry-generator-0")
+        monkeypatch.setenv("TOTAL_ROBOTS", "1000")
+        monkeypatch.setenv("POD_TOTAL_REPLICAS", "10")
+        assert _resolve_robot_id_range() == (0, 100)
+
+    def test_pod_three_third_slice(self, monkeypatch):
+        """generator-3 → (300, 400)."""
+        from app import _resolve_robot_id_range
+        monkeypatch.setenv("POD_NAME", "robot-telemetry-generator-3")
+        monkeypatch.setenv("TOTAL_ROBOTS", "1000")
+        monkeypatch.setenv("POD_TOTAL_REPLICAS", "10")
+        assert _resolve_robot_id_range() == (300, 400)
+
+    def test_last_pod_clipped_to_total(self, monkeypatch):
+        """generator-9 with total=1000 replicas=10 → (900, 1000) — 끝점 clip."""
+        from app import _resolve_robot_id_range
+        monkeypatch.setenv("POD_NAME", "robot-telemetry-generator-9")
+        monkeypatch.setenv("TOTAL_ROBOTS", "1000")
+        monkeypatch.setenv("POD_TOTAL_REPLICAS", "10")
+        assert _resolve_robot_id_range() == (900, 1000)
+
+    def test_uneven_split_ceil(self, monkeypatch):
+        """1000 / 7 = 142.86 → ceil(143) per pod, 마지막 pod 은 142 담당."""
+        from app import _resolve_robot_id_range
+        monkeypatch.setenv("TOTAL_ROBOTS", "1000")
+        monkeypatch.setenv("POD_TOTAL_REPLICAS", "7")
+        # pod-0: (0, 143), pod-6: (858, 1000)
+        monkeypatch.setenv("POD_NAME", "generator-0")
+        assert _resolve_robot_id_range() == (0, 143)
+        monkeypatch.setenv("POD_NAME", "generator-6")
+        assert _resolve_robot_id_range() == (858, 1000)
 
 
 # ── 2. 데이터 스키마 검증 ─────────────────────────────────────────

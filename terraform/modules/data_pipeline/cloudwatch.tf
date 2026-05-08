@@ -37,3 +37,44 @@ resource "aws_lambda_permission" "alarm_invoke_alert" {
   principal     = "lambda.alarms.cloudwatch.amazonaws.com"
   source_arn    = aws_cloudwatch_metric_alarm.firehose_delivery_errors.arn
 }
+
+# CloudWatch Alarm: KDS main write throttle
+#
+# 1000 robots production 전환 시 신규: WriteProvisionedThroughputExceeded 가
+# 1건이라도 발생하면 즉시 Slack 알림. 4 shard 환경 peak 1000 rec/s 의 25% 사용률
+# 이라 정상 운영 0건 기대 — 발생 시 partition key skew (60%+ hot shard) 또는
+# 부하 증가 신호 → describe-stream-summary 로 OpenShardCount 확인 + reshard 검토.
+resource "aws_cloudwatch_metric_alarm" "kds_main_write_throttle" {
+  alarm_name          = "${var.project_name}-kds-main-write-throttle"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  datapoints_to_alarm = "1"
+  metric_name         = "WriteProvisionedThroughputExceeded"
+  namespace           = "AWS/Kinesis"
+  period              = "60"
+  statistic           = "Sum"
+  threshold           = "0"
+  treat_missing_data  = "notBreaching"
+  alarm_description   = "KDS main stream write throttle (>0 events/min). 1000 robots production 전환 후 신규 — partition key skew 또는 shard 부족 신호."
+  actions_enabled     = true
+  alarm_actions       = [aws_lambda_function.alert.arn]
+  ok_actions          = [aws_lambda_function.alert.arn]
+
+  dimensions = {
+    StreamName = aws_kinesis_stream.main.name
+  }
+}
+
+resource "aws_lambda_permission" "alarm_invoke_alert_kds_throttle" {
+  statement_id  = "AllowCloudWatchAlarmInvokeKDSThrottle"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.alert.function_name
+  principal     = "lambda.alarms.cloudwatch.amazonaws.com"
+  source_arn    = aws_cloudwatch_metric_alarm.kds_main_write_throttle.arn
+}
+
+# Carry-over: Generator put_records_giving_up log filter alarm.
+# 전제 조건: FluentBit / CloudWatch Container Insights 로 generator pod stdout 이
+# CloudWatch Logs 에 forwarding 되어야 함. 현재 클러스터에 logging agent 미배포
+# → 별도 PR 에서 (1) FluentBit DaemonSet (2) aws_cloudwatch_log_metric_filter
+# pattern '{ $.event = "put_records_giving_up" }' (3) metric alarm 순으로 추가.

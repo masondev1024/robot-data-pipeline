@@ -181,7 +181,7 @@ def main() -> None:
         return
 
     print(f"Loading profiles from {csv_path} for {robot_count:,} robots...")
-    profiles = load_profiles(csv_path, robot_count)
+    profiles = load_profiles(csv_path, (0, robot_count))
 
     timestamps = generate_timestamps(days, interval_min)
     total_expected = len(profiles) * len(timestamps)

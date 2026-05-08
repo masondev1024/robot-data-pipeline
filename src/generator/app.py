@@ -1,6 +1,7 @@
 import asyncio
 import csv
 import json
+import math
 import os
 import random
 import signal
@@ -66,10 +67,36 @@ def _trigger_force_anomaly() -> None:
     }))
 
 
-def load_profiles(csv_path: str, robot_count: int) -> list[dict]:
+def _resolve_robot_id_range() -> tuple[int, int]:
+    """StatefulSet ordinal + replicas 기반 robot ID range 결정.
+
+    POD_NAME 끝의 숫자 = ordinal. TOTAL_ROBOTS / POD_TOTAL_REPLICAS = pod 당 robot 수.
+    e.g. POD_NAME='generator-3', TOTAL_ROBOTS=1000, POD_TOTAL_REPLICAS=10
+         → robots_per_pod = 100 → start=300, end=400
+
+    1000대를 10 pod 으로 분할 시 마지막 pod 이 잔여 분 담당 (ceil 분배).
+    배포 시 POD_TOTAL_REPLICAS 와 StatefulSet spec.replicas 가 일치해야 함.
     """
-    AI4I 2020 CSV를 읽어 robot_count개 로봇 프로필을 반환한다.
-    CSV 행 수 < robot_count이면 행을 순환(cycle)한다.
+    pod_name = os.environ["POD_NAME"]
+    pod_index = int(pod_name.rsplit("-", 1)[-1])
+    total_robots = int(os.environ["TOTAL_ROBOTS"])
+    total_replicas = int(os.environ["POD_TOTAL_REPLICAS"])
+    robots_per_pod = math.ceil(total_robots / total_replicas)
+    start = pod_index * robots_per_pod
+    end = min(start + robots_per_pod, total_robots)
+    return start, end
+
+
+def load_profiles(csv_path: str, id_range: tuple[int, int]) -> list[dict]:
+    """
+    AI4I 2020 CSV를 읽어 id_range 슬라이스 만큼 로봇 프로필을 반환한다.
+    CSV 행 수 < global index 이면 행을 순환(cycle)한다.
+
+    Args:
+        csv_path: AI4I 2020 시드 CSV 경로
+        id_range: (start_global_index, end_global_index) — 전역 robot 번호 슬라이스.
+                  e.g. (0, 100) → robot_id ROBOT-00001~ROBOT-00100
+                       (300, 400) → robot_id ROBOT-00301~ROBOT-00400 (StatefulSet pod-3)
 
     컬럼 매핑:
       Process temperature [K] → motor_temp_base  (K-273.15, clamp 60~100°C)
@@ -78,11 +105,12 @@ def load_profiles(csv_path: str, robot_count: int) -> list[dict]:
       Machine failure         → is_faulty          (True면 스파이크 확률 70%)
       TWF/HDF/PWF/OSF/RNF     → failure_type       (Task 8.1, ground truth 라벨)
     """
+    start, end = id_range
     with open(csv_path, newline="") as f:
         rows = list(csv.DictReader(f))
 
     profiles = []
-    for i in range(robot_count):
+    for i in range(start, end):
         r = rows[i % len(rows)]
         proc_k  = float(r["Process temperature [K]"])
         rpm     = float(r["Rotational speed [rpm]"])
@@ -311,13 +339,21 @@ async def batch_sender(queue: asyncio.Queue,
 
 
 async def main() -> None:
-    robot_count   = int(os.environ.get("ROBOT_COUNT", "10000"))
+    # 1000대 production 분할: StatefulSet ordinal 기반 robot ID range.
+    # POD_NAME 미설정 시 (로컬 dev) 옛 ROBOT_COUNT env 호환 모드로 fallback.
+    if "POD_NAME" in os.environ:
+        id_range = _resolve_robot_id_range()
+    else:
+        legacy_count = int(os.environ.get("ROBOT_COUNT", "100"))
+        id_range = (0, legacy_count)
+
+    robot_count   = id_range[1] - id_range[0]
     tick_interval = float(os.environ.get("TICK_INTERVAL_SECONDS", "1.0"))
     stream_name   = os.environ["KINESIS_STREAM_NAME"]
     csv_path      = os.environ.get("SEED_CSV_PATH", "data/seed_data_sample.csv")
 
-    print(f"Loading profiles from {csv_path} for {robot_count} robots (tick={tick_interval}s)...")
-    profiles = load_profiles(csv_path, robot_count)
+    print(f"Loading profiles from {csv_path} for robots {id_range[0]}~{id_range[1]} (tick={tick_interval}s)...")
+    profiles = load_profiles(csv_path, id_range)
 
     kinesis = get_client("kinesis")
     queue   = asyncio.Queue(maxsize=robot_count * 2)
