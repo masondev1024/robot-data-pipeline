@@ -183,7 +183,14 @@ def _get_grafana_url() -> str:
 
 
 async def refresh_cache():
-    """Athena Gold 테이블 최신 파티션 조회 → _gold_cache 갱신."""
+    """Athena Gold 테이블 최신 파티션 조회 → _gold_cache 갱신.
+
+    어제(D-1) 파티션이 없으면(=비용 셧다운으로 daily_etl 미실행) 최근 7일 내
+    가장 최신 파티션으로 fallback. partition pruning 위해 inner/outer 둘 다
+    `dt >= window_start` 명시.
+    Why: 2026-05-12 — 5/11 셧다운으로 5/11 gold 파티션 부재 → '(데이터 없음)' →
+    AI 챗봇이 시스템 프롬프트 Edge Case 분기 ("Gold 데이터가 없습니다") 로 응답.
+    """
     global _gold_cache, _cache_updated_at, _data_date
 
     database = os.environ.get("ATHENA_DATABASE", "robot_telemetry_db")
@@ -193,12 +200,16 @@ async def refresh_cache():
         "s3://de-ai-06-smartfactory-bucket/project-athena-results/",
     )
 
-    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    window_start = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
     query = f"""
 SELECT robot_id, avg_motor_temp, max_motor_temp,
        battery_start, battery_end, battery_drain, active_hours, dt
 FROM gold_robot_daily_stats
-WHERE dt = DATE '{yesterday}'
+WHERE dt >= DATE '{window_start}'
+  AND dt = (
+      SELECT MAX(dt) FROM gold_robot_daily_stats
+      WHERE dt >= DATE '{window_start}'
+  )
 ORDER BY avg_motor_temp DESC
 LIMIT 100
 """
@@ -218,10 +229,11 @@ LIMIT 100
             header = ",".join(rows[0].keys())
             data_lines = "\n".join(",".join(r.values()) for r in rows)
             _gold_cache = f"{header}\n{data_lines}"
+            _data_date = rows[0].get("dt") or window_start
         else:
             _gold_cache = "(데이터 없음)"
+            _data_date = ""
         _cache_updated_at = datetime.now(timezone.utc).isoformat()
-        _data_date = yesterday
     except Exception as exc:
         print(f"[refresh_cache] 실패: {exc}")
         if not _gold_cache:
