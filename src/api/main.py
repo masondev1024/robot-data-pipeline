@@ -666,6 +666,10 @@ async def list_recommendations():
 
     portal /work-orders 페이지에서 "+ 작업 생성" 버튼으로 1건씩 명시 enqueue.
     자동 생성 X — generator 가상 데이터 폭주 방지 (사용자 결정).
+
+    어제(D-1) 파티션이 없으면 최근 7일 내 가장 최신 dt 로 fallback — 비용
+    셧다운 gap 자연 회복. inner/outer 둘 다 dt 범위 명시로 partition pruning 유지.
+    Why: 2026-05-12 — refresh_cache 와 동일 D-1 hard-code 회귀 (포털 "추천 후보 없음").
     """
     sql = """
     WITH base AS (
@@ -682,7 +686,11 @@ async def list_recommendations():
              END AS hourly_loss
       FROM gold_robot_daily_stats g
       JOIN dim_robot_line d ON g.robot_id = d.robot_id
-      WHERE g.dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)
+      WHERE g.dt >= (CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '7' DAY)
+        AND g.dt = (
+            SELECT MAX(dt) FROM gold_robot_daily_stats
+            WHERE dt >= (CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '7' DAY)
+        )
         AND COALESCE(g.dominant_failure_type, 'NONE') <> 'NONE'
     ),
     scored AS (
