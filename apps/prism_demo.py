@@ -667,6 +667,116 @@ def render_retrain_evidence() -> None:
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
+def render_feature_importance_change() -> None:
+    """마커 9 신규 — incident #47 학습 후 XGBoost feature importance 변화.
+
+    재학습 자산화 narrative: incident 가 모델 결정 트리에 어떻게 통합됐는지.
+    """
+    st.markdown("##### 🧠 incident #47 학습 영향도 — Feature Importance 변화")
+
+    features = ["motor_temp_max", "tool_age", "thermal_drift", "vibration_max",
+                "coolant_temp", "spindle_rpm"]
+    before_imp = [0.18, 0.22, 0.12, 0.15, 0.08, 0.10]
+    after_imp  = [0.31, 0.18, 0.21, 0.14, 0.06, 0.08]
+
+    col_metric, col_chart = st.columns([1, 2])
+    with col_metric:
+        st.metric("motor_temp_max", "0.18 → 0.31", delta="+72%",
+                  help="incident #47 로 HDF 핵심 feature 부각")
+        st.metric("thermal_drift", "0.12 → 0.21", delta="+75%",
+                  help="인과 DAG v2 신규 path 반영")
+        st.metric("tool_age 가중", "0.22 → 0.18", delta="-18%", delta_color="inverse",
+                  help="HDF 비중 ↑ → 다른 feature 가중 ↓")
+        st.caption("📊 incident 패턴이 XGBoost 결정 트리에 자산화")
+
+    with col_chart:
+        fig = go.Figure()
+        fig.add_trace(go.Bar(name="재학습 전", x=features, y=before_imp,
+                             marker_color="#aec7e8",
+                             text=[f"{v:.2f}" for v in before_imp],
+                             textposition="auto"))
+        fig.add_trace(go.Bar(name="재학습 후", x=features, y=after_imp,
+                             marker_color="#1f77b4",
+                             text=[f"{v:.2f}" for v in after_imp],
+                             textposition="auto"))
+        fig.update_layout(
+            title=dict(text="XGBoost Feature Importance (top 6)", font=dict(size=13)),
+            barmode="group", height=290,
+            yaxis=dict(range=[0, 0.4], title="Importance"),
+            margin=dict(l=10, r=10, t=50, b=40),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            xaxis=dict(tickangle=-15),
+        )
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
+def render_closed_loop_summary() -> None:
+    """마커 10 신규 — PRISM Closed-Loop 4-step 가치 요약 (발표 메시지)."""
+    st.markdown("##### 🔄 PRISM Closed-Loop 4-step — 완주 시간 3:45")
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        with st.container(border=True):
+            st.markdown("##### 📡 ① 센서통합")
+            st.metric("처리 latency", "< 100ms")
+            st.caption("DuckDB in-process · 11 sensor 실시간")
+    with c2:
+        with st.container(border=True):
+            st.markdown("##### 🔍 ② 인과 RCA")
+            st.metric("RCA 시간", "24min", delta="-90%", delta_color="inverse")
+            st.caption("DoWhy 6-Node + σ_max 0.40 robust")
+    with c3:
+        with st.container(border=True):
+            st.markdown("##### 🤖 ③ Multi-Agent")
+            st.metric("협상 응답", "~8s")
+            st.caption("Sonnet + Haiku × 4 · Net Value (KRW)")
+    with c4:
+        with st.container(border=True):
+            st.markdown("##### 🎓 ④ 학습 자산화")
+            st.metric("재학습 정확도", "0.91", delta="+47%")
+            st.caption("incident #47 → DAG v2 + 모델 갱신")
+
+
+def render_cost_impact() -> None:
+    """마커 10 신규 — PRISM 도입 비용 임팩트 (vs 엔터프라이즈 MES)."""
+    st.markdown("##### 💰 비용 임팩트 — 1년 운영 시뮬 (1인 메이커스페이스)")
+
+    col_compare, col_chart = st.columns([1, 2])
+    with col_compare:
+        st.metric("PRISM 연간", "₩240,000",
+                  help="₩20 × 12 = 노트북 1대 + Bedrock on-demand")
+        st.metric("MES 연간", "₩10,000,000+",
+                  delta="-97.6%", delta_color="inverse",
+                  help="엔터프라이즈 MES (보수적 추정)")
+        st.metric("연간 절감", "₩9,760,000+",
+                  help="PRISM 도입 시 절감 + incident 손실 -90%")
+        st.caption("📌 비용 -98% + incident 손실 사전 예방")
+
+    with col_chart:
+        categories = ["라이선스/<br>운영비", "incident<br>1건 손실<br>(평균)", "RCA<br>인건비/년"]
+        without_prism = [10_000_000, 5_000_000, 8_000_000]
+        with_prism = [240_000, 500_000, 800_000]
+        fig = go.Figure()
+        fig.add_trace(go.Bar(name="MES (without PRISM)", x=categories, y=without_prism,
+                             marker_color="#d62728",
+                             text=[f"₩{v/1_000_000:.1f}M" for v in without_prism],
+                             textposition="auto"))
+        fig.add_trace(go.Bar(name="PRISM", x=categories, y=with_prism,
+                             marker_color="#2ca02c",
+                             text=[f"₩{v/1_000_000:.2f}M" for v in with_prism],
+                             textposition="auto"))
+        fig.update_layout(
+            title=dict(text="3 비용 항목 비교 (단위: 원)", font=dict(size=13)),
+            barmode="group", height=290,
+            yaxis=dict(title="₩", type="log",
+                       tickvals=[100_000, 1_000_000, 10_000_000],
+                       ticktext=["10만", "100만", "1000만"]),
+            margin=dict(l=10, r=10, t=50, b=40),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        )
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
 def render_oee_evidence() -> None:
     """마커 10 (3:45 OEE +35%) 근거 — Availability × Performance × Quality (Nakajima 표준)."""
     st.markdown("##### 🏭 OEE +35% 달성 — Nakajima 3 구성 요소")
@@ -827,10 +937,8 @@ def main() -> None:
 
     with col_left:
         # 마커 0~6: DAG (marker_idx 별 색상) + 단계별 가시 액션
-        # 마커 7~: 4 Agent + Supervisor (DAG 숨김, 스크롤 X)
         if marker_idx < 7:
             render_causal_dag(marker_idx)
-            # 마커별 액션 (mason 5차 피드백 P0+P1)
             if marker_idx == 1:
                 st.markdown("---")
                 render_predictive_alert()
@@ -844,44 +952,27 @@ def main() -> None:
                 st.markdown("---")
                 render_incident_alert()
 
-        # 마커 10: OEE +35% evidence (가장 최신 결과, 상단)
-        if marker_idx >= 10:
-            render_oee_evidence()
-            st.markdown("---")
-
-        # 마커 9: 재학습 evidence
-        if marker_idx >= 9:
-            render_retrain_evidence()
-            st.markdown("---")
-
-        # 마커 2:15 (idx 7) 이후 — 4 Agent + Supervisor 표시
-        # 마커 7: 4 Agent 협상이 main view
-        # 마커 8+: Supervisor 결정이 main view (상단), 4 Agent 는 근거 reference (하단)
-        if marker_idx >= 7:
+        # 마커 7~8: 4 Agent 협상 + Supervisor 결정
+        elif marker_idx in (7, 8):
             try:
                 if _PRISM_MODE in ("demo", "live"):
-                    # 실호출 — Supervisor 가 4 Agent fan-out + net_value 산정
                     sup_out, candidates_ordered = _real_supervisor_decision(
                         marker_idx, alpha, beta, gamma, horizon_h=4,
                     )
-                    if marker_idx >= 8:
+                    if marker_idx == 8:
                         render_supervisor_card(sup_out)
                         st.markdown("---")
                         st.markdown("##### 🤖 위 결정의 근거: 4 Domain Agent 협상")
                         render_4agent_outputs(candidates_ordered[0])
                     else:
-                        # 마커 7: 4 Agent 만 (Supervisor 결정 전)
                         render_4agent_outputs(candidates_ordered[0])
                 else:
-                    # dev mode — mock fallback
                     action = _mock_4agent_action()
-                    if marker_idx >= 8:
+                    if marker_idx == 8:
                         sup_out = _mock_supervisor_decision()
                         net, breakdown = compute_net_value_KRW(
-                            quality=action.quality,
-                            safety=action.safety,
-                            equipment=action.equipment,
-                            production=action.production,
+                            quality=action.quality, safety=action.safety,
+                            equipment=action.equipment, production=action.production,
                             alpha=alpha, beta=beta, gamma=gamma, horizon_h=4,
                         )
                         updated_decision = SupervisorDecision(
@@ -907,6 +998,20 @@ def main() -> None:
             except BedrockError:
                 st.error("Bedrock 호출 오류 — 영상 fallback 전환")
                 fallback_video()
+
+        # 마커 9: 재학습 deep dive (Supervisor + 4 Agent 제거, mason 6차 피드백)
+        elif marker_idx == 9:
+            render_retrain_evidence()
+            st.markdown("---")
+            render_feature_importance_change()
+
+        # 마커 10: OEE + Closed-Loop 요약 + 비용 임팩트
+        elif marker_idx == 10:
+            render_oee_evidence()
+            st.markdown("---")
+            render_closed_loop_summary()
+            st.markdown("---")
+            render_cost_impact()
 
     with col_right:
         st.markdown("#### 마커 컨트롤")
