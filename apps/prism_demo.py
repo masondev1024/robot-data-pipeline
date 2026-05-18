@@ -573,19 +573,6 @@ def main() -> None:
         page_icon="🏭",
     )
 
-    # 사이드바 폭 확장 (default 244px → 360px) — native output / 학술 reference 잘림 fix
-    st.markdown(
-        """
-        <style>
-        section[data-testid="stSidebar"] {
-            min-width: 360px !important;
-            max-width: 360px !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
     render_header()
     st.markdown("---")
 
@@ -609,7 +596,10 @@ def main() -> None:
     col_left, col_right = st.columns([2, 1])
 
     with col_left:
-        render_causal_dag()
+        # 마커 0~6: DAG 가 main view (인과 추론 단계)
+        # 마커 7~: 4 Agent 협상이 main view (스크롤 불필요), DAG 는 숨김
+        if marker_idx < 7:
+            render_causal_dag()
 
         # 마커 2:15 (idx 7) 이후 — 4 Agent + Supervisor 표시
         if marker_idx >= 7:
