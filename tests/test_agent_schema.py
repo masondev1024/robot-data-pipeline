@@ -132,12 +132,17 @@ def test_invalid_failure_type_enum():
 # ── compute_net_value_KRW ───────────────────────────────────────
 
 def test_net_value_safety_violation_dominates():
-    """β safety_violation=1억 KRW → 어떤 throughput 도 net 음수."""
+    """β safety_violation=1억 KRW → 중간 throughput 까지 net 음수 압도.
+
+    UPH 247 full capacity (178M throughput) 에서는 β default=1 만으로 safety=100M 압도 안 됨.
+    이건 도메인 의도 (β slider 가산 시연으로 halt 유도, ADR Decision 1 Synthesis 1).
+    UPH 100 = 72M throughput < 100M safety → 압도 검증.
+    """
     net, breakdown = compute_net_value_KRW(
         quality=_quality(defect_prob=0.0),
         safety=_safety(prob=1.0),
         equipment=_equipment(rul=100.0),
-        production=_production(uph=247.0),
+        production=_production(uph=100.0),
         horizon_h=4,
     )
     assert breakdown.safety_loss_KRW == -100_000_000.0

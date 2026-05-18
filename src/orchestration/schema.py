@@ -117,7 +117,7 @@ def compute_net_value_KRW(
     beta: float = 1.0,
     gamma: float = 1.0,
     horizon_h: int = 4,
-    unit_revenue_KRW: float = 18_000.0,
+    unit_revenue_KRW: float = 180_000.0,
     unit_defect_cost_KRW: float = 50_000.0,
     safety_violation_KRW: float = 100_000_000.0,
     rul_hour_cost_KRW: float = 25_000.0,
