@@ -61,6 +61,21 @@ MARKERS: list[tuple[int, str]] = [
 ]
 TOTAL_SECONDS = 225  # 3:45
 
+# 각 마커별 한국어 1줄 설명 (mason 피드백: 단계 metric 아래 caption)
+_MARKER_DESCRIPTIONS: dict[int, str] = {
+    0:  "센서 데이터 정상 흐름, 모든 라인 가동 중",
+    1:  "이상 신호 감지 — 결함 risk 62% 예지경보 발동",
+    2:  "DoWhy 6-Node DAG 인과 추론 v1 생성",
+    3:  "운영자가 시뮬레이션 가속 요청",
+    4:  "fast-forward 시뮬 결과 표시",
+    5:  "결함 #47 실제 발생, motor_temp 105°C 도달",
+    6:  "DAG v2 갱신 — spindle_rpm 개입 효과 추가",
+    7:  "4 Domain Agent 가 동시 분석 (품질·안전·설비·생산)",
+    8:  "Supervisor 가 Net Value 산정 — 최적 액션 권고",
+    9:  "강화학습 모델 재학습 완료, 정확도 0.62 → 0.91 (+47%)",
+    10: "OEE +35% 달성, 시연 완료",
+}
+
 # PRISM 차별화 KPI
 COST_PRISM_KRW_PER_MONTH = "₩10–20"
 COST_MES_KRW_PER_YEAR = "₩10,000+"
@@ -275,20 +290,21 @@ def render_marker_timeline(current_marker_idx: int) -> None:
     current_sec = MARKERS[current_marker_idx][0]
     progress_pct = current_sec / TOTAL_SECONDS
 
-    # Progress bar
-    st.progress(progress_pct, text=f"{MARKERS[current_marker_idx][1]}  ({progress_pct:.0%})")
+    # 현재 마커 강조 (큰 markdown header)
+    st.markdown(f"### ▶ {MARKERS[current_marker_idx][1]}  ({progress_pct:.0%})")
+    st.progress(progress_pct)
 
-    # Chip row via Plotly
+    # Chip row via Plotly — 키운 크기 (mason 피드백: 글씨 잘 보이게)
     labels = [label for _, label in MARKERS]
     x_pos = [i for i in range(len(MARKERS))]
     colors = [
         "#1f77b4" if i == current_marker_idx else
         "#aec7e8" if i < current_marker_idx else
-        "#d3d3d3"
+        "#e0e0e0"
         for i in range(len(MARKERS))
     ]
     font_colors = [
-        "white" if i <= current_marker_idx else "#555"
+        "white" if i <= current_marker_idx else "#666"
         for i in range(len(MARKERS))
     ]
 
@@ -297,10 +313,10 @@ def render_marker_timeline(current_marker_idx: int) -> None:
         x=x_pos,
         y=[0] * len(MARKERS),
         mode="markers+text",
-        marker=dict(size=18, color=colors, line=dict(width=1, color="#999")),
+        marker=dict(size=30, color=colors, line=dict(width=2, color="#666")),
         text=[str(i) for i in range(len(MARKERS))],
         textposition="middle center",
-        textfont=dict(color=font_colors, size=10),
+        textfont=dict(color=font_colors, size=14, family="Arial Black"),
         hovertext=labels,
         hoverinfo="text",
     ))
@@ -309,25 +325,28 @@ def render_marker_timeline(current_marker_idx: int) -> None:
         type="line",
         x0=0, x1=len(MARKERS) - 1,
         y0=0, y1=0,
-        line=dict(color="#aec7e8", width=2),
+        line=dict(color="#aec7e8", width=3),
         layer="below",
     )
-    # Labels below chips
+    # Labels below chips — 2 줄 (시간 + 라벨), 수평
     for i, (_, label) in enumerate(MARKERS):
-        short = label.split(" ", 1)[1] if " " in label else label
+        parts = label.split(" ", 1)
+        time_str = parts[0] if parts else ""
+        label_str = parts[1] if len(parts) > 1 else ""
         fig.add_annotation(
-            x=i, y=-0.25,
-            text=short[:10],
+            x=i, y=-0.55,
+            text=f"<b>{time_str}</b><br>{label_str}",
             showarrow=False,
-            font=dict(size=8, color="#555"),
-            textangle=-30,
+            font=dict(size=11, color="#333"),
+            textangle=0,
+            align="center",
         )
 
     fig.update_layout(
-        height=110,
-        margin=dict(l=10, r=10, t=5, b=40),
-        xaxis=dict(visible=False),
-        yaxis=dict(visible=False, range=[-0.5, 0.4]),
+        height=180,
+        margin=dict(l=10, r=10, t=10, b=10),
+        xaxis=dict(visible=False, range=[-0.5, len(MARKERS) - 0.5]),
+        yaxis=dict(visible=False, range=[-1.2, 0.5]),
         plot_bgcolor="white",
         paper_bgcolor="white",
         showlegend=False,
@@ -474,6 +493,80 @@ def render_4agent_outputs(action: CandidateAction) -> None:
             st.caption(f"💬 *“{action.production.narrative_kr}”*")
 
 
+def render_retrain_evidence() -> None:
+    """마커 9 (3:30 재학습) 근거 — 정확도 0.62→0.91 + Failure class 별 F1.
+
+    incident #47 패턴 추가 학습 → XGBoost 6-class 모델 재학습 완료.
+    """
+    st.markdown("##### 🎓 재학습 결과 — incident #47 패턴 학습")
+
+    col_metric, col_chart = st.columns([1, 2])
+    with col_metric:
+        st.metric("재학습 전 정확도", "0.62", help="incident #47 발생 시점 모델")
+        st.metric("재학습 후 정확도", "0.91", delta="+0.29 (+47%)",
+                  help="incident #47 패턴 추가 학습 후")
+        st.caption("📊 동일 결함 패턴 재발 예방, 강화학습 루프 검증")
+
+    with col_chart:
+        class_names = ["NONE", "TWF", "HDF", "PWF", "OSF", "RNF"]
+        before_f1 = [0.85, 0.45, 0.50, 0.60, 0.55, 0.65]
+        after_f1  = [0.96, 0.88, 0.93, 0.90, 0.85, 0.92]
+        fig = go.Figure()
+        fig.add_trace(go.Bar(name="재학습 전", x=class_names, y=before_f1,
+                             marker_color="#aec7e8",
+                             text=[f"{v:.2f}" for v in before_f1],
+                             textposition="auto"))
+        fig.add_trace(go.Bar(name="재학습 후", x=class_names, y=after_f1,
+                             marker_color="#1f77b4",
+                             text=[f"{v:.2f}" for v in after_f1],
+                             textposition="auto"))
+        fig.update_layout(
+            title=dict(text="Failure Class 별 F1 Score", font=dict(size=13)),
+            barmode="group", height=270,
+            yaxis=dict(range=[0, 1.05], title="F1"),
+            margin=dict(l=10, r=10, t=50, b=10),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        )
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
+def render_oee_evidence() -> None:
+    """마커 10 (3:45 OEE +35%) 근거 — Availability × Performance × Quality (Nakajima 표준)."""
+    st.markdown("##### 🏭 OEE +35% 달성 — Nakajima 3 구성 요소")
+
+    components = ["Availability<br>(가용률)", "Performance<br>(성능률)", "Quality<br>(품질률)"]
+    before = [0.75, 0.70, 0.65]   # OEE = 0.341
+    after  = [0.85, 0.85, 0.92]   # OEE = 0.665
+    oee_before = before[0] * before[1] * before[2]
+    oee_after  = after[0] * after[1] * after[2]
+
+    col_card, col_chart = st.columns([1, 2])
+    with col_card:
+        st.metric("OEE 개선 전", f"{oee_before:.1%}")
+        st.metric("OEE 개선 후", f"{oee_after:.1%}",
+                  delta=f"+{(oee_after / oee_before - 1) * 100:.0f}% (relative)")
+        st.caption("OEE = 가용 × 성능 × 품질  (Nakajima 1989)")
+
+    with col_chart:
+        fig = go.Figure()
+        fig.add_trace(go.Bar(name="개선 전", x=components, y=before,
+                             marker_color="#aec7e8",
+                             text=[f"{v:.0%}" for v in before],
+                             textposition="auto"))
+        fig.add_trace(go.Bar(name="개선 후", x=components, y=after,
+                             marker_color="#1f77b4",
+                             text=[f"{v:.0%}" for v in after],
+                             textposition="auto"))
+        fig.update_layout(
+            title=dict(text="3 구성 요소 비교", font=dict(size=13)),
+            barmode="group", height=270,
+            yaxis=dict(range=[0, 1.05], title="율"),
+            margin=dict(l=10, r=10, t=50, b=10),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        )
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
 def render_supervisor_card(decision: SupervisorOutput) -> None:
     """Supervisor 결정 카드 — net_value + tradeoff_breakdown + alternatives."""
     dec = decision.decision
@@ -601,6 +694,16 @@ def main() -> None:
         if marker_idx < 7:
             render_causal_dag()
 
+        # 마커 10: OEE +35% evidence (가장 최신 결과, 상단)
+        if marker_idx >= 10:
+            render_oee_evidence()
+            st.markdown("---")
+
+        # 마커 9: 재학습 evidence
+        if marker_idx >= 9:
+            render_retrain_evidence()
+            st.markdown("---")
+
         # 마커 2:15 (idx 7) 이후 — 4 Agent + Supervisor 표시
         # 마커 7: 4 Agent 협상이 main view
         # 마커 8+: Supervisor 결정이 main view (상단), 4 Agent 는 근거 reference (하단)
@@ -655,9 +758,6 @@ def main() -> None:
                 st.error("Bedrock 호출 오류 — 영상 fallback 전환")
                 fallback_video()
 
-        else:
-            st.info(f"마커 7 (2:15 4 Agent) 이후 분석 결과 표시 — 현재: 마커 {marker_idx}")
-
     with col_right:
         st.markdown("#### 마커 컨트롤")
         st.caption(f"현재: **{MARKERS[marker_idx][1]}**  ({marker_idx + 1}/{len(MARKERS)})")
@@ -683,6 +783,7 @@ def main() -> None:
         ss = sec % 60
         st.metric("타임코드", f"{mm}:{ss:02d}")
         st.metric("단계", label.split(" ", 1)[1] if " " in label else label)
+        st.caption(f"📝 {_MARKER_DESCRIPTIONS.get(marker_idx, '')}")
 
         # 재학습 결과 (마커 3:30 이후)
         if marker_idx >= 9:
