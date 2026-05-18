@@ -602,6 +602,8 @@ def main() -> None:
             render_causal_dag()
 
         # 마커 2:15 (idx 7) 이후 — 4 Agent + Supervisor 표시
+        # 마커 7: 4 Agent 협상이 main view
+        # 마커 8+: Supervisor 결정이 main view (상단), 4 Agent 는 근거 reference (하단)
         if marker_idx >= 7:
             try:
                 if _PRISM_MODE in ("demo", "live"):
@@ -609,14 +611,17 @@ def main() -> None:
                     sup_out, candidates_ordered = _real_supervisor_decision(
                         marker_idx, alpha, beta, gamma, horizon_h=4,
                     )
-                    # winning candidate (= candidates_ordered[0]) 의 4 Agent narrative 표시
-                    render_4agent_outputs(candidates_ordered[0])
                     if marker_idx >= 8:
                         render_supervisor_card(sup_out)
+                        st.markdown("---")
+                        st.markdown("##### 🤖 위 결정의 근거: 4 Domain Agent 협상")
+                        render_4agent_outputs(candidates_ordered[0])
+                    else:
+                        # 마커 7: 4 Agent 만 (Supervisor 결정 전)
+                        render_4agent_outputs(candidates_ordered[0])
                 else:
-                    # dev mode — mock fallback (cache pre-build 안 끝났을 때 / 개발)
+                    # dev mode — mock fallback
                     action = _mock_4agent_action()
-                    render_4agent_outputs(action)
                     if marker_idx >= 8:
                         sup_out = _mock_supervisor_decision()
                         net, breakdown = compute_net_value_KRW(
@@ -634,6 +639,11 @@ def main() -> None:
                             tradeoff_breakdown=breakdown,
                         )
                         render_supervisor_card(SupervisorOutput(decision=updated_decision))
+                        st.markdown("---")
+                        st.markdown("##### 🤖 위 결정의 근거: 4 Domain Agent 협상")
+                        render_4agent_outputs(action)
+                    else:
+                        render_4agent_outputs(action)
 
             except CacheReplayError:
                 st.error("Cache miss — 영상 fallback 전환")
