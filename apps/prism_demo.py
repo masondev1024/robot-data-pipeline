@@ -403,37 +403,75 @@ def render_causal_dag() -> None:
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
-def render_4agent_outputs(action: CandidateAction) -> None:
-    """4 Agent 출력 — 4 컬럼 레이아웃.
+def _quality_badge(q: QualityAgentOutput) -> str:
+    p = q.numeric.defect_prob
+    ft = q.numeric.top_failure_type
+    if p >= 0.5: return f"❌ **위험** — {ft} 발생 우려"
+    if p >= 0.2: return f"⚠️ **주의** — {ft} 모니터"
+    return f"✅ **정상** — {ft}"
 
-    각 Agent 의 numeric + narrative_kr 표시.
+
+def _safety_badge(s: SafetyAgentOutput) -> str:
+    n = s.numeric
+    if n.estop_required: return "🛑 **즉시 정지** — E-stop 발동"
+    if n.sop_violation: return "⚠️ **SOP 위반** — 감속/정지 필요"
+    return "✅ **안전** — SOP 범위"
+
+
+def _equipment_badge(e: EquipmentAgentOutput, horizon_h: int = 4) -> str:
+    rul = e.numeric.rul_hours
+    if rul < 24: return f"🛠️ **정비 시급** — RUL {rul:.0f}h"
+    if rul < 48: return f"⚠️ **곧 정비** — RUL {rul:.0f}h"
+    return f"✅ **가동 가능** — RUL {rul:.0f}h"
+
+
+def _production_badge(p: ProductionAgentOutput) -> str:
+    n = p.numeric
+    if not n.schedule_feasible: return f"⚠️ **재계획** — UPH {n.throughput_uph:.0f}"
+    return f"✅ **진행 권장** — UPH {n.throughput_uph:.0f}"
+
+
+def render_4agent_outputs(action: CandidateAction) -> None:
+    """4 Domain Agent 협상 — 4 컬럼 bordered container.
+
+    페르소나 (🎯/🛡️/⚙️/📈) + 추천 badge + 💬 인용 톤 narrative 로 "보고서" 느낌 X,
+    "각자 주장 펼치는" 협상 narrative 강화.
     """
-    st.markdown("#### 4 Domain Agent 분석 결과")
+    st.markdown("#### 4 Domain Agent 협상")
+    st.caption("각 Agent 가 자신의 도메인 시점에서 candidate action 을 평가 → Supervisor 가 Net Value 로 종합")
     c_q, c_s, c_e, c_p = st.columns(4)
 
     with c_q:
-        st.markdown("**품질 Agent**")
-        st.metric("결함 확률", f"{action.quality.numeric.defect_prob:.0%}")
-        st.metric("Failure Type", action.quality.numeric.top_failure_type)
-        st.caption(action.quality.narrative_kr)
+        with st.container(border=True):
+            st.markdown("##### 🎯 품질 Agent")
+            st.markdown(_quality_badge(action.quality))
+            st.metric("결함 확률", f"{action.quality.numeric.defect_prob:.0%}")
+            st.metric("Failure Type", action.quality.numeric.top_failure_type)
+            st.caption(f"💬 *“{action.quality.narrative_kr}”*")
 
     with c_s:
-        st.markdown("**안전 Agent**")
-        st.metric("안전 위반 확률", f"{action.safety.numeric.safety_violation_prob:.0%}")
-        st.metric("E-Stop 필요", "YES" if action.safety.numeric.estop_required else "NO")
-        st.caption(action.safety.narrative_kr)
+        with st.container(border=True):
+            st.markdown("##### 🛡️ 안전 Agent")
+            st.markdown(_safety_badge(action.safety))
+            st.metric("안전 위반 확률", f"{action.safety.numeric.safety_violation_prob:.0%}")
+            st.metric("E-Stop 필요", "YES" if action.safety.numeric.estop_required else "NO")
+            st.caption(f"💬 *“{action.safety.narrative_kr}”*")
 
     with c_e:
-        st.markdown("**설비 Agent**")
-        st.metric("잔여 수명(h)", f"{action.equipment.numeric.rul_hours:.1f}")
-        st.metric("IsoForest 점수", f"{action.equipment.numeric.isolation_forest_score:.2f}")
-        st.caption(action.equipment.narrative_kr)
+        with st.container(border=True):
+            st.markdown("##### ⚙️ 설비 Agent")
+            st.markdown(_equipment_badge(action.equipment))
+            st.metric("잔여 수명(h)", f"{action.equipment.numeric.rul_hours:.1f}")
+            st.metric("IsoForest 점수", f"{action.equipment.numeric.isolation_forest_score:.2f}")
+            st.caption(f"💬 *“{action.equipment.narrative_kr}”*")
 
     with c_p:
-        st.markdown("**생산 Agent**")
-        st.metric("처리량(uph)", f"{action.production.numeric.throughput_uph:.0f}")
-        st.metric("스케줄 가능", "YES" if action.production.numeric.schedule_feasible else "NO")
-        st.caption(action.production.narrative_kr)
+        with st.container(border=True):
+            st.markdown("##### 📈 생산 Agent")
+            st.markdown(_production_badge(action.production))
+            st.metric("처리량(uph)", f"{action.production.numeric.throughput_uph:.0f}")
+            st.metric("스케줄 가능", "YES" if action.production.numeric.schedule_feasible else "NO")
+            st.caption(f"💬 *“{action.production.narrative_kr}”*")
 
 
 def render_supervisor_card(decision: SupervisorOutput) -> None:
@@ -533,6 +571,19 @@ def main() -> None:
         layout="wide",
         page_title="PRISM Demo",
         page_icon="🏭",
+    )
+
+    # 사이드바 폭 확장 (default 244px → 360px) — native output / 학술 reference 잘림 fix
+    st.markdown(
+        """
+        <style>
+        section[data-testid="stSidebar"] {
+            min-width: 360px !important;
+            max-width: 360px !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
     )
 
     render_header()
