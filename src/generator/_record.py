@@ -2,6 +2,8 @@
 
 Stateful per-robot drift in app.py vs stateless backfill is intentional, so
 the per-tick record builder is NOT shared. Only truly identical pieces live here.
+
+Pure 함수 — RNG는 caller 가 random.Random 인스턴스로 주입한다 (재현 가능).
 """
 import json
 import math
@@ -15,14 +17,18 @@ def iso_z_now() -> str:
     return datetime.now(timezone.utc).strftime(ISO_Z_FMT)
 
 
-def jittered_pos(pos: float) -> float:
-    return round(pos + random.uniform(-0.0001, 0.0001), 6)
+def jittered_pos(pos: float, rng: random.Random | None = None) -> float:
+    if rng is None:
+        rng = random.Random()
+    return round(pos + rng.uniform(-0.0001, 0.0001), 6)
 
 
-def jittered_load(load_base: int) -> float:
+def jittered_load(load_base: int, rng: random.Random | None = None) -> float:
     # Glue Bronze catalog가 DOUBLE이므로 float로 송신해야 KDF Parquet 변환이
     # 결정적으로 DOUBLE을 선택한다. INT 송신 시 INT32/DOUBLE 비결정 → HIVE_BAD_DATA.
-    return round(min(100.0, max(0.0, load_base + random.gauss(0, 5))), 2)
+    if rng is None:
+        rng = random.Random()
+    return round(min(100.0, max(0.0, load_base + rng.gauss(0, 5))), 2)
 
 
 def to_kinesis_record(record: dict) -> dict:

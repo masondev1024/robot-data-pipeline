@@ -102,10 +102,10 @@ class TestGenerateRecord:
         # is_faulty 로봇은 1% 확률로 spike (BACKFILL_SPIKE_PROB). P(no spike in 200) ≈ 13%
         # → flaky. seed 고정 + 1000 trial 로 결정성 확보.
         import random as _r
-        _r.seed(42)
+        rng = _r.Random(42)
         t = datetime(2026, 4, 25, 12, 0, tzinfo=timezone.utc)
         temps = [
-            backfill.generate_record(FAULTY_PROFILE, t)["motor_temp"]
+            backfill.generate_record(FAULTY_PROFILE, t, rng)["motor_temp"]
             for _ in range(1000)
         ]
         assert max(temps) >= 90.0

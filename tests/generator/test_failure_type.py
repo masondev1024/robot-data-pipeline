@@ -47,20 +47,20 @@ class TestResolveFailureType:
 class TestProfileFailureType:
     def test_profile_has_failure_type_field(self):
         """모든 profile에 failure_type 필드가 포함된다."""
-        profiles = load_profiles(SEED_CSV, 50)
+        profiles = load_profiles(SEED_CSV, (0, 50))
         for p in profiles:
             assert "failure_type" in p, f"Missing failure_type: {p['robot_id']}"
 
     def test_failure_type_in_valid_enum(self):
         """failure_type ∈ {NONE, TWF, HDF, PWF, OSF, RNF}."""
         valid = {"NONE", "TWF", "HDF", "PWF", "OSF", "RNF"}
-        profiles = load_profiles(SEED_CSV, 200)
+        profiles = load_profiles(SEED_CSV, (0, 200))
         for p in profiles:
             assert p["failure_type"] in valid, f"Invalid failure_type: {p['failure_type']}"
 
     def test_non_faulty_robots_have_none(self):
         """is_faulty=False 로봇은 failure_type=NONE."""
-        profiles = load_profiles(SEED_CSV, 200)
+        profiles = load_profiles(SEED_CSV, (0, 200))
         for p in profiles:
             if not p["is_faulty"]:
                 assert p["failure_type"] == "NONE", (
@@ -69,7 +69,7 @@ class TestProfileFailureType:
 
     def test_faulty_robots_have_non_none(self):
         """is_faulty=True 로봇은 NONE이 아닌 type을 가진다 (한 명 이상 존재 보장)."""
-        profiles = load_profiles(SEED_CSV, 200)
+        profiles = load_profiles(SEED_CSV, (0, 200))
         faulty = [p for p in profiles if p["is_faulty"]]
         assert len(faulty) > 0, "no faulty robot found"
         for p in faulty:

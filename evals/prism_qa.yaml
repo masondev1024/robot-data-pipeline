@@ -1,0 +1,113 @@
+# PRISM Demo Eval — 본선 4분 시연 시나리오 검증 (ADR v2 §6 Integration, A4)
+#
+# golden_qa.yaml 패턴 확장:
+#   id / category / question / expected_keywords / forbidden_phrases /
+#   expected_robot_id_format / expected_tool_calls / expected_pydantic_model.
+#
+# 카테고리:
+#   quality_agent / safety_agent / equipment_agent / production_agent  — 4 Domain Agent
+#   supervisor_negotiation                                              — Sonnet Supervisor
+#   causal_rca                                                          — DoWhy σ_max 노출
+#   closed_loop_marker                                                  — 9 마커 trigger
+#   edge_case                                                           — pre-mortem 시나리오
+#
+# 본 yaml 은 D-3 (5/19) 에 작성, run_eval.py 확장 (PRISM Agent 라우팅) 은 D-2 (5/20).
+# 본선 D-1 (5/21) 의 verify_demo_determinism.py metric #4 = 본 suite Opus judge ≥ 0.90.
+
+# ─── quality_agent (2) ───────────────────────────────────────────
+- id: prism_q01
+  category: quality_agent
+  question: "ROBOT-00018 의 향후 24h 결함 확률과 1순위 failure type 을 알려줘"
+  expected_keywords: ["defect_prob", "HDF"]
+  expected_robot_id_format: true
+  expected_pydantic_model: "QualityAgentOutput"
+  forbidden_phrases: ["EndpointNotFound", "predictor not deployed"]
+
+- id: prism_q02
+  category: quality_agent
+  question: "현재 가동 중인 robot 중 defect_prob 가 가장 높은 1대는?"
+  expected_keywords: ["defect_prob"]
+  expected_robot_id_format: true
+  expected_pydantic_model: "QualityAgentOutput"
+
+# ─── safety_agent (2) ────────────────────────────────────────────
+- id: prism_s01
+  category: safety_agent
+  question: "max_motor_temp 105°C 인 robot 이 SOP 100°C 를 초과했어. E-stop 필요 여부 판단해줘"
+  expected_keywords: ["sop_violation", "estop"]
+  expected_robot_id_format: false
+  expected_pydantic_model: "SafetyAgentOutput"
+
+- id: prism_s02
+  category: safety_agent
+  question: "안전 위반 확률이 0.62 인 상황에서 즉시 점검 권고해야 해?"
+  expected_keywords: ["safety_violation_prob", "점검"]
+  expected_pydantic_model: "SafetyAgentOutput"
+
+# ─── equipment_agent (1) ─────────────────────────────────────────
+- id: prism_e01
+  category: equipment_agent
+  question: "ROBOT-00011 의 잔여 수명 (RUL) 과 isolation forest 이상치 점수 알려줘"
+  expected_keywords: ["rul_hours", "isolation_forest"]
+  expected_robot_id_format: true
+  expected_pydantic_model: "EquipmentAgentOutput"
+
+# ─── production_agent (1) ────────────────────────────────────────
+- id: prism_p01
+  category: production_agent
+  question: "현재 스케줄에서 throughput 247 uph 가 가능한지 LP 로 확인해줘"
+  expected_keywords: ["throughput_uph", "schedule_feasible"]
+  expected_pydantic_model: "ProductionAgentOutput"
+
+# ─── supervisor_negotiation (3) ──────────────────────────────────
+- id: prism_sv01
+  category: supervisor_negotiation
+  question: "4 Agent 출력을 받았어. action A1 (정상속도 유지), A2 (spindle_rpm -15%) 중 net_value_KRW 최대인 결정 알려줘"
+  expected_keywords: ["net_value_KRW", "A2", "tradeoff_breakdown"]
+  expected_pydantic_model: "SupervisorOutput"
+  forbidden_phrases: ["임의로 결정", "잘 모르겠"]
+
+- id: prism_sv02
+  category: supervisor_negotiation
+  question: "안전 위반 (estop_required=true) action 과 throughput 높은 action 중 어느 쪽 net_value 가 dominant?"
+  expected_keywords: ["safety", "estop", "hard-block"]
+  expected_pydantic_model: "SupervisorOutput"
+
+- id: prism_sv03
+  category: supervisor_negotiation
+  question: "cost_safety_violation slider 를 1억에서 5천만으로 낮추면 결정이 어떻게 바뀌어?"
+  expected_keywords: ["slider", "net_value"]
+  expected_pydantic_model: "SupervisorOutput"
+
+# ─── causal_rca (2) ──────────────────────────────────────────────
+- id: prism_c01
+  category: causal_rca
+  question: "DoWhy refute_estimate 결과 σ_max=0.42 였어. 평가자에게 어떻게 설명할래?"
+  expected_keywords: ["robust", "partial R²", "Wright"]
+  forbidden_phrases: ["pass", "fail"]  # PASS/FAIL 은 DoWhy native 아님 (C2 academic integrity)
+
+- id: prism_c02
+  category: causal_rca
+  question: "σ_max=1.20 이면 인과 추정 신뢰 가능? 어떤 라벨로 노출해야 해?"
+  expected_keywords: ["fragile", "σ_max", "1.0"]
+  forbidden_phrases: ["robust"]
+
+# ─── closed_loop_marker (2) ──────────────────────────────────────
+- id: prism_m01
+  category: closed_loop_marker
+  question: "시연 0:30 마커 — risk=62%, 8h 후 결함 예측. 운영자에게 어떻게 알릴까?"
+  expected_keywords: ["risk", "62", "예지"]
+  forbidden_phrases: ["확실히", "100%"]
+
+- id: prism_m02
+  category: closed_loop_marker
+  question: "시연 3:00 마커 — 4 Agent 출력 모두 도착. Supervisor 가 협상해서 final decision 줘"
+  expected_keywords: ["net_value_KRW", "rationale_kr"]
+  expected_pydantic_model: "SupervisorOutput"
+
+# ─── edge_case (1) ───────────────────────────────────────────────
+- id: prism_x01
+  category: edge_case
+  question: "본선장 WiFi 가 끊겼는데 평가자가 'Bedrock 호출 실패 시 어떻게 되냐?' 물어보면?"
+  expected_keywords: ["cache_replay", "사전 검증", "byte-equal"]
+  forbidden_phrases: ["실시간 분석 중", "라이브 호출"]  # 거짓 라벨 금지 (A3 (ii))

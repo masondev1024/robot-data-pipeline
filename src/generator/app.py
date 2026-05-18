@@ -26,6 +26,9 @@ from src.generator.schema_validator import get_failure_count, validate_record
 # 0이면 비활성. handler가 time.time()+duration 으로 갱신.
 _force_anomaly_until_ts: float = 0.0
 
+# 네트워크 재시도 backoff jitter 전용 RNG — robot 시뮬레이션 RNG 와 격리.
+_retry_rng: random.Random = random.Random()
+
 
 def _load_realism_params() -> dict:
     """Env var 기반 fault-state 파라미터 + realism 계수 dict 반환."""
@@ -140,7 +143,7 @@ def load_profiles(csv_path: str, id_range: tuple[int, int]) -> list[dict]:
             "drain_factor":    drain,
             "is_faulty":       is_faulty,
             "failure_type":    f_type,
-            "battery":         random.randint(50, 100),
+            "battery":         random.Random().randint(50, 100),
         })
     return profiles
 
@@ -173,7 +176,7 @@ async def simulate_robot(profile: dict,
         shift_factor = hour_load_multiplier(hour_utc, params["hour_load_variance"])
         current_load = round(
             min(100.0, max(0.0,
-                profile["load_base"] * shift_factor + random.gauss(0, 5))),
+                profile["load_base"] * shift_factor + rng.gauss(0, 5))),
             2,
         )
 
@@ -187,8 +190,8 @@ async def simulate_robot(profile: dict,
         if is_stuck and last_motor_temp is not None:
             motor_temp = last_motor_temp
         else:
-            noise = random.gauss(0, 2)
-            drift = drift * 0.99 + random.gauss(0, 0.1)
+            noise = rng.gauss(0, 2)
+            drift = drift * 0.99 + rng.gauss(0, 0.1)
             load_corr = load_temp_delta(current_load, params["load_temp_coeff"])
             motor_temp = round(
                 min(110.0, max(55.0,
@@ -199,7 +202,7 @@ async def simulate_robot(profile: dict,
 
         # 4) Battery: load·temp factor 기반 drain + 점진적 충전
         if charging:
-            battery += random.uniform(0.5, 1.0)
+            battery += rng.uniform(0.5, 1.0)
             if battery >= 100.0:
                 battery = 100.0
                 charging = False
@@ -208,7 +211,7 @@ async def simulate_robot(profile: dict,
                 current_load, motor_temp,
                 params["battery_load_coeff"], params["battery_temp_coeff"],
             )
-            battery -= profile["drain_factor"] * factor * random.uniform(0.01, 0.05)
+            battery -= profile["drain_factor"] * factor * rng.uniform(0.01, 0.05)
             if battery <= 5.0:
                 charging = True  # 5% 도달 시 charging 진입 (즉시 100% 점프 금지)
 
@@ -223,8 +226,8 @@ async def simulate_robot(profile: dict,
 
         record = {
             "robot_id":      profile["robot_id"],
-            "pos_x":         jittered_pos(profile["pos_x"]),
-            "pos_y":         jittered_pos(profile["pos_y"]),
+            "pos_x":         jittered_pos(profile["pos_x"], rng),
+            "pos_y":         jittered_pos(profile["pos_y"], rng),
             "battery_level": round(float(max(0.0, min(100.0, battery))), 2),
             "current_load":  current_load,
             "motor_temp":    motor_temp,
@@ -266,7 +269,7 @@ async def _send_with_retry(records: list[dict],
             )
         except Exception as e:
             # 전체 호출 실패 (네트워크/throttling 등) → 백오프 후 전체 재시도
-            backoff = (2 ** attempt) * 0.1 + random.uniform(0, 0.05)
+            backoff = (2 ** attempt) * 0.1 + _retry_rng.uniform(0, 0.05)
             print(json.dumps({
                 "event": "put_records_call_failed",
                 "attempt": attempt + 1,
