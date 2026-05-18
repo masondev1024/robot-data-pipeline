@@ -53,8 +53,26 @@ def load_refute_data(path: str | Path = "assets/causal_refute_v2.json") -> Causa
     return CausalRefuteData.model_validate(raw)
 
 
-def render_card(refute: CausalRefuteData) -> None:
-    """Streamlit sidebar card. import 는 함수 내부 (테스트가 streamlit 없이 가능)."""
+def load_narrative(path: str | Path = "assets/causal_refute_narrative.md") -> str | None:
+    """학술 narrative markdown 로드 (D-3 산출, 평가자 reference).
+
+    파일 없으면 None — caller 가 우아하게 skip.
+    """
+    p = Path(path)
+    if not p.exists():
+        return None
+    return p.read_text(encoding="utf-8")
+
+
+def render_card(
+    refute: CausalRefuteData,
+    narrative_path: str | Path = "assets/causal_refute_narrative.md",
+) -> None:
+    """Streamlit sidebar card.
+
+    σ_max 라벨 + narrative_kr + native print expander + 학술 reference expander (평가자용).
+    import 는 함수 내부 (테스트가 streamlit 없이 가능).
+    """
     import streamlit as st
 
     label = label_for_sigma_max(refute.sigma_max)
@@ -72,3 +90,9 @@ def render_card(refute: CausalRefuteData) -> None:
         st.caption(f"DoWhy refute: {refute.narrative_kr}")
         with st.expander("🔍 자세히 (native output)"):
             st.code(refute.raw_print, language="text")
+
+        # 학술 reference (D-3 agent A 산출) — Wright 1991 + 4 refuter 학술 설명
+        narrative = load_narrative(narrative_path)
+        if narrative:
+            with st.expander("📖 학술 reference (Wright 1991)"):
+                st.markdown(narrative)

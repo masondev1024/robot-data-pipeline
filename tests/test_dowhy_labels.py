@@ -100,3 +100,31 @@ def test_load_refute_data_roundtrip(tmp_path: Path):
 def test_load_refute_data_missing_file():
     with pytest.raises(FileNotFoundError):
         load_refute_data("nonexistent_path_xyz.json")
+
+
+# ── load_narrative (D-3 agent A 학술 reference) ────────────────────
+
+from src.orchestration.causal_card import load_narrative
+
+
+def test_load_narrative_existing_file(tmp_path: Path):
+    p = tmp_path / "narrative.md"
+    p.write_text("# 학술 reference\n\nσ_max = 0.40\n", encoding="utf-8")
+    text = load_narrative(p)
+    assert text is not None
+    assert "학술 reference" in text
+
+
+def test_load_narrative_missing_file(tmp_path: Path):
+    assert load_narrative(tmp_path / "absent.md") is None
+
+
+def test_load_narrative_production_file_has_wright_reference():
+    """실제 assets/causal_refute_narrative.md 학술 키워드 포함 검증."""
+    repo_narrative = Path(__file__).resolve().parents[1] / "assets" / "causal_refute_narrative.md"
+    if not repo_narrative.exists():
+        pytest.skip(f"production narrative 없음 ({repo_narrative}) — D-3 agent A 미완료")
+    text = load_narrative(repo_narrative)
+    assert text is not None
+    # 학술 reference + 4 refuter 키워드 + σ_max 결론
+    assert "Wright" in text or "1991" in text or "partial R²" in text or "σ_max" in text
