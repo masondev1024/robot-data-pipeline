@@ -45,12 +45,11 @@ variable "github_branch" {
 # data source 로 /robot-telemetry/slack-webhook-url 에서 직접 읽는다 (single source of truth).
 # 사고 회귀 방지: TF_VAR 미export 시 default 'CHANGEME' apply silent failure 차단.
 
-variable "grafana_admin_password" {
-  description = "Grafana admin password (managed by AWS Secrets Manager)"
-  type        = string
-  sensitive   = true
-  default     = "changeme123"
-}
+# NOTE: grafana_admin_password 변수는 제거됨 (2026-05-19 D-3 보안 점검 H1 fix).
+# Grafana admin 은 K8s secret `grafana-admin` (k8s/monitoring/grafana-deployment.yaml:40,45)
+# 에서 직접 read 하며, terraform 모듈은 변수만 정의했을 뿐 미참조였다.
+# 사고 회귀 방지: CLAUDE.md §C — fallback default 'changeme123' silent apply 금지.
+# Secrets Manager data source 패턴 (slack_webhook 참조) 으로 향후 통합 시 추가.
 
 variable "kds_main_shard_count" {
   description = "Telemetry KDS shard count. 1000 robots × 1Hz peak = 1000 rec/s 송신. 4 shard = 4000 rec/s 한계 → peak 25% 사용. 한 shard 분포 편향 30~60% 시도 한 shard 300~600 rec/s, 안전 마진 40%+. 2 shard 도 가능하나 Firehose flush stagger (2026-05-04 사고) 안전 마진 위해 4. apply 후 OpenShardCount=4 명시 검증 필수 (CLAUDE.md 가드레일, 2026-05-05 사고)."
