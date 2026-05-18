@@ -23,7 +23,7 @@ from src.orchestration.agents.quality import SYSTEM_PROMPT as Q_PROMPT  # noqa: 
 from src.orchestration.agents.safety import SYSTEM_PROMPT as S_PROMPT  # noqa: E402
 from src.orchestration.agents.equipment import SYSTEM_PROMPT as E_PROMPT  # noqa: E402
 from src.orchestration.agents.production import SYSTEM_PROMPT as P_PROMPT  # noqa: E402
-from src.orchestration.supervisor import SUPERVISOR_SYSTEM_PROMPT  # noqa: E402
+from src.orchestration.supervisor import SUPERVISOR_SYSTEM_PROMPT, Supervisor  # noqa: E402
 from src.orchestration.llm_cache import cache_key  # noqa: E402
 
 # ── 출력 파일 ────────────────────────────────────────────────────────────────────
@@ -403,13 +403,9 @@ SUPERVISOR_RESPONSES: dict[str, dict] = {
 }
 
 
-def _build_user_prompt(action_id: str, scenario_context: dict) -> str:
-    """Supervisor._build_user_prompt 와 정확히 동일한 포맷."""
-    return (
-        f"<scenario>\n{scenario_context}\n</scenario>\n"
-        f"<candidate_action>{action_id}</candidate_action>\n"
-        "위 시나리오에서 candidate_action 을 채택했을 때의 도메인 numeric + narrative_kr 을 JSON 으로 반환하라."
-    )
+# Supervisor.staticmethod 직접 alias — single source of truth (D-3 code review M5).
+# 별도 정의 시 1글자 drift → 51 entries 전량 cache miss → 시연 fallback_video 회귀 위험.
+_build_user_prompt = Supervisor._build_user_prompt
 
 
 def _build_supervisor_user_prompt(scenario_context: dict) -> str:

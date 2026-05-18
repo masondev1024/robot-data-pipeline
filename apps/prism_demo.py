@@ -1049,8 +1049,7 @@ def main() -> None:
 
     st.markdown("---")
     st.caption(
-        "PRISM v0.1-demo  |  PRISM_MODE=" + __import__("os").environ.get("PRISM_MODE", "dev")
-        + "  |  본선 5/22 시연용"
+        f"PRISM v0.1-demo  |  PRISM_MODE={_PRISM_MODE}  |  본선 5/22 시연용"
     )
 
 
