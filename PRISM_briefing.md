@@ -185,26 +185,38 @@ python -m scripts.verify_demo_determinism --rehearse=2026-05-21
 - `apps/prism_demo.py` 골격 + `scripts/verify_demo_determinism.py` D-1 gate
 - 회귀: 314 PASS
 
-### ✅ D-3 (5/19) 완료 — 11 commit, ~6h
+### ✅ D-3 (5/19) 완료 — 15 commit, ~8h (오토파일럿 야간 포함)
+
+**핵심 코드 구현 (시연 narrative)**:
 - `e290a12` 4 Agent + Supervisor 도메인 prompt fill (mason 도메인 노트 기반)
 - `7a73a59` 9 마커 Closed-Loop 통합 (PRISM_MODE dev/demo/live) + DoWhy narrative + cache 1차
 - `133f7be` cache 시나리오 정합 재생성 + `unit_revenue` 180K KRW fix
 - `667f83a` causal_refute_narrative Streamlit expander 노출
-- `ccfd04f` 사이드바 폭 fix 롤백 + 마커 7 이후 DAG 숨김 (mason 피드백)
+
+**UX 강화 (mason 6차 click-through 피드백)**:
+- `ccfd04f` 사이드바 폭 fix 롤백 + 마커 7 이후 DAG 숨김
 - `c60aecf` 마커 8 Supervisor 가 상단 main view 로 reorder
 - `3ea4f3b` 마커 timeline 가독성 + 단계 caption + 마커 9/10 evidence
 - `42e3f96` DAG 마커별 동적 색상 + 마커 1/3/4/5/6 가시 액션 (P0+P1)
 - `8633cb8` 마커 9/10 Supervisor 제거, 학습 자산화 + 비용 임팩트 대체
 
+**오토파일럿 야간 (보안 + 코드 리뷰 fix + e2e prep)**:
+- `275892d` briefing Section 6/7 갱신
+- `5d5c6a5` H1 — terraform `grafana_admin_password` fallback 'changeme123' 제거 (CLAUDE.md §C)
+- `404ab99` M2 — DuckDB table/order_by SQL injection whitelist + 4 신규 test
+- `7af7cf7` e2e — tests/e2e/test_4min_demo_runtime.py (cache + byte-equal + β slider, 8 PASS)
+- `156f1c5` H1 dead `__import__` + M5 `_build_user_prompt` single source (drift 차단)
+
 ### ✅ E2E 시연 검증 (PRISM_MODE=demo, cache hit, Bedrock 호출 0회)
 - Marker 0 normal:   `continue` ₩173,370,000
 - Marker 8 fault:    `continue` ₩100,060,000 (β=1) → `throttle_50pct` ₩61M (β=2) — slider 시연
 - Marker 10 recover: `continue` ₩163,948,000
-- 회귀: **331 PASS**, 16 skipped, 0 failed
+- 회귀: **346 PASS**, 16 skipped, 0 failed (e2e 8 신규 + storage whitelist 4 신규 외 +3)
 
-### ⏳ 다음 D-3 (오후/야간)
-- `/security-review` (background 진행 중 — Bedrock 키 / AWS creds / 시연 화면 secret 노출 점검)
-- Storage 통합 — DuckDB write/read 시각화 (선택, ~25분)
+### ✅ 보안 검토 + 코드 리뷰 결과
+- security-review: CRITICAL 0, HIGH 1 ✅ fix (H1 terraform), MEDIUM 3 (M2 ✅ fix, M1/M3 production 강화 본선 후)
+- code-reviewer: HIGH 3 — H1 ✅ fix, H2 (mock dead compute, 본선 후 OK), H3 (backward compat keep)
+- M5 ✅ fix — `_build_user_prompt` drift 차단 (cache miss → fallback 회귀 잠재 위험 해소)
 
 ### ⏳ D-2 (5/20)
 - `/ultraqa` 9 마커 결정성 byte-equal 3회 검증
