@@ -175,35 +175,50 @@ python -m scripts.verify_demo_determinism --rehearse=2026-05-21
 
 ---
 
-## 6. 현재 진척 (commit `085dc2c` → `main`, 2026-05-18 야간)
+## 6. 현재 진척 (commit `8633cb8` → `main`, 2026-05-19 D-3 오후)
 
-### ✅ 완료
-- `.omc/plans/prism-d4-adr.md` (ralplan iter 2 consensus, 12 개선 통합, 1500+ 단어)
-- `src/orchestration/__init__.py` (디렉토리 setup)
-- `src/orchestration/schema.py` (4 Agent + Supervisor Pydantic + compute_net_value_KRW)
-- `src/orchestration/causal_card.py` (σ_max 임계 + Streamlit 카드 + Pydantic CausalRefuteData)
-- `src/orchestration/llm_cache.py` (SHA256 record/replay + auto-cascade + offline 모드)
-- `src/orchestration/storage.py` (DuckDB robot_telemetry + cnc_telemetry + SHA256 검증)
-- `src/orchestration/agents/{__init__,base,quality,safety,equipment,production}.py` (4 Domain Agent 본체, 도메인 prompt 자리표시자 + tool 자리표시자)
-- `src/generator/*` RNG 격리 (모듈 전역 → 인스턴스 주입)
-- `evals/prism_qa.yaml` (12 case PRISM eval suite, Opus judge ≥0.90 gate)
-- `tests/`: storage 13 + agent_schema 11 + dowhy_labels 15 + llm_cache 19 + rng_isolation 7 + test_agents 20 = **85 신규**
-- 전체 회귀: **259 passed, 16 skipped, 0 failed**
-- `project_memory_add_directive` PRISM 핵심 상수 (4일간 drift 금지)
-- `~/.claude/settings.json` Stop hook (osascript Glass 알림)
+### ✅ D-4 (5/18) 완료
+- ADR v2 (`.omc/plans/prism-d4-adr.md`, ralplan iter 2 consensus)
+- Pydantic schema + causal_card (σ_max 임계) + llm_cache (record/replay + auto-cascade) + DuckDB storage
+- 4 Agent + Supervisor **본체** (system_prompt 자리표시자)
+- 6-Node DoWhy DAG (σ_max=0.40 robust, Wright 1991)
+- `apps/prism_demo.py` 골격 + `scripts/verify_demo_determinism.py` D-1 gate
+- 회귀: 314 PASS
 
-### ⏳ Background 진행 중
-- `src/orchestration/causal_dag.py` (6-Node DoWhy DAG + σ_max 사전 계산 → `assets/causal_refute_v2.json`)
-- `apps/prism_demo.py` (Streamlit 9 마커 timeline + 사이드바 + Plotly DAG + auto-cascade fallback)
+### ✅ D-3 (5/19) 완료 — 11 commit, ~6h
+- `e290a12` 4 Agent + Supervisor 도메인 prompt fill (mason 도메인 노트 기반)
+- `7a73a59` 9 마커 Closed-Loop 통합 (PRISM_MODE dev/demo/live) + DoWhy narrative + cache 1차
+- `133f7be` cache 시나리오 정합 재생성 + `unit_revenue` 180K KRW fix
+- `667f83a` causal_refute_narrative Streamlit expander 노출
+- `ccfd04f` 사이드바 폭 fix 롤백 + 마커 7 이후 DAG 숨김 (mason 피드백)
+- `c60aecf` 마커 8 Supervisor 가 상단 main view 로 reorder
+- `3ea4f3b` 마커 timeline 가독성 + 단계 caption + 마커 9/10 evidence
+- `42e3f96` DAG 마커별 동적 색상 + 마커 1/3/4/5/6 가시 액션 (P0+P1)
+- `8633cb8` 마커 9/10 Supervisor 제거, 학습 자산화 + 비용 임팩트 대체
 
-### ⏳ 다음 (새벽 02시 reset 후)
-- 도메인 prompt fill (Quality/Safety/Equipment/Production 4 Agent system_prompt)
-- Supervisor 협상 코드 (`src/orchestration/supervisor.py`)
-- `/ccg` Supervisor prompt 3-way 검증
-- Closed-Loop 9 마커 통합 (Streamlit + Storage + Agents + DoWhy)
-- `cache_replay.jsonl` 사전 빌드 (D-2)
-- `scripts/verify_demo_determinism.py` 작성 (D-1)
-- 영상 fallback 녹화 (사용자, D-2~D-1)
+### ✅ E2E 시연 검증 (PRISM_MODE=demo, cache hit, Bedrock 호출 0회)
+- Marker 0 normal:   `continue` ₩173,370,000
+- Marker 8 fault:    `continue` ₩100,060,000 (β=1) → `throttle_50pct` ₩61M (β=2) — slider 시연
+- Marker 10 recover: `continue` ₩163,948,000
+- 회귀: **331 PASS**, 16 skipped, 0 failed
+
+### ⏳ 다음 D-3 (오후/야간)
+- `/security-review` (background 진행 중 — Bedrock 키 / AWS creds / 시연 화면 secret 노출 점검)
+- Storage 통합 — DuckDB write/read 시각화 (선택, ~25분)
+
+### ⏳ D-2 (5/20)
+- `/ultraqa` 9 마커 결정성 byte-equal 3회 검증
+- `/visual-verdict` UI QA
+- `/ai-slop-cleaner --review-only` 4 Agent 슬롭 점검
+- venue 네트워크 SLA 문의 (mason 외부)
+- 영상 fallback 1차 녹화 (mason, OBS Studio)
+
+### ⏳ D-1 (5/21)
+- 사람 리허설 ≥3회 (mason)
+- `/writer` 발표 슬라이드 polish
+- `/team-fix` 리허설 issue bounded remediation
+- **Verification Gate 실행** (`scripts/verify_demo_determinism.py --rehearse=2026-05-21`)
+- LLM cache + 영상 동결
 
 ---
 
@@ -214,10 +229,11 @@ python -m scripts.verify_demo_determinism --rehearse=2026-05-21
 | R1 | venue 네트워크 SLA 미확인 | ⏳ D-2 | LTE 핫스팟 백업 + `PRISM_OFFLINE=1` |
 | R2 | `evals/golden_qa.yaml` PRISM 부적합 | ✅ | `prism_qa.yaml` 12 case 신규 |
 | R3 | Generator RNG 잔재 | ✅ | A5 refactor (115 PASS) |
-| R4 | Streamlit 미경험 | ⏳ background | 골격 검증 후 결정. Fallback option: FastAPI + Jinja2 + Plotly.js |
+| R4 | Streamlit 미경험 | ✅ | mason 6차 click-through 피드백 반영 (timeline/DAG 동적/마커별 액션) |
 | R5 | 자동 commit ↔ ralplan iter mutation 충돌 | ✅ | 본 머지 commit 으로 해소 |
-| R6 (신규) | 도메인 prompt fill 시점 의존 | ⏳ D-3 새벽 | 사용자 도메인 공부 + `/ccg` 합의 |
-| R7 (신규) | DoWhy / Streamlit 외부 라이브러리 hallucination | ⏳ | `context7 MCP` 매 호출마다 |
+| R6 | 도메인 prompt fill 시점 의존 | ✅ | `e290a12` mason 도메인 노트 + 5 system_prompt fill |
+| R7 | DoWhy / Streamlit 외부 라이브러리 hallucination | ✅ | DoWhy refute 정상 + Streamlit click-through 안정 |
+| R8 (신규) | Bedrock 키 / AWS creds 시연 화면 노출 | ⏳ D-3 야간 | `/security-review` background 진행 중 |
 
 ---
 
