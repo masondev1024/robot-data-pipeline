@@ -59,6 +59,25 @@ CNC_COLS = (
     "vibration_xyz", "thermal_drift", "dimension_dev", "defect",
 )
 
+# SQL injection 방어 (D-3 보안 M2): caller 가 외부 입력으로 table/order_by 라우팅 시
+# f-string 보간 (line 109, 130, 134) 으로 인한 회귀 위험 차단.
+_ALLOWED_TABLES = frozenset({"robot_telemetry", "cnc_telemetry"})
+_ALLOWED_ORDER_COLS = frozenset({"ts", "robot_id", "machine_id"})
+
+
+def _assert_table(table: str) -> None:
+    if table not in _ALLOWED_TABLES:
+        raise ValueError(
+            f"unknown table: {table!r} (allowed: {sorted(_ALLOWED_TABLES)})"
+        )
+
+
+def _assert_order_by(order_by: str) -> None:
+    if order_by not in _ALLOWED_ORDER_COLS:
+        raise ValueError(
+            f"unknown order_by: {order_by!r} (allowed: {sorted(_ALLOWED_ORDER_COLS)})"
+        )
+
 
 def default_path() -> str:
     """PRISM_MODE=demo → data/prism_demo.duckdb, else :memory:."""
@@ -102,6 +121,7 @@ class StorageDB:
     # ── write ──────────────────────────────────────────────────
 
     def _write_rows(self, table: str, cols: tuple[str, ...], rows: Iterable[dict]) -> int:
+        _assert_table(table)
         rows = list(rows)
         if not rows:
             return 0
@@ -127,10 +147,16 @@ class StorageDB:
         return [dict(zip(cols, row)) for row in cur.fetchall()]
 
     def count(self, table: str) -> int:
+        _assert_table(table)
         return self.query(f"SELECT COUNT(*) AS n FROM {table}")[0]["n"]
 
     def table_sha256(self, table: str, order_by: str = "ts") -> str:
-        """결정성 검증용. ORDER BY ts → row 순서 고정 → SHA256."""
+        """결정성 검증용. ORDER BY ts → row 순서 고정 → SHA256.
+
+        table/order_by 는 whitelist 검증 (M2 SQL injection 방어).
+        """
+        _assert_table(table)
+        _assert_order_by(order_by)
         rows = self.query(f"SELECT * FROM {table} ORDER BY {order_by}")
         blob = "\n".join(repr(sorted(r.items())) for r in rows).encode("utf-8")
         return hashlib.sha256(blob).hexdigest()

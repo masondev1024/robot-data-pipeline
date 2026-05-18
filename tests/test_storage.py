@@ -172,3 +172,34 @@ def test_robot_cols_const_matches_schema_keys():
 def test_cnc_cols_const_matches_schema_keys():
     sample = _cnc_row(datetime(2026, 5, 22))
     assert set(CNC_COLS) == set(sample.keys())
+
+
+# ── SQL injection 방어 (D-3 보안 M2 fix) ──────────────────────────
+
+
+def test_write_rows_rejects_invalid_table(tmp_path):
+    db_path = tmp_path / "test.duckdb"
+    with StorageDB(str(db_path)) as db:
+        with pytest.raises(ValueError, match="unknown table"):
+            db._write_rows("malicious; DROP TABLE robot_telemetry;", ROBOT_COLS, [{}])
+
+
+def test_count_rejects_invalid_table(tmp_path):
+    db_path = tmp_path / "test.duckdb"
+    with StorageDB(str(db_path)) as db:
+        with pytest.raises(ValueError, match="unknown table"):
+            db.count("system_tables")
+
+
+def test_table_sha256_rejects_invalid_table(tmp_path):
+    db_path = tmp_path / "test.duckdb"
+    with StorageDB(str(db_path)) as db:
+        with pytest.raises(ValueError, match="unknown table"):
+            db.table_sha256("DROP_TABLE_HACK")
+
+
+def test_table_sha256_rejects_invalid_order_by(tmp_path):
+    db_path = tmp_path / "test.duckdb"
+    with StorageDB(str(db_path)) as db:
+        with pytest.raises(ValueError, match="unknown order_by"):
+            db.table_sha256("robot_telemetry", order_by="1; SELECT * FROM secrets")
