@@ -9,6 +9,7 @@ ADR v2 Section 2 Decision 2/3 + Section 4 (cache architecture) 구현.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -38,6 +39,9 @@ from src.orchestration.schema import (
     compute_net_value_KRW,
 )
 from src.orchestration.llm_cache import CacheReplayError, BedrockError
+
+# PRISM_MODE 분기: dev (mock) | demo (cache replay) | live (Bedrock 실호출)
+_PRISM_MODE = os.environ.get("PRISM_MODE", "dev").lower()
 
 # ── 상수 ────────────────────────────────────────────────────────────────────────
 
@@ -152,6 +156,91 @@ def _mock_supervisor_decision() -> SupervisorOutput:
 def _mock_4agent_action() -> CandidateAction:
     """4 Agent 출력 mock — 마커 2:15 (idx 7) 이후 표시."""
     return _mock_candidate("spindle_reduce_10pct", 0.18, 0.05, 42.0, 247.0)
+
+
+# ── 9 마커 시나리오 (Closed-Loop 통합, PRISM_MODE=demo/live) ──────────────────────
+
+_MARKER_TO_SCENARIO: dict[int, str] = {
+    0: "normal",   # 0:00 정상
+    1: "normal",   # 0:15 예지경보
+    2: "normal",   # 0:30 인과 v1
+    3: "normal",   # 0:45 인간 결정
+    4: "normal",   # 1:00 시뮬 가속
+    5: "fault",    # 1:15 불량 #47 발생
+    6: "fault",    # 1:30 인과 v2
+    7: "fault",    # 2:15 4 Agent 협상
+    8: "fault",    # 3:00 Supervisor 결정
+    9: "recover",  # 3:30 재학습 0.62→0.91
+    10: "recover", # 3:45 OEE +35%
+}
+
+_SCENARIOS: dict[str, dict] = {
+    "normal": {
+        "robot_id": "ROBOT-00018",
+        "phase": "normal",
+        "motor_temp_c": 85.0,
+        "vibration_xyz": 0.8,
+        "tool_age_h": 120.0,
+        "spindle_rpm": 8500,
+        "coolant_temp_c": 22.0,
+        "thermal_drift_um": 5.0,
+        "dimension_dev_um": 2.0,
+        "defect_signal": 0.05,
+    },
+    "fault": {
+        "robot_id": "ROBOT-00018",
+        "phase": "fault",
+        "motor_temp_c": 105.0,
+        "vibration_xyz": 2.3,
+        "tool_age_h": 180.0,
+        "spindle_rpm": 8500,
+        "coolant_temp_c": 28.0,
+        "thermal_drift_um": 18.0,
+        "dimension_dev_um": 12.0,
+        "defect_signal": 0.60,
+    },
+    "recover": {
+        "robot_id": "ROBOT-00018",
+        "phase": "recover",
+        "motor_temp_c": 92.0,
+        "vibration_xyz": 1.1,
+        "tool_age_h": 185.0,
+        "spindle_rpm": 7650,
+        "coolant_temp_c": 24.0,
+        "thermal_drift_um": 8.0,
+        "dimension_dev_um": 4.0,
+        "defect_signal": 0.18,
+    },
+}
+
+# Supervisor candidate_actions (4 옵션, 시연 fixed)
+_CANDIDATE_ACTIONS: list[str] = [
+    "continue",              # 진행 (위험 감수)
+    "throttle_50pct",        # 부하 50% 감속
+    "schedule_maintenance",  # 정비 스케줄
+    "halt",                  # 즉시 정지
+]
+
+
+def _real_supervisor_decision(
+    marker_idx: int,
+    alpha: float,
+    beta: float,
+    gamma: float,
+    horizon_h: int = 4,
+) -> tuple[SupervisorOutput, list[CandidateAction]]:
+    """Supervisor.negotiate_with_candidates 실호출 (PRISM_MODE=demo/live).
+
+    PRISM_MODE=demo 시 LLMCache replay 의존 — miss → CacheReplayError → fallback_video().
+    """
+    from src.orchestration.supervisor import Supervisor, SupervisorConfig
+
+    scenario_id = _MARKER_TO_SCENARIO.get(marker_idx, "fault")
+    scenario_context = _SCENARIOS[scenario_id]
+    sup = Supervisor(config=SupervisorConfig(
+        alpha=alpha, beta=beta, gamma=gamma, horizon_h=horizon_h,
+    ))
+    return sup.negotiate_with_candidates(scenario_context, _CANDIDATE_ACTIONS)
 
 
 # ── UI 컴포넌트 ──────────────────────────────────────────────────────────────────
@@ -474,34 +563,36 @@ def main() -> None:
         # 마커 2:15 (idx 7) 이후 — 4 Agent + Supervisor 표시
         if marker_idx >= 7:
             try:
-                # [TODO: D-3 새벽 사용자 fill — 실 Bedrock invoke 연결]
-                action = _mock_4agent_action()
-                render_4agent_outputs(action)
-
-                if marker_idx >= 8:
-                    # Supervisor (마커 3:00 이후)
-                    # [TODO: D-3 새벽 사용자 fill — 실 Supervisor 호출 연결]
-                    sup_out = _mock_supervisor_decision()
-                    # α/β/γ 반영 재계산
-                    net, breakdown = compute_net_value_KRW(
-                        quality=action.quality,
-                        safety=action.safety,
-                        equipment=action.equipment,
-                        production=action.production,
-                        alpha=alpha,
-                        beta=beta,
-                        gamma=gamma,
-                        horizon_h=4,
+                if _PRISM_MODE in ("demo", "live"):
+                    # 실호출 — Supervisor 가 4 Agent fan-out + net_value 산정
+                    sup_out, candidates_ordered = _real_supervisor_decision(
+                        marker_idx, alpha, beta, gamma, horizon_h=4,
                     )
-                    # mock decision 에 슬라이더 값 반영
-                    updated_decision = SupervisorDecision(
-                        action_id=sup_out.decision.action_id,
-                        net_value_KRW=net,
-                        alternatives=sup_out.decision.alternatives,
-                        rationale_kr=sup_out.decision.rationale_kr,
-                        tradeoff_breakdown=breakdown,
-                    )
-                    render_supervisor_card(SupervisorOutput(decision=updated_decision))
+                    # winning candidate (= candidates_ordered[0]) 의 4 Agent narrative 표시
+                    render_4agent_outputs(candidates_ordered[0])
+                    if marker_idx >= 8:
+                        render_supervisor_card(sup_out)
+                else:
+                    # dev mode — mock fallback (cache pre-build 안 끝났을 때 / 개발)
+                    action = _mock_4agent_action()
+                    render_4agent_outputs(action)
+                    if marker_idx >= 8:
+                        sup_out = _mock_supervisor_decision()
+                        net, breakdown = compute_net_value_KRW(
+                            quality=action.quality,
+                            safety=action.safety,
+                            equipment=action.equipment,
+                            production=action.production,
+                            alpha=alpha, beta=beta, gamma=gamma, horizon_h=4,
+                        )
+                        updated_decision = SupervisorDecision(
+                            action_id=sup_out.decision.action_id,
+                            net_value_KRW=net,
+                            alternatives=sup_out.decision.alternatives,
+                            rationale_kr=sup_out.decision.rationale_kr,
+                            tradeoff_breakdown=breakdown,
+                        )
+                        render_supervisor_card(SupervisorOutput(decision=updated_decision))
 
             except CacheReplayError:
                 st.error("Cache miss — 영상 fallback 전환")

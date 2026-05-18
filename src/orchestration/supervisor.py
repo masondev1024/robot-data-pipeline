@@ -154,7 +154,19 @@ class Supervisor:
         scenario_context: dict,
         candidate_actions: list[str],
     ) -> SupervisorOutput:
-        """4 Agent fan-out + net_value 산정 + argmax → SupervisorOutput.
+        """기존 API — SupervisorOutput 만 반환. UI 통합 시 negotiate_with_candidates 권장."""
+        sup_out, _ = self.negotiate_with_candidates(scenario_context, candidate_actions)
+        return sup_out
+
+    def negotiate_with_candidates(
+        self,
+        scenario_context: dict,
+        candidate_actions: list[str],
+    ) -> tuple[SupervisorOutput, list[CandidateAction]]:
+        """4 Agent fan-out + net_value 산정 + argmax → (SupervisorOutput, 정렬된 CandidateAction list).
+
+        Streamlit prism_demo.py 가 winning candidate 의 4 Agent narrative_kr 을
+        화면에 표시할 때 사용. candidates_ordered[0] = best.
 
         - safety.numeric.estop_required=True 인 action 은 hard-block (net_value = -inf).
         - 가장 net_value 큰 action 이 decision. 나머지 = alternatives (rank 2~).
@@ -166,20 +178,12 @@ class Supervisor:
         for action_id in candidate_actions:
             candidate = self._fan_out(action_id, scenario_context)
             hard_block = candidate.safety.numeric.estop_required
-            if hard_block:
-                # hard-block: net_value 최소화. tradeoff 는 그래도 산정 (rationale 용)
-                _, breakdown = compute_net_value_KRW(
-                    candidate.quality, candidate.safety, candidate.equipment, candidate.production,
-                    alpha=self.config.alpha, beta=self.config.beta, gamma=self.config.gamma,
-                    horizon_h=self.config.horizon_h,
-                )
-                net = float("-inf")
-            else:
-                net, breakdown = compute_net_value_KRW(
-                    candidate.quality, candidate.safety, candidate.equipment, candidate.production,
-                    alpha=self.config.alpha, beta=self.config.beta, gamma=self.config.gamma,
-                    horizon_h=self.config.horizon_h,
-                )
+            _net_temp, breakdown = compute_net_value_KRW(
+                candidate.quality, candidate.safety, candidate.equipment, candidate.production,
+                alpha=self.config.alpha, beta=self.config.beta, gamma=self.config.gamma,
+                horizon_h=self.config.horizon_h,
+            )
+            net = float("-inf") if hard_block else _net_temp
             scored.append((candidate, net, breakdown, hard_block))
 
         # argmax. hard-block 만 있으면 첫 번째를 임시 선택 + rationale 명시.
@@ -203,7 +207,9 @@ class Supervisor:
             rationale_kr=rationale,
             tradeoff_breakdown=best_break,
         )
-        return SupervisorOutput(decision=decision)
+        sup_out = SupervisorOutput(decision=decision)
+        candidates_ordered = [c for c, _, _, _ in scored]
+        return sup_out, candidates_ordered
 
     @staticmethod
     def _build_rationale(
