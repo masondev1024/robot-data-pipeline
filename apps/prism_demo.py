@@ -133,39 +133,30 @@ def _mock_candidate(action_id: str, defect_prob: float, safety_prob: float,
 
 
 def _mock_supervisor_decision() -> SupervisorOutput:
-    """D-2 까지 실 호출 미작동 — demo skeleton 용 mock.
+    """dev mode skeleton — caller (main) 가 α/β/γ slider 로 net_value 재계산.
 
-    실 호출은 도메인 prompt fill (D-3 새벽 사용자 작업) 후.
+    H2 fix: net_a 변수만 제거 (dead — caller 재계산). breakdown_a 는 smoke test
+    (test_mock_supervisor_decision_tradeoff_breakdown_signs) 가 검증해서 유지.
     """
     action_a = _mock_candidate("spindle_reduce_10pct", 0.18, 0.05, 42.0, 247.0)
-    action_b = _mock_candidate("coolant_flush",         0.62, 0.22, 18.5, 195.0)
+    action_b = _mock_candidate("coolant_flush", 0.62, 0.22, 18.5, 195.0)
 
-    net_a, breakdown_a = compute_net_value_KRW(
-        quality=action_a.quality,
-        safety=action_a.safety,
-        equipment=action_a.equipment,
-        production=action_a.production,
+    _, breakdown_a = compute_net_value_KRW(
+        action_a.quality, action_a.safety, action_a.equipment, action_a.production,
         horizon_h=4,
     )
     net_b, _ = compute_net_value_KRW(
-        quality=action_b.quality,
-        safety=action_b.safety,
-        equipment=action_b.equipment,
-        production=action_b.production,
+        action_b.quality, action_b.safety, action_b.equipment, action_b.production,
         horizon_h=4,
     )
-
-    decision = SupervisorDecision(
+    return SupervisorOutput(decision=SupervisorDecision(
         action_id="spindle_reduce_10pct",
-        net_value_KRW=net_a,
-        alternatives=[
-            AlternativeAction(action_id="coolant_flush", net_value_KRW=net_b, rank=2),
-        ],
-        rationale_kr="spindle_reduce_10pct 가 coolant_flush 대비 net +540만원 우위. "
+        net_value_KRW=0.0,  # caller 재계산
+        alternatives=[AlternativeAction(action_id="coolant_flush", net_value_KRW=net_b, rank=2)],
+        rationale_kr="spindle_reduce_10pct 가 coolant_flush 대비 우위. "
                      "결함 확률 62%→18% 개선, 안전 위반 무시가능 수준.",
         tradeoff_breakdown=breakdown_a,
-    )
-    return SupervisorOutput(decision=decision)
+    ))
 
 
 def _mock_4agent_action() -> CandidateAction:

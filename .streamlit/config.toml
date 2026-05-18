@@ -1,0 +1,26 @@
+# PRISM 시연용 Streamlit 설정 (본선 5/22 D-Day)
+# wide layout + 안정 theme + 사용량 통계 비활성
+
+[theme]
+base = "light"
+primaryColor = "#1f77b4"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f0f2f6"
+textColor = "#262730"
+font = "sans serif"
+
+[browser]
+gatherUsageStats = false
+
+[server]
+headless = false
+port = 8501
+enableCORS = false
+enableXsrfProtection = false
+runOnSave = false  # 시연 중 hot-reload 차단 (안정성)
+
+[client]
+showErrorDetails = false  # 시연 화면에 stack trace 노출 차단
+
+[runner]
+magicEnabled = true

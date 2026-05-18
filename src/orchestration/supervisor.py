@@ -18,8 +18,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any
-
 from src.orchestration.agents.base import BaseAgent
 from src.orchestration.agents.equipment import EquipmentAgent
 from src.orchestration.agents.production import ProductionAgent
