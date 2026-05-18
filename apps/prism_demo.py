@@ -354,72 +354,209 @@ def render_marker_timeline(current_marker_idx: int) -> None:
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
-def render_causal_dag() -> None:
-    """Plotly + networkx 6-node 인과 DAG.
+def _node_colors_for_marker(marker_idx: int) -> dict[str, str]:
+    """marker_idx → DAG 노드 색상 매핑 (mason 5차 피드백: 동적 표현)."""
+    base = {n: "#cccccc" for n in DAG_NODES}
+    base["DEFECT"] = "#d62728"
 
-    spindle_rpm intervention 노드 강조 표시.
-    DoWhy 호출 없음 — 사전 계산 데이터만.
+    if marker_idx == 1:
+        base["tool_age"] = "#ff7f0e"
+    elif marker_idx in (2, 3):
+        for n in ["tool_age", "spindle_rpm", "coolant_temp",
+                  "vibration_xyz", "thermal_drift", "dimension_dev"]:
+            base[n] = "#1f77b4"
+    elif marker_idx == 4:
+        for n in ["tool_age", "coolant_temp", "vibration_xyz",
+                  "thermal_drift", "dimension_dev"]:
+            base[n] = "#1f77b4"
+        base["spindle_rpm"] = "#ff7f0e"
+    elif marker_idx == 5:
+        for n in ["tool_age", "spindle_rpm", "coolant_temp", "dimension_dev"]:
+            base[n] = "#1f77b4"
+        base["vibration_xyz"] = "#d62728"
+        base["thermal_drift"] = "#d62728"
+    elif marker_idx == 6:
+        for n in ["tool_age", "spindle_rpm", "dimension_dev"]:
+            base[n] = "#1f77b4"
+        base["coolant_temp"] = "#ff7f0e"
+        base["vibration_xyz"] = "#d62728"
+        base["thermal_drift"] = "#d62728"
+    return base
+
+
+_DAG_TITLES = {
+    0: "인과 DAG  |  baseline (정상 가동)",
+    1: "인과 DAG  |  <span style='color:#ff7f0e'>tool_age 누적 감지 (예지)</span>",
+    2: "인과 DAG v1  |  <span style='color:#1f77b4'>원인 후보 식별</span>",
+    3: "인과 DAG v1  |  <span style='color:#1f77b4'>운영자 검토 중</span>",
+    4: "인과 DAG  |  <span style='color:#ff7f0e'>spindle_rpm 개입 시뮬 (do-intervention)</span>",
+    5: "인과 DAG  |  <span style='color:#d62728'>thermal/vibration → DEFECT 실재 발생</span>",
+    6: "인과 DAG v2  |  <span style='color:#ff7f0e'>coolant_temp 신규 path 발견 (학습)</span>",
+}
+
+
+def render_causal_dag(marker_idx: int = 0) -> None:
+    """6-Node 인과 DAG with marker-specific node coloring (mason 5차 피드백).
+
+    각 마커별 활성 노드를 색상으로 강조 — 시연 narrative 가 정적 X, 동적 가시화.
     """
     G = nx.DiGraph()
     G.add_nodes_from(DAG_NODES)
     G.add_edges_from(DAG_EDGES)
-
-    # 계층 레이아웃 (좌→우)
     pos = nx.planar_layout(G)
 
-    # 엣지 trace
+    # 엣지
     edge_x, edge_y = [], []
     for src, dst in G.edges():
         x0, y0 = pos[src]
         x1, y1 = pos[dst]
         edge_x += [x0, x1, None]
         edge_y += [y0, y1, None]
-
     edge_trace = go.Scatter(
-        x=edge_x, y=edge_y,
-        mode="lines",
-        line=dict(width=1.5, color="#888"),
-        hoverinfo="none",
+        x=edge_x, y=edge_y, mode="lines",
+        line=dict(width=1.5, color="#888"), hoverinfo="none",
     )
 
-    # 노드 색상
-    node_colors = []
-    for n in G.nodes():
-        if n == "DEFECT":
-            node_colors.append("#d62728")   # 결과 노드 — 빨강
-        elif n == INTERVENTION_NODE:
-            node_colors.append("#ff7f0e")   # intervention — 주황
-        else:
-            node_colors.append("#1f77b4")   # 원인 노드 — 파랑
-
+    # 노드 (marker_idx 별 색상)
+    color_map = _node_colors_for_marker(marker_idx)
     node_x = [pos[n][0] for n in G.nodes()]
     node_y = [pos[n][1] for n in G.nodes()]
+    node_color_list = [color_map[n] for n in G.nodes()]
 
     node_trace = go.Scatter(
-        x=node_x, y=node_y,
-        mode="markers+text",
-        marker=dict(size=22, color=node_colors, line=dict(width=1.5, color="white")),
-        text=list(G.nodes()),
-        textposition="top center",
-        textfont=dict(size=10),
-        hoverinfo="text",
+        x=node_x, y=node_y, mode="markers+text",
+        marker=dict(size=24, color=node_color_list, line=dict(width=2, color="white")),
+        text=list(G.nodes()), textposition="top center",
+        textfont=dict(size=10), hoverinfo="text",
     )
 
     fig = go.Figure(data=[edge_trace, node_trace])
     fig.update_layout(
-        title=dict(
-            text="인과 DAG  |  <span style='color:#ff7f0e'>주황 = spindle_rpm 개입 포인트</span>",
-            font=dict(size=13),
-        ),
-        height=340,
-        margin=dict(l=10, r=10, t=40, b=10),
-        xaxis=dict(visible=False),
-        yaxis=dict(visible=False),
-        plot_bgcolor="white",
-        paper_bgcolor="white",
-        showlegend=False,
+        title=dict(text=_DAG_TITLES.get(marker_idx, "인과 DAG"), font=dict(size=13)),
+        height=340, margin=dict(l=10, r=10, t=40, b=10),
+        xaxis=dict(visible=False), yaxis=dict(visible=False),
+        plot_bgcolor="white", paper_bgcolor="white", showlegend=False,
     )
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
+# ── 마커별 가시 액션 helper (mason 5차 피드백 P0+P1) ──────────────────────────────
+
+def render_predictive_alert() -> None:
+    """마커 1 (0:15 예지경보) — XGBoost 확률 기반 risk 알람 + 6-class 확률 분포."""
+    st.warning("⚠️ **예지경보** — ROBOT-00018, motor_temp 92°C 상승 추세 + tool_age 누적 감지")
+
+    col_alert, col_chart = st.columns([1, 2])
+    with col_alert:
+        st.metric("결함 Risk", "62%", delta="+44%p", delta_color="inverse",
+                  help="XGBoost 6-class 1−P(NONE)")
+        st.metric("1순위 Failure", "HDF",
+                  help="Heat Dissipation Failure")
+        st.caption("📊 단순 임계값 X → ML 확률 예지 (ADR-009)")
+
+    with col_chart:
+        classes = ["NONE", "TWF", "HDF", "PWF", "OSF", "RNF"]
+        probs = [0.12, 0.18, 0.62, 0.04, 0.03, 0.01]
+        colors = ["#ff7f0e" if c == "HDF" else "#aec7e8" for c in classes]
+        fig = go.Figure(go.Bar(
+            x=classes, y=probs, marker_color=colors,
+            text=[f"{p:.0%}" for p in probs], textposition="auto",
+        ))
+        fig.update_layout(
+            title=dict(text="XGBoost 6-class 확률 분포", font=dict(size=13)),
+            height=240, yaxis=dict(range=[0, 0.8], title="P"),
+            margin=dict(l=10, r=10, t=40, b=10), showlegend=False,
+        )
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
+def render_human_decision() -> None:
+    """마커 3 (0:45 인간결정) — 운영자 의사결정 카드 (Human-in-the-loop)."""
+    st.info("🧑‍🔧 **운영자 검토** — risk 62% 예지 + 인과 DAG 확인 → 적용 전 시뮬 결정")
+
+    col_l, col_r = st.columns(2)
+    with col_l:
+        with st.container(border=True):
+            st.markdown("##### 📋 검토 요약")
+            st.markdown(
+                "- ⚠️ **risk 62%** HDF 예지\n"
+                "- 🔍 **σ_max 0.40** robust (Wright 1991)\n"
+                "- 🛠️ **개입 후보**: `spindle_rpm` ↓\n"
+                "- ❓ **결정**: 즉시 적용? 시뮬?"
+            )
+    with col_r:
+        with st.container(border=True):
+            st.markdown("##### ✅ 운영자 선택")
+            st.success("🎬 **'먼저 시뮬레이션 가속'** 선택")
+            st.caption("📝 maker-space-op-001 · ⏱️ 0:42")
+            st.caption("⚙️ 적용 전 가상 검증 → 위험 무리한 적용 X")
+
+
+def render_simulation_evidence() -> None:
+    """마커 4 (1:00 시뮬가속) — DoWhy counterfactual `do(spindle_rpm=7650)` 결과."""
+    st.success("🎬 **시뮬레이션 가속 완료** — counterfactual `do(spindle_rpm = 7650)` 결과")
+
+    col_metrics, col_chart = st.columns([1, 2])
+    with col_metrics:
+        st.metric("vibration_xyz", "0.8 → 0.5", delta="-38%", delta_color="inverse")
+        st.metric("thermal_drift_um", "5 → 3", delta="-40%", delta_color="inverse")
+        st.metric("defect_prob", "62% → 18%", delta="-44%p", delta_color="inverse")
+        st.caption("📊 DoWhy do-intervention (Pearl 1995)")
+
+    with col_chart:
+        metrics = ["vibration_xyz", "thermal_drift_um", "defect_prob"]
+        baseline = [0.8, 5.0, 0.62]
+        intervention = [0.5, 3.0, 0.18]
+        fig = go.Figure()
+        fig.add_trace(go.Bar(name="개입 전", x=metrics, y=baseline,
+                             marker_color="#d62728",
+                             text=[f"{v}" for v in baseline], textposition="auto"))
+        fig.add_trace(go.Bar(name="개입 후 (시뮬)", x=metrics, y=intervention,
+                             marker_color="#2ca02c",
+                             text=[f"{v}" for v in intervention], textposition="auto"))
+        fig.update_layout(
+            title=dict(text="counterfactual: spindle_rpm 8500 → 7650", font=dict(size=13)),
+            barmode="group", height=270,
+            margin=dict(l=10, r=10, t=50, b=10),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        )
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
+def render_incident_alert() -> None:
+    """마커 5~6 (1:15 / 1:30) — INCIDENT #47 빨강 alert + sensor timeline."""
+    st.error("🚨 **INCIDENT #47** — ROBOT-00018  motor_temp **105°C** 도달 (SOP 임계 100°C 초과), HDF 실재 발생")
+
+    col_metrics, col_chart = st.columns([1, 2])
+    with col_metrics:
+        st.metric("motor_temp", "105°C", delta="+13°C / 1min", delta_color="inverse")
+        st.metric("vibration_xyz", "2.3", delta="+1.5 (+188%)", delta_color="inverse")
+        st.metric("defect_prob (실측)", "62% → 95%", delta="+33%p", delta_color="inverse")
+        st.caption("⚠️ 예지 risk 62% 실제 발현, DAG v2 갱신")
+
+    with col_chart:
+        sec = list(range(60))
+        motor_temp = [85 + 0.05 * t + (0.5 * (t - 30) if t >= 30 else 0) for t in sec]
+        vibration = [0.8 + 0.01 * t + (0.05 * (t - 30) if t >= 30 else 0) for t in sec]
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=sec, y=motor_temp, name="motor_temp (°C)",
+                                  mode="lines", line=dict(color="#d62728", width=2),
+                                  yaxis="y"))
+        fig.add_trace(go.Scatter(x=sec, y=vibration, name="vibration_xyz",
+                                  mode="lines", line=dict(color="#ff7f0e", width=2),
+                                  yaxis="y2"))
+        fig.add_hline(y=100, line_dash="dash", line_color="red",
+                      annotation_text="SOP 임계 100°C", annotation_position="top right")
+        fig.update_layout(
+            title=dict(text="incident #47 sensor timeline (60s)", font=dict(size=13)),
+            height=270,
+            xaxis=dict(title="time (s)"),
+            yaxis=dict(title="motor_temp (°C)", side="left"),
+            yaxis2=dict(title="vibration_xyz", side="right", overlaying="y"),
+            margin=dict(l=10, r=10, t=50, b=10),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        )
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
 def _quality_badge(q: QualityAgentOutput) -> str:
@@ -689,10 +826,23 @@ def main() -> None:
     col_left, col_right = st.columns([2, 1])
 
     with col_left:
-        # 마커 0~6: DAG 가 main view (인과 추론 단계)
-        # 마커 7~: 4 Agent 협상이 main view (스크롤 불필요), DAG 는 숨김
+        # 마커 0~6: DAG (marker_idx 별 색상) + 단계별 가시 액션
+        # 마커 7~: 4 Agent + Supervisor (DAG 숨김, 스크롤 X)
         if marker_idx < 7:
-            render_causal_dag()
+            render_causal_dag(marker_idx)
+            # 마커별 액션 (mason 5차 피드백 P0+P1)
+            if marker_idx == 1:
+                st.markdown("---")
+                render_predictive_alert()
+            elif marker_idx == 3:
+                st.markdown("---")
+                render_human_decision()
+            elif marker_idx == 4:
+                st.markdown("---")
+                render_simulation_evidence()
+            elif marker_idx == 5 or marker_idx == 6:
+                st.markdown("---")
+                render_incident_alert()
 
         # 마커 10: OEE +35% evidence (가장 최신 결과, 상단)
         if marker_idx >= 10:
