@@ -1,9 +1,12 @@
-"""Eval runner — golden_qa.yaml 30개 → /api/chat 직접 호출 → judge 채점 → 평균/리포트.
+"""Eval runner — golden_qa.yaml (30) 또는 prism_qa.yaml (12) → judge 채점.
 
-ADR-011 참조. 사용법:
-  python -m evals.run_eval                        # 모든 case 실행
-  python -m evals.run_eval --filter category=edge # 카테고리 필터
-  python -m evals.run_eval --threshold 4.0        # 평균 점수 fail threshold
+ADR-011 + ADR v2 §7 (verify gate metric #4). 사용법:
+  python -m evals.run_eval                                    # golden_qa (default)
+  python -m evals.run_eval --suite prism_qa                   # PRISM 본선용
+  python -m evals.run_eval --filter category=edge             # 카테고리 필터
+  python -m evals.run_eval --threshold 4.0                    # fail threshold (5점 scale)
+  python -m evals.run_eval --suite prism_qa \\
+      --output metrics/eval_score.jsonl                       # verify gate ledger (D-1)
 """
 import argparse
 import json
@@ -50,8 +53,16 @@ def _ensure_gold_cache():
     api_main._cache_ready = True
 
 
-def run(filter_expr: str | None, threshold: float) -> int:
-    cases_path = Path(__file__).parent / "golden_qa.yaml"
+def run(
+    filter_expr: str | None,
+    threshold: float,
+    suite: str = "golden_qa",
+    output_jsonl: str | None = None,
+) -> int:
+    cases_path = Path(__file__).parent / f"{suite}.yaml"
+    if not cases_path.exists():
+        print(f"suite yaml 없음: {cases_path}", file=sys.stderr)
+        return 1
     cases = yaml.safe_load(cases_path.read_text())
 
     if filter_expr:
@@ -119,6 +130,24 @@ def run(filter_expr: str | None, threshold: float) -> int:
     out_path.write_text(json.dumps(results, ensure_ascii=False, indent=2))
     print(f"per-case detail written to {out_path}", file=sys.stderr)
 
+    # ADR v2 §7 verify gate metric #4 — jsonl ledger 형식 (eval_score.jsonl)
+    # threshold 는 5 점 scale 이지만 verify gate 는 0-1 normalized 기대. avg/5 변환.
+    if output_jsonl:
+        output_path = Path(output_jsonl)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        avg_normalized = round(overall_avg / 5.0, 3)
+        with output_path.open("w", encoding="utf-8") as fh:
+            fh.write(json.dumps({
+                "suite": suite,
+                "avg_score": avg_normalized,
+                "avg_score_raw_5pt": overall_avg,
+                "case_count": len(valid),
+                "category_avg": cat_avg,
+                "threshold_5pt": threshold,
+                "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            }, ensure_ascii=False) + "\n")
+        print(f"verify gate ledger written to {output_path} (avg={avg_normalized})", file=sys.stderr)
+
     return 0 if overall_avg >= threshold else 1
 
 
@@ -126,8 +155,13 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--filter", default=None, help="key=value (e.g. category=edge)")
     parser.add_argument("--threshold", type=float, default=4.0)
+    parser.add_argument("--suite", default="golden_qa",
+                        choices=["golden_qa", "prism_qa"],
+                        help="evaluation suite (yaml prefix)")
+    parser.add_argument("--output", default=None,
+                        help="ADR v2 §7 verify gate ledger (e.g. metrics/eval_score.jsonl)")
     args = parser.parse_args()
-    sys.exit(run(args.filter, args.threshold))
+    sys.exit(run(args.filter, args.threshold, args.suite, args.output))
 
 
 if __name__ == "__main__":
