@@ -998,6 +998,15 @@ def render_sidebar(alpha: float, beta: float, gamma: float) -> tuple[float, floa
         gamma_val = st.slider("γ — RUL 손실 가중치",  0.0, 3.0, gamma, 0.1,
                               help="rul_loss × γ")
 
+        status = _seed_storage_demo()
+        st.markdown("---")
+        st.markdown("### 📦 DuckDB In-Process")
+        st.caption(
+            f"robot_telemetry **{status['n_total']:,} rows** · {status['file_size_kb']:.1f} KB\n\n"
+            f"`{status['path']}`\n\n"
+            f"SHA256: `{status['sha_prefix']}...`"
+        )
+
         st.markdown("---")
         st.markdown("### 비용 비교")
         st.markdown(f"| 항목 | 비용 |")

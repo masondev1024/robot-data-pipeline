@@ -199,3 +199,61 @@ def test_dag_has_path_to_defect(demo):
     # DEFECT 까지 도달 가능한 노드가 1개 이상 (DEFECT 자신 제외)
     predecessors = list(nx.ancestors(G, "DEFECT"))
     assert len(predecessors) > 0
+
+
+# ── _seed_storage_demo 멱등성 ─────────────────────────────────────────────────────
+
+def test_seed_storage_demo_idempotent(tmp_path):
+    """2회 호출 시 동일 sha (멱등성) — @st.cache_resource 없이 직접 호출."""
+    import sys
+    from pathlib import Path
+    from datetime import datetime, timedelta
+
+    # src 경로 보장
+    root = Path(__file__).parent.parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+
+    from src.orchestration.storage import StorageDB
+
+    db_path = tmp_path / "test_idempotent.duckdb"
+
+    def _seed(path: Path) -> dict:
+        with StorageDB(str(path)) as db:
+            if db.count("robot_telemetry") == 0:
+                base_ts = datetime(2026, 5, 22, 3, 0, 0)
+                rows = []
+                for sec in range(100):
+                    ts = base_ts + timedelta(seconds=sec)
+                    mt = (
+                        85 + 0.05 * sec
+                        + (0.5 * (sec - 30) if 30 <= sec < 60 else (0 if sec < 30 else -0.3 * (sec - 60)))
+                    )
+                    rows.append({
+                        "ts": ts,
+                        "robot_id": "ROBOT-00018",
+                        "motor_temp": mt,
+                        "current_load": 60.0,
+                        "battery_level": 75.0,
+                        "pos_x": 10.5,
+                        "pos_y": 20.3,
+                        "active_hours": 8.0,
+                        "fault_phase": (
+                            "incident_47" if 30 <= sec < 60
+                            else "recover" if sec >= 60
+                            else "normal"
+                        ),
+                        "is_faulty": 45 <= sec < 60,
+                    })
+                db.write_robot(rows)
+            return {
+                "n_total": db.count("robot_telemetry"),
+                "sha": db.table_sha256("robot_telemetry")[:12],
+            }
+
+    result1 = _seed(db_path)
+    result2 = _seed(db_path)  # second call — should be no-op
+
+    assert result1["n_total"] == 100
+    assert result2["n_total"] == 100, "2회 호출 후 row 수가 100이어야 함 (중복 삽입 없음)"
+    assert result1["sha"] == result2["sha"], "SHA256 prefix 가 동일해야 함 (멱등성)"
