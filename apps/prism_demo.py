@@ -524,27 +524,34 @@ def render_causal_v1_explanation() -> None:
 
 
 def render_causal_v2_explanation() -> None:
-    """마커 6 (1:30 인과 v2) — DAG v1 → v2 학습 narrative."""
-    st.success("🎓 **인과 v2 학습 완료** — incident #47 패턴이 신규 path 로 자동 통합")
+    """마커 6 (1:30 인과 v2) — v1 한계 → v2 학습 (B+A narrative).
+
+    PRISM 의 진짜 가치 = 결함 막기 X, **사고로부터 자산화 + 다음 사이클 강해진다**.
+    """
+    st.success("🎓 **인과 v2 학습 완료** — v1 의 단일 path 한계 보완, incident #47 영구 자산화")
 
     col_l, col_r = st.columns([1, 1])
     with col_l:
         with st.container(border=True):
-            st.markdown("##### 🔄 v1 → v2 변화")
+            st.markdown("##### 🔄 v1 의 한계 → v2 갱신")
             st.markdown(
-                "- ➕ **신규 edge**: `coolant_temp → thermal_drift`\n"
-                "- 🟠 **coolant_temp** 주황색 강조 (신규 발견 원인)\n"
+                "**v1 (인과 분석 직후)**:\n"
+                "- 🔵 `spindle_rpm` 단일 path 강조\n"
+                "- ❌ `coolant_temp → thermal_drift` 누락\n\n"
+                "**v2 (incident #47 학습 후)**:\n"
+                "- ➕ 신규 edge: `coolant_temp → thermal_drift`\n"
+                "- 🟠 `coolant_temp` 주황 강조 (신규 발견 원인)\n"
                 "- 📊 σ_max 재계산: 0.40 → 0.38 (더 robust)"
             )
     with col_r:
         with st.container(border=True):
-            st.markdown("##### 💡 학습 자산화")
+            st.markdown("##### 💡 PRISM 핵심 가치 — 학습 자산화")
             st.markdown(
-                "incident #47 데이터로 인과 모델 자동 갱신.\n\n"
-                "다음 시연에서:\n"
-                "- 동일 패턴 재발 시 **즉시** 인식\n"
-                "- coolant_temp 모니터 우선순위 ↑\n"
-                "- 모델은 영구적 자산"
+                "❌ **MES**: 결함 발생 → 알람만 → 인간이 매번 처음부터 진단\n\n"
+                "✅ **PRISM**: 결함 발생 → **인과 모델 자동 갱신** → 다음 사이클부터:\n"
+                "- 동일 패턴 **즉시** 인식 (1~2시간 → 수초)\n"
+                "- `coolant_temp` 모니터 우선순위 ↑\n"
+                "- 모델은 **노트북에 영구 누적** 자산"
             )
 
 
@@ -623,15 +630,18 @@ def render_human_decision() -> None:
 
 
 def render_simulation_evidence() -> None:
-    """마커 4 (1:00 시뮬가속) — DoWhy counterfactual `do(spindle_rpm=7650)` 결과."""
-    st.success("🎬 **시뮬레이션 가속 완료** — counterfactual `do(spindle_rpm = 7650)` 결과")
+    """마커 4 (1:00 시뮬가속) — DoWhy counterfactual `do(spindle_rpm=7650)` 결과.
+
+    ⚠️ 가상 시뮬 — 실 라인 변경 X. 다음 마커에서 v1 모델의 단일 path 한계 노출.
+    """
+    st.success("🎬 **시뮬레이션 가속 완료** — counterfactual `do(spindle_rpm = 7650)` (가상 시뮬, 실 라인 미적용)")
 
     col_metrics, col_chart = st.columns([1, 2])
     with col_metrics:
         st.metric("vibration_xyz", "0.8 → 0.5", delta="-38%", delta_color="inverse")
         st.metric("thermal_drift_um", "5 → 3", delta="-40%", delta_color="inverse")
         st.metric("defect_prob", "62% → 18%", delta="-44%p", delta_color="inverse")
-        st.caption("📊 DoWhy do-intervention (Pearl 1995)")
+        st.caption("📊 DoWhy do-intervention (Pearl 1995) — 가상 시뮬, 실 라인은 그대로")
 
     with col_chart:
         metrics = ["vibration_xyz", "thermal_drift_um", "defect_prob"]
@@ -654,7 +664,10 @@ def render_simulation_evidence() -> None:
 
 
 def render_incident_alert() -> None:
-    """마커 5~6 (1:15 / 1:30) — INCIDENT #47 빨강 alert + sensor timeline."""
+    """마커 5~6 — INCIDENT #47 빨강 alert + sensor timeline.
+
+    narrative B+A: 예지 적중 + v1 모델 단일 path 한계 노출 → 학습 자산화 motivation.
+    """
     st.error("🚨 **INCIDENT #47** — ROBOT-00018  motor_temp **105°C** 도달 (SOP 임계 100°C 초과), HDF 실재 발생")
 
     col_metrics, col_chart = st.columns([1, 2])
@@ -662,7 +675,11 @@ def render_incident_alert() -> None:
         st.metric("motor_temp", "105°C", delta="+13°C / 1min", delta_color="inverse")
         st.metric("vibration_xyz", "2.3", delta="+1.5 (+188%)", delta_color="inverse")
         st.metric("defect_prob (실측)", "62% → 95%", delta="+33%p", delta_color="inverse")
-        st.caption("⚠️ 예지 risk 62% 실제 발현, DAG v2 갱신")
+        st.caption(
+            "⚠️ 예지 risk 62% 적중 — 단, **v1 은 spindle_rpm 단일 path 만 봤음**. "
+            "실제는 `coolant_temp → thermal_drift` 도 작용 (v1 누락). "
+            "→ 학습 자산화 motivation (다음 마커 v2)."
+        )
 
     with col_chart:
         sec = list(range(60))
