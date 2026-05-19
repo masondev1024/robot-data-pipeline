@@ -525,26 +525,29 @@ def _node_colors_for_marker(marker_idx: int) -> dict[str, str]:
         base["tool_age"] = _COLOR_FOCUS_ORANGE
         base["DEFECT"] = _COLOR_RISK_AMBER
     elif marker_idx == 2:
-        # v1 추천: coolant_temp 주황, v1 path (thermal → dim) 파랑
+        # v1 추천: coolant_temp 주황 (추천 변수), 나머지 인과 path (predecessor + mediator) 파랑
         base["tool_age"] = _COLOR_PATH_BLUE
         base["spindle_rpm"] = _COLOR_PATH_BLUE
         base["coolant_temp"] = _COLOR_FOCUS_ORANGE
+        base["vibration_xyz"] = _COLOR_PATH_BLUE  # mediator (tool_age + spindle 직하류)
         base["thermal_drift"] = _COLOR_PATH_BLUE
         base["dimension_dev"] = _COLOR_PATH_BLUE
         base["DEFECT"] = _COLOR_RISK_AMBER
     elif marker_idx == 3:
-        # 보류: DAG 색은 마커 2 와 동일 (분석 보존) — "보류" 는 title amber + caption 으로
+        # 보류: DAG 색은 마커 2 와 동일 (분석 보존). "보류" 는 title amber + caption 으로
         base["tool_age"] = _COLOR_PATH_BLUE
         base["spindle_rpm"] = _COLOR_PATH_BLUE
         base["coolant_temp"] = _COLOR_FOCUS_ORANGE
+        base["vibration_xyz"] = _COLOR_PATH_BLUE
         base["thermal_drift"] = _COLOR_PATH_BLUE
         base["dimension_dev"] = _COLOR_PATH_BLUE
         base["DEFECT"] = _COLOR_RISK_AMBER
     elif marker_idx == 4:
-        # fast-forward: coolant_temp dim (보류 미적용) + thermal/dim/DEFECT 빨강 (결함 진행 시뮬)
+        # fast-forward: coolant dim (보류 미적용) + vibration/thermal/dim/DEFECT 빨강 (결함 진행)
         base["tool_age"] = _COLOR_PATH_BLUE
         base["spindle_rpm"] = _COLOR_PATH_BLUE
         base["coolant_temp"] = _COLOR_HOLD_DIM
+        base["vibration_xyz"] = _COLOR_DEFECT_RED  # fault progression (mediator 도 활성)
         base["thermal_drift"] = _COLOR_DEFECT_RED
         base["dimension_dev"] = _COLOR_DEFECT_RED
         base["DEFECT"] = _COLOR_DEFECT_RED
@@ -609,11 +612,19 @@ def render_causal_dag(marker_idx: int = 0) -> None:
     node_y = [pos[n][1] for n in G.nodes()]
     node_color_list = [color_map[n] for n in G.nodes()]
 
+    # dimension_dev 는 edge 가 모이는 위치라 label 이 선에 가려짐 → 노드 밑 표시
+    text_positions = [
+        "bottom center" if n == "dimension_dev" else "top center"
+        for n in G.nodes()
+    ]
+
     node_trace = go.Scatter(
         x=node_x, y=node_y, mode="markers+text",
-        marker=dict(size=24, color=node_color_list, line=dict(width=2, color="white")),
-        text=list(G.nodes()), textposition="top center",
-        textfont=dict(size=10), hoverinfo="text",
+        marker=dict(size=26, color=node_color_list, line=dict(width=2, color="white")),
+        text=[f"<b>{n}</b>" for n in G.nodes()],  # 굵게 (가시성)
+        textposition=text_positions,
+        textfont=dict(size=13, family="Arial Black, sans-serif"),
+        hoverinfo="text",
     )
 
     fig = go.Figure(data=[edge_trace, node_trace])
