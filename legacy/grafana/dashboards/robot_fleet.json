@@ -238,7 +238,7 @@
             "uid": "athena"
           },
           "format": 1,
-          "rawSQL": "SELECT COUNT(*) AS \"AI 점검 권장\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE) AND dominant_failure_type IS NOT NULL AND dominant_failure_type <> 'NONE'",
+          "rawSQL": "SELECT COUNT(*) AS \"AI 점검 권장\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '2' DAY AS DATE) AND dominant_failure_type IS NOT NULL AND dominant_failure_type <> 'NONE'",
           "refId": "A",
           "table": "gold_robot_daily_stats"
         }
@@ -870,7 +870,7 @@
             "uid": "athena"
           },
           "format": 1,
-          "rawSQL": "WITH base AS (\n  SELECT\n    g.robot_id, d.production_line, d.station_type,\n    COALESCE(g.dominant_failure_type, 'NONE') AS failure_type,\n    g.max_motor_temp, g.battery_drain, g.max_temp_load_ratio,\n    CASE g.dominant_failure_type\n      WHEN 'HDF' THEN CASE WHEN g.max_motor_temp>110 THEN 1 ELSE 2 END\n      WHEN 'PWF' THEN 2 WHEN 'OSF' THEN 3 WHEN 'TWF' THEN 5 WHEN 'RNF' THEN 7 ELSE 7\n    END AS rul_days,\n    CASE d.production_line\n      WHEN 'LINE-A' THEN 300000 WHEN 'LINE-B' THEN 250000\n      WHEN 'LINE-C' THEN 400000 WHEN 'LINE-D' THEN 150000 ELSE 200000\n    END AS hourly_loss\n  FROM robot_telemetry_db.gold_robot_daily_stats g\n  JOIN robot_telemetry_db.dim_robot_line d ON g.robot_id = d.robot_id\n  WHERE g.dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)\n    AND COALESCE(g.dominant_failure_type, 'NONE') <> 'NONE'\n),\nscored AS (\n  SELECT *,\n    -- 정규화 점수 0~250 — 1337 같은 raw load_ratio 폭발 차단\n    LEAST(100, GREATEST(0, (max_motor_temp - 80) * 2))\n    + LEAST(100, GREATEST(0, battery_drain * 2))\n    + LEAST(50, max_temp_load_ratio * 5) AS priority_score\n  FROM base\n),\nper_type_top AS (\n  SELECT *,\n    ROW_NUMBER() OVER (PARTITION BY failure_type ORDER BY priority_score DESC) AS rn_in_type\n  FROM scored\n)\nSELECT\n  ROW_NUMBER() OVER (ORDER BY priority_score DESC) AS \"순위\",\n  robot_id                                           AS \"Robot\",\n  production_line || ' ' || station_type             AS \"Line·공정\",\n  failure_type                                       AS \"고장유형\",\n  rul_days                                           AS \"잔여수명(d)\",\n  CAST((hourly_loss * 4) / 10000 AS VARCHAR) || '만원' AS \"잠재 손실\",\n  CASE\n    WHEN priority_score >= 220 THEN '임박'\n    WHEN priority_score >= 170 THEN '긴급'\n    WHEN priority_score >= 110 THEN '주의'\n    WHEN priority_score >=  60 THEN '관찰'\n    ELSE                            '양호'\n  END                                                AS \"긴급도\"\nFROM per_type_top\nWHERE rn_in_type <= 6\nORDER BY priority_score DESC\nLIMIT 30",
+          "rawSQL": "WITH base AS (\n  SELECT\n    g.robot_id, d.production_line, d.station_type,\n    COALESCE(g.dominant_failure_type, 'NONE') AS failure_type,\n    g.max_motor_temp, g.battery_drain, g.max_temp_load_ratio,\n    CASE g.dominant_failure_type\n      WHEN 'HDF' THEN CASE WHEN g.max_motor_temp>110 THEN 1 ELSE 2 END\n      WHEN 'PWF' THEN 2 WHEN 'OSF' THEN 3 WHEN 'TWF' THEN 5 WHEN 'RNF' THEN 7 ELSE 7\n    END AS rul_days,\n    CASE d.production_line\n      WHEN 'LINE-A' THEN 300000 WHEN 'LINE-B' THEN 250000\n      WHEN 'LINE-C' THEN 400000 WHEN 'LINE-D' THEN 150000 ELSE 200000\n    END AS hourly_loss\n  FROM robot_telemetry_db.gold_robot_daily_stats g\n  JOIN robot_telemetry_db.dim_robot_line d ON g.robot_id = d.robot_id\n  WHERE g.dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '2' DAY AS DATE)\n    AND COALESCE(g.dominant_failure_type, 'NONE') <> 'NONE'\n),\nscored AS (\n  SELECT *,\n    -- 정규화 점수 0~250 — 1337 같은 raw load_ratio 폭발 차단\n    LEAST(100, GREATEST(0, (max_motor_temp - 80) * 2))\n    + LEAST(100, GREATEST(0, battery_drain * 2))\n    + LEAST(50, max_temp_load_ratio * 5) AS priority_score\n  FROM base\n),\nper_type_top AS (\n  SELECT *,\n    ROW_NUMBER() OVER (PARTITION BY failure_type ORDER BY priority_score DESC) AS rn_in_type\n  FROM scored\n)\nSELECT\n  ROW_NUMBER() OVER (ORDER BY priority_score DESC) AS \"순위\",\n  robot_id                                           AS \"Robot\",\n  production_line || ' ' || station_type             AS \"Line·공정\",\n  failure_type                                       AS \"고장유형\",\n  rul_days                                           AS \"잔여수명(d)\",\n  CAST((hourly_loss * 4) / 10000 AS VARCHAR) || '만원' AS \"잠재 손실\",\n  CASE\n    WHEN priority_score >= 220 THEN '임박'\n    WHEN priority_score >= 170 THEN '긴급'\n    WHEN priority_score >= 110 THEN '주의'\n    WHEN priority_score >=  60 THEN '관찰'\n    ELSE                            '양호'\n  END                                                AS \"긴급도\"\nFROM per_type_top\nWHERE rn_in_type <= 6\nORDER BY priority_score DESC\nLIMIT 30",
           "refId": "A",
           "table": "gold_robot_daily_stats"
         }
@@ -1019,7 +1019,7 @@
             "uid": "athena"
           },
           "format": 1,
-          "rawSQL": "SELECT\n  d.production_line                                                                AS \"라인\",\n  d.station_type                                                                   AS \"공정\",\n  COUNT(*)                                                                         AS \"총 로봇\",\n  SUM(CASE WHEN g.dominant_failure_type IS NULL OR g.dominant_failure_type='NONE' THEN 1 ELSE 0 END) AS \"정상\",\n  SUM(CASE WHEN g.dominant_failure_type IS NOT NULL AND g.dominant_failure_type<>'NONE' THEN 1 ELSE 0 END) AS \"AI 점검\",\n  ROUND(100.0 * SUM(CASE WHEN g.dominant_failure_type IS NOT NULL AND g.dominant_failure_type<>'NONE' THEN 1 ELSE 0 END) / COUNT(*), 1) AS \"위험율(%)\"\nFROM robot_telemetry_db.gold_robot_daily_stats g\nJOIN robot_telemetry_db.dim_robot_line d ON g.robot_id = d.robot_id\nWHERE g.dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)\nGROUP BY 1, 2\nORDER BY 1",
+          "rawSQL": "SELECT\n  d.production_line                                                                AS \"라인\",\n  d.station_type                                                                   AS \"공정\",\n  COUNT(*)                                                                         AS \"총 로봇\",\n  SUM(CASE WHEN g.dominant_failure_type IS NULL OR g.dominant_failure_type='NONE' THEN 1 ELSE 0 END) AS \"정상\",\n  SUM(CASE WHEN g.dominant_failure_type IS NOT NULL AND g.dominant_failure_type<>'NONE' THEN 1 ELSE 0 END) AS \"AI 점검\",\n  ROUND(100.0 * SUM(CASE WHEN g.dominant_failure_type IS NOT NULL AND g.dominant_failure_type<>'NONE' THEN 1 ELSE 0 END) / COUNT(*), 1) AS \"위험율(%)\"\nFROM robot_telemetry_db.gold_robot_daily_stats g\nJOIN robot_telemetry_db.dim_robot_line d ON g.robot_id = d.robot_id\nWHERE g.dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '2' DAY AS DATE)\nGROUP BY 1, 2\nORDER BY 1",
           "refId": "A",
           "table": "gold_robot_daily_stats"
         }
@@ -1170,7 +1170,7 @@
             "uid": "athena"
           },
           "format": 1,
-          "rawSQL": "SELECT\n  d.production_line AS \"라인\",\n  SUM(CASE WHEN g.dominant_failure_type = 'TWF' THEN 1 ELSE 0 END) AS \"TWF (공구마모)\",\n  SUM(CASE WHEN g.dominant_failure_type = 'HDF' THEN 1 ELSE 0 END) AS \"HDF (방열부족)\",\n  SUM(CASE WHEN g.dominant_failure_type = 'PWF' THEN 1 ELSE 0 END) AS \"PWF (전력이상)\",\n  SUM(CASE WHEN g.dominant_failure_type = 'OSF' THEN 1 ELSE 0 END) AS \"OSF (과부하)\",\n  SUM(CASE WHEN g.dominant_failure_type = 'RNF' THEN 1 ELSE 0 END) AS \"RNF (랜덤)\"\nFROM robot_telemetry_db.gold_robot_daily_stats g\nJOIN robot_telemetry_db.dim_robot_line d ON g.robot_id = d.robot_id\nWHERE g.dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)\n  AND g.dominant_failure_type IS NOT NULL\n  AND g.dominant_failure_type <> 'NONE'\nGROUP BY d.production_line\nORDER BY d.production_line",
+          "rawSQL": "SELECT\n  d.production_line AS \"라인\",\n  SUM(CASE WHEN g.dominant_failure_type = 'TWF' THEN 1 ELSE 0 END) AS \"TWF (공구마모)\",\n  SUM(CASE WHEN g.dominant_failure_type = 'HDF' THEN 1 ELSE 0 END) AS \"HDF (방열부족)\",\n  SUM(CASE WHEN g.dominant_failure_type = 'PWF' THEN 1 ELSE 0 END) AS \"PWF (전력이상)\",\n  SUM(CASE WHEN g.dominant_failure_type = 'OSF' THEN 1 ELSE 0 END) AS \"OSF (과부하)\",\n  SUM(CASE WHEN g.dominant_failure_type = 'RNF' THEN 1 ELSE 0 END) AS \"RNF (랜덤)\"\nFROM robot_telemetry_db.gold_robot_daily_stats g\nJOIN robot_telemetry_db.dim_robot_line d ON g.robot_id = d.robot_id\nWHERE g.dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '2' DAY AS DATE)\n  AND g.dominant_failure_type IS NOT NULL\n  AND g.dominant_failure_type <> 'NONE'\nGROUP BY d.production_line\nORDER BY d.production_line",
           "refId": "A",
           "table": "gold_robot_daily_stats"
         }
@@ -1309,7 +1309,7 @@
             "uid": "athena"
           },
           "format": 1,
-          "rawSQL": "SELECT SUM(CASE WHEN anomaly_record_count > 100 OR max_motor_temp > 100 THEN 1 ELSE 0 END) AS \"Critical\", SUM(CASE WHEN (anomaly_record_count > 0 OR max_motor_temp > 95) AND NOT (anomaly_record_count > 100 OR max_motor_temp > 100) THEN 1 ELSE 0 END) AS \"High\", SUM(CASE WHEN max_motor_temp > 85 AND anomaly_record_count = 0 AND max_motor_temp <= 95 THEN 1 ELSE 0 END) AS \"Medium\", SUM(CASE WHEN max_motor_temp <= 85 AND anomaly_record_count = 0 THEN 1 ELSE 0 END) AS \"Normal\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
+          "rawSQL": "SELECT SUM(CASE WHEN anomaly_record_count > 100 OR max_motor_temp > 100 THEN 1 ELSE 0 END) AS \"Critical\", SUM(CASE WHEN (anomaly_record_count > 0 OR max_motor_temp > 95) AND NOT (anomaly_record_count > 100 OR max_motor_temp > 100) THEN 1 ELSE 0 END) AS \"High\", SUM(CASE WHEN max_motor_temp > 85 AND anomaly_record_count = 0 AND max_motor_temp <= 95 THEN 1 ELSE 0 END) AS \"Medium\", SUM(CASE WHEN max_motor_temp <= 85 AND anomaly_record_count = 0 THEN 1 ELSE 0 END) AS \"Normal\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '2' DAY AS DATE)",
           "refId": "A",
           "table": "gold_robot_daily_stats"
         }
@@ -1531,7 +1531,7 @@
             "uid": "athena"
           },
           "format": 1,
-          "rawSQL": "SELECT robot_id AS \"로봇 ID\", ROUND(max_motor_temp, 1) AS \"최고 온도(°C)\", battery_drain AS \"배터리 소모\", anomaly_record_count AS \"이상치 발생\", ROUND(max_temp_load_ratio, 2) AS \"최대 부하율\", ROUND(max_motor_temp + COALESCE(anomaly_record_count, 0) * 0.05 + battery_drain * 0.3 + COALESCE(max_temp_load_ratio, 0) * 5, 1) AS \"위험도\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE) ORDER BY \"위험도\" DESC LIMIT 15",
+          "rawSQL": "SELECT robot_id AS \"로봇 ID\", ROUND(max_motor_temp, 1) AS \"최고 온도(°C)\", battery_drain AS \"배터리 소모\", anomaly_record_count AS \"이상치 발생\", ROUND(max_temp_load_ratio, 2) AS \"최대 부하율\", ROUND(max_motor_temp + COALESCE(anomaly_record_count, 0) * 0.05 + battery_drain * 0.3 + COALESCE(max_temp_load_ratio, 0) * 5, 1) AS \"위험도\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '2' DAY AS DATE) ORDER BY \"위험도\" DESC LIMIT 15",
           "refId": "A",
           "table": "gold_robot_daily_stats"
         }
@@ -1634,7 +1634,7 @@
             "uid": "athena"
           },
           "format": 1,
-          "rawSQL": "SELECT robot_id, ROUND(max_motor_temp, 1) AS \"최고 온도\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE) ORDER BY max_motor_temp DESC LIMIT 10",
+          "rawSQL": "SELECT robot_id, ROUND(max_motor_temp, 1) AS \"최고 온도\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '2' DAY AS DATE) ORDER BY max_motor_temp DESC LIMIT 10",
           "refId": "A",
           "table": "gold_robot_daily_stats"
         }
@@ -1740,7 +1740,7 @@
             "uid": "athena"
           },
           "format": 1,
-          "rawSQL": "SELECT dominant_failure_type AS \"고장 유형\", COUNT(*) AS \"로봇 수\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE) AND dominant_failure_type IS NOT NULL AND dominant_failure_type <> 'NONE' GROUP BY dominant_failure_type ORDER BY COUNT(*) DESC",
+          "rawSQL": "SELECT dominant_failure_type AS \"고장 유형\", COUNT(*) AS \"로봇 수\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '2' DAY AS DATE) AND dominant_failure_type IS NOT NULL AND dominant_failure_type <> 'NONE' GROUP BY dominant_failure_type ORDER BY COUNT(*) DESC",
           "refId": "A",
           "table": "gold_robot_daily_stats"
         }

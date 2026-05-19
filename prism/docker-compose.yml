@@ -1,0 +1,32 @@
+# PRISM 운영 콘솔 — 단일 호스트 배포.
+# 사용: cd prism/ && cp .env.example .env && docker compose up --build
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: prism/Dockerfile.app
+    image: prism-app:local
+    container_name: prism-app
+    env_file: .env
+    environment:
+      # .env 에서 BEDROCK_OFFLINE / PRISM_MODE 등 주입.
+      # 명시 override 가 필요한 항목만 여기에.
+      - STREAMLIT_SERVER_PORT=${STREAMLIT_PORT:-8501}
+    ports:
+      - "${STREAMLIT_PORT:-8501}:8501"
+    volumes:
+      # DuckDB 적재 결과를 호스트로 보존 (재시작 시 시연 상태 유지).
+      - ../data:/app/data
+      # 시연 중 cache_replay 업데이트 hot-reload 필요시.
+      - ../assets:/app/assets:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+# CNC stream generator 는 현 PRISM Streamlit 안에서 직접 tick 을 돌리므로 별도 컨테이너 불필요.
+# 1000대 robot scale-up 시에만 legacy/k8s/generator/ 의 StatefulSet 으로 분리.

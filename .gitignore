@@ -43,6 +43,23 @@ data/seed_data.csv
 data/*.zip
 data/*.duckdb
 
+# legacy/ 안의 terraform state 도 동일 보호 (credential leak 방지)
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.backup
+**/*.tfstate.*
+**/*.tfstate.*.backup
+**/.terraform.lock.hcl
+**/destroy*.tfplan
+**/tfplan
+**/*.tfplan
+
+# 본선 자료 PDF — git 추적 X
+*.pdf
+PRISM_마스터가이드.pdf
+# OMC state / 메모리 (로컬 only)
+.omc/
+
 # 로컬 학습 문서 — 원격 저장소에 올리지 않음
 ARCHITECTURE_OVERVIEW.md
 DATA_FLOW_DETAILED.md
