@@ -220,6 +220,19 @@ _SCENARIOS: dict[str, dict] = {
 }
 
 # Supervisor candidate_actions (4 옵션, 시연 fixed)
+# 마커별 sub-metric — "현재 마커 KPI" 박스 아래 표시. 의미 있는 시점만.
+_MARKER_SUB_KPIS: dict[int, list[tuple[str, str]]] = {
+    1:  [("결함 risk", "62%"), ("1순위 type", "HDF")],
+    2:  [("원인 후보", "6 노드"), ("σ_max", "0.40 ✅")],
+    4:  [("시뮬 가속비", "240×"), ("defect Δ", "-44%p")],
+    5:  [("motor_temp", "105°C"), ("vibration", "+188%")],
+    6:  [("신규 edge", "+1"), ("DAG 버전", "v2")],
+    8:  [("Net Value", "₩100M"), ("권고 강도", "강한")],
+    9:  [("정확도", "0.91"), ("개선", "+47%")],
+    10: [("OEE", "66%"), ("개선", "+35%")],
+}
+
+
 _CANDIDATE_ACTIONS: list[str] = [
     "continue",              # 진행 (위험 감수)
     "throttle_50pct",        # 부하 50% 감속
@@ -247,6 +260,56 @@ def _real_supervisor_decision(
         alpha=alpha, beta=beta, gamma=gamma, horizon_h=horizon_h,
     ))
     return sup.negotiate_with_candidates(scenario_context, _CANDIDATE_ACTIONS)
+
+
+# ── DuckDB storage demo helper ───────────────────────────────────────────────────
+
+@st.cache_resource(show_spinner=False)
+def _seed_storage_demo() -> dict:
+    """incident #47 sensor timeline 100 행 DuckDB 적재 (1회). 사이드바 status 반환."""
+    from datetime import datetime, timedelta
+
+    from src.orchestration.storage import StorageDB  # noqa: PLC0415
+
+    db_path = _ROOT / "data" / "prism_demo.duckdb"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    with StorageDB(str(db_path)) as db:
+        if db.count("robot_telemetry") == 0:
+            # seed 100 rows (60s timeline + 40s recovery)
+            base_ts = datetime(2026, 5, 22, 3, 0, 0)
+            rows = []
+            for sec in range(100):
+                ts = base_ts + timedelta(seconds=sec)
+                mt = (
+                    85 + 0.05 * sec
+                    + (0.5 * (sec - 30) if 30 <= sec < 60 else (0 if sec < 30 else -0.3 * (sec - 60)))
+                )
+                rows.append({
+                    "ts": ts,
+                    "robot_id": "ROBOT-00018",
+                    "motor_temp": mt,
+                    "current_load": 60.0,
+                    "battery_level": 75.0,
+                    "pos_x": 10.5,
+                    "pos_y": 20.3,
+                    "active_hours": 8.0,
+                    "fault_phase": (
+                        "incident_47" if 30 <= sec < 60
+                        else "recover" if sec >= 60
+                        else "normal"
+                    ),
+                    "is_faulty": 45 <= sec < 60,
+                })
+            db.write_robot(rows)
+        n_total = db.count("robot_telemetry")
+        sha = db.table_sha256("robot_telemetry")[:12]
+    file_size_kb = db_path.stat().st_size / 1024 if db_path.exists() else 0
+    return {
+        "n_total": n_total,
+        "file_size_kb": file_size_kb,
+        "sha_prefix": sha,
+        "path": str(db_path.relative_to(_ROOT)),
+    }
 
 
 # ── UI 컴포넌트 ──────────────────────────────────────────────────────────────────
@@ -432,6 +495,70 @@ def render_causal_dag(marker_idx: int = 0) -> None:
 
 
 # ── 마커별 가시 액션 helper (mason 5차 피드백 P0+P1) ──────────────────────────────
+
+def render_causal_v1_explanation() -> None:
+    """마커 2 (0:30 인과 v1) — DAG 의미 청중 친화 부가 설명."""
+    st.info("🔍 **인과 분석 시작** — risk 62% 예지경보의 근본 원인 후보 식별")
+
+    col_l, col_r = st.columns([1, 1])
+    with col_l:
+        with st.container(border=True):
+            st.markdown("##### 📘 DAG 노드 색상 가이드")
+            st.markdown(
+                "- 🔵 **파란색** — 원인 후보 (causal predecessor)\n"
+                "- 🟠 **주황색** — 개입 포인트 (do-intervention)\n"
+                "- 🔴 **빨간색** — 결과 노드 (DEFECT)\n"
+                "- ⚪ **회색** — 현재 비활성"
+            )
+    with col_r:
+        with st.container(border=True):
+            st.markdown("##### 🎯 이 단계의 의미")
+            st.markdown(
+                "단순 상관관계 (correlation) 가 아니라 **인과 관계 (causation)**.\n\n"
+                "DoWhy 가 6 노드에서 인과 path 식별:\n"
+                "- 3 개 base cause: `tool_age`, `spindle_rpm`, `coolant_temp`\n"
+                "- 2 개 mediator: `vibration_xyz`, `thermal_drift`\n"
+                "- 1 개 outcome path: `dimension_dev` → `DEFECT`"
+            )
+    st.caption("⚖️ Confounder Robustness: σ_max = 0.40 < 0.5 → **robust** (Wright 1991 partial R²)")
+
+
+def render_causal_v2_explanation() -> None:
+    """마커 6 (1:30 인과 v2) — DAG v1 → v2 학습 narrative."""
+    st.success("🎓 **인과 v2 학습 완료** — incident #47 패턴이 신규 path 로 자동 통합")
+
+    col_l, col_r = st.columns([1, 1])
+    with col_l:
+        with st.container(border=True):
+            st.markdown("##### 🔄 v1 → v2 변화")
+            st.markdown(
+                "- ➕ **신규 edge**: `coolant_temp → thermal_drift`\n"
+                "- 🟠 **coolant_temp** 주황색 강조 (신규 발견 원인)\n"
+                "- 📊 σ_max 재계산: 0.40 → 0.38 (더 robust)"
+            )
+    with col_r:
+        with st.container(border=True):
+            st.markdown("##### 💡 학습 자산화")
+            st.markdown(
+                "incident #47 데이터로 인과 모델 자동 갱신.\n\n"
+                "다음 시연에서:\n"
+                "- 동일 패턴 재발 시 **즉시** 인식\n"
+                "- coolant_temp 모니터 우선순위 ↑\n"
+                "- 모델은 영구적 자산"
+            )
+
+
+def render_normal_status() -> None:
+    """마커 0 (0:00 정상) — sensor live 4-grid."""
+    st.info("✅ **정상 가동 중** — 모든 sensor 안전 범위, 라인 가동률 100%")
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: st.metric("motor_temp", "85°C", help="SOP 임계 100°C 미만")
+    with c2: st.metric("vibration_xyz", "0.8", help="기준 norm < 1.5")
+    with c3: st.metric("RPM", "8,500", help="표준 8500")
+    with c4: st.metric("coolant_temp", "22°C", help="기준 < 25°C")
+    st.caption("📡 11 sensor 실시간 통합 · DuckDB in-process · latency < 100ms")
+
 
 def render_predictive_alert() -> None:
     """마커 1 (0:15 예지경보) — XGBoost 확률 기반 risk 알람 + 6-class 확률 분포."""
@@ -930,16 +1057,27 @@ def main() -> None:
         # 마커 0~6: DAG (marker_idx 별 색상) + 단계별 가시 액션
         if marker_idx < 7:
             render_causal_dag(marker_idx)
-            if marker_idx == 1:
+            if marker_idx == 0:
+                st.markdown("---")
+                render_normal_status()
+            elif marker_idx == 1:
                 st.markdown("---")
                 render_predictive_alert()
+            elif marker_idx == 2:
+                st.markdown("---")
+                render_causal_v1_explanation()
             elif marker_idx == 3:
                 st.markdown("---")
                 render_human_decision()
             elif marker_idx == 4:
                 st.markdown("---")
                 render_simulation_evidence()
-            elif marker_idx == 5 or marker_idx == 6:
+            elif marker_idx == 5:
+                st.markdown("---")
+                render_incident_alert()
+            elif marker_idx == 6:
+                st.markdown("---")
+                render_causal_v2_explanation()
                 st.markdown("---")
                 render_incident_alert()
 
@@ -1023,7 +1161,7 @@ def main() -> None:
             st.rerun()
 
         st.markdown("---")
-        st.markdown("#### 현재 마커 KPI")
+        st.markdown("#### 현재 단계 상세")
         sec, label = MARKERS[marker_idx]
         mm = sec // 60
         ss = sec % 60
@@ -1031,12 +1169,19 @@ def main() -> None:
         st.metric("단계", label.split(" ", 1)[1] if " " in label else label)
         st.caption(f"📝 {_MARKER_DESCRIPTIONS.get(marker_idx, '')}")
 
-        # 재학습 결과 (마커 3:30 이후)
+        # 마커별 sub-metric (KPI 의미 있는 시점만)
+        sub_kpis = _MARKER_SUB_KPIS.get(marker_idx, [])
+        if sub_kpis:
+            st.markdown("---")
+            st.markdown("##### 단계 지표")
+            for label_kpi, value_kpi in sub_kpis:
+                st.metric(label_kpi, value_kpi)
+
+        # 마커 9 재학습 / 마커 10 OEE final
         if marker_idx >= 9:
-            st.success("재학습 완료: 0.62 → 0.91 (+47%)")
-        # OEE 결과 (마커 3:45)
+            st.success("🎓 재학습: 0.62 → 0.91 (+47%)")
         if marker_idx >= 10:
-            st.success("OEE +35% 달성")
+            st.success("🏭 OEE +35% 달성")
 
     st.markdown("---")
     st.caption(
