@@ -17,7 +17,9 @@ from src.orchestration.causal_dag import (
     _dag_to_dot,
     build_dag,
     compute_sigma_max,
+    estimate_intervention_effect,
     fit_causal_model,
+    fit_causal_model_for,
     narrative_kr_for_sigma_max,
     serialize_refute_data,
     synthetic_sensor_data,
@@ -96,6 +98,52 @@ def test_estimate_ate_positive():
     assert float(estimate.value) > 0, (
         f"Expected positive ATE (spindle_rpm → DEFECT), got {estimate.value}"
     )
+
+
+# ── test_intervention_effect (마커 4·8 라이브 호출용) ────────────────────────
+
+def test_estimate_intervention_effect_coolant_positive():
+    """coolant_temp ↑ → DEFECT ↑ — DoWhy do(coolant_temp=1) vs do(=0) ATE > 0.
+
+    causal path: coolant_temp → thermal_drift → dimension_dev → DEFECT.
+    """
+    dag = build_dag()
+    df = synthetic_sensor_data(n=2_000, seed=2026)
+    model = fit_causal_model_for(df, dag, treatment="coolant_temp", outcome="DEFECT")
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        ate = estimate_intervention_effect(model, treatment_value=1.0, control_value=0.0)
+
+    assert ate > 0, f"Expected positive ATE (coolant_temp → DEFECT), got {ate}"
+
+
+def test_estimate_intervention_effect_deterministic():
+    """seed=2026 → 동일 입력 → 동일 ATE (시연 결정성)."""
+    dag = build_dag()
+    df = synthetic_sensor_data(n=2_000, seed=2026)
+    model = fit_causal_model_for(df, dag, treatment="spindle_rpm", outcome="DEFECT")
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        ates = [
+            estimate_intervention_effect(model, treatment_value=0.5, control_value=0.0)
+            for _ in range(3)
+        ]
+    assert len(set(ates)) == 1, f"non-deterministic ATE: {ates}"
+
+
+def test_estimate_intervention_effect_negative_treatment():
+    """spindle_rpm ↓ (treatment=-0.5) → DEFECT ↓ — 음의 ATE (보호 효과)."""
+    dag = build_dag()
+    df = synthetic_sensor_data(n=2_000, seed=2026)
+    model = fit_causal_model_for(df, dag, treatment="spindle_rpm", outcome="DEFECT")
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        ate_down = estimate_intervention_effect(model, treatment_value=-0.5, control_value=0.0)
+
+    assert ate_down < 0, f"Expected negative ATE (spindle 감속 = 보호), got {ate_down}"
 
 
 # ── test_sigma_max_deterministic ─────────────────────────────────────────────

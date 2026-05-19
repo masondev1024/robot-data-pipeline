@@ -155,20 +155,49 @@ def synthetic_sensor_data(n: int = 5_000, seed: int = 2026) -> pd.DataFrame:
 # ── DoWhy 모델 ────────────────────────────────────────────────────────────────
 
 def fit_causal_model(df: pd.DataFrame, dag: nx.DiGraph) -> dowhy.CausalModel:
-    """DoWhy CausalModel: treatment=spindle_rpm, outcome=DEFECT."""
+    """DoWhy CausalModel: treatment=spindle_rpm, outcome=DEFECT (default fixture)."""
+    return fit_causal_model_for(df, dag, treatment="spindle_rpm", outcome="DEFECT")
+
+
+def fit_causal_model_for(
+    df: pd.DataFrame,
+    dag: nx.DiGraph,
+    treatment: str = "spindle_rpm",
+    outcome: str = "DEFECT",
+) -> dowhy.CausalModel:
+    """DoWhy CausalModel — 임의 treatment/outcome (마커 4 라이브 do() 시 coolant_temp 사용)."""
     return dowhy.CausalModel(
         data=df,
-        treatment="spindle_rpm",
-        outcome="DEFECT",
+        treatment=treatment,
+        outcome=outcome,
         graph=_dag_to_dot(dag),
         proceed_when_unidentifiable=True,
     )
 
 
 def estimate_ate(model: dowhy.CausalModel) -> float:
-    """backdoor.linear_regression ATE 추정."""
+    """backdoor.linear_regression ATE 추정 (treatment=1 vs control=0)."""
+    return estimate_intervention_effect(model, treatment_value=1.0, control_value=0.0)
+
+
+def estimate_intervention_effect(
+    model: dowhy.CausalModel,
+    treatment_value: float = 1.0,
+    control_value: float = 0.0,
+) -> float:
+    """do(treatment=treatment_value) − do(treatment=control_value) ATE.
+
+    본선 마커 4·8 라이브 호출:
+        - 마커 4: 보류(treatment=0) vs 적용(treatment=−0.5, 5% 감소) ATE
+        - 마커 8: candidate action 별 do() 효과 → 4 Agent 입력 enrich
+    """
     identified = model.identify_effect()
-    estimate = model.estimate_effect(identified, method_name="backdoor.linear_regression")
+    estimate = model.estimate_effect(
+        identified,
+        method_name="backdoor.linear_regression",
+        control_value=control_value,
+        treatment_value=treatment_value,
+    )
     return float(estimate.value)
 
 

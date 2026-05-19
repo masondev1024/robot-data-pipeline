@@ -263,6 +263,32 @@ def _real_supervisor_decision(
     return sup.negotiate_with_candidates(scenario_context, _CANDIDATE_ACTIONS)
 
 
+# ── DoWhy 라이브 ATE 계산 캐시 (Phase 1: 본선 라이브 do-intervention) ─────────────
+
+@st.cache_resource(show_spinner="🔬 DoWhy 6-Node DAG 학습 중... (5k row, ~3초)")
+def _get_causal_artifact() -> dict:
+    """5k row 합성 데이터 + DoWhy CausalModel 2종 (treatment=coolant/spindle) — 시연 시작 1회 학습.
+
+    streamlit @st.cache_resource 로 process-lifetime 캐시. rerun 시 재계산 X.
+    마커 4 (보류 fast-forward) + 마커 8 (Supervisor candidate ATE) 에서 라이브 호출.
+    """
+    import warnings  # noqa: PLC0415
+    from src.orchestration.causal_dag import (  # noqa: PLC0415
+        build_dag, synthetic_sensor_data, fit_causal_model_for,
+    )
+    dag = build_dag()
+    df = synthetic_sensor_data(n=5_000, seed=2026)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model_coolant = fit_causal_model_for(df, dag, treatment="coolant_temp", outcome="DEFECT")
+        model_spindle = fit_causal_model_for(df, dag, treatment="spindle_rpm", outcome="DEFECT")
+    return {
+        "dag": dag, "df": df,
+        "model_coolant": model_coolant,
+        "model_spindle": model_spindle,
+    }
+
+
 # ── CNC stream generator (1 instance, session 유지) ─────────────────────────────
 
 @st.cache_resource(show_spinner=False)
@@ -718,12 +744,36 @@ def render_human_decision() -> None:
 def render_simulation_evidence() -> None:
     """마커 4 (1:00 시뮬가속) — 운영자 보류 시 3시간 fast-forward (기획서 page 7 정합).
 
-    counterfactual `do(intervention = None)` — 보류 상태 그대로 시간 압축 → 결함 발생 시뮬.
+    Phase 1 (본선 라이브): DoWhy do(coolant_temp) ATE 라이브 호출 — 보류 vs 적용 차이를
+    실 인과추론으로 보여준다. trajectory plot 은 결정성 위해 결정론적 공식 유지.
     """
     st.warning("🎬 **시뮬레이션 가속 — 보류 시 3시간 fast-forward**")
+
+    # ── 라이브 DoWhy do(coolant_temp) ATE — 보류 vs 적용 ────────────────────────
+    import warnings  # noqa: PLC0415
+    from src.orchestration.causal_dag import estimate_intervention_effect  # noqa: PLC0415
+    art = _get_causal_artifact()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        # 보류: coolant_temp 변화 X (baseline 유지). treatment=control=0 → ATE=0.
+        ate_hold = estimate_intervention_effect(
+            art["model_coolant"], treatment_value=0.0, control_value=0.0,
+        )
+        # 적용 (절삭유 +5% = coolant_temp −1σ standardised 감소): treatment=−1, control=0.
+        ate_apply = estimate_intervention_effect(
+            art["model_coolant"], treatment_value=-1.0, control_value=0.0,
+        )
+    ate_delta = ate_apply - ate_hold
+
     st.markdown(
         "운영자가 v1 추천 **'보류'** 시 어떻게 되는지 시간 가속 시뮬 — "
         "`do(intervention = None)` counterfactual, **3시간 → 1초 압축**."
+    )
+    st.success(
+        "🔬 **라이브 DoWhy ATE 호출 (5k row, backdoor.linear_regression)**  \n"
+        f"- 보류 시 ATE = `{ate_hold:+.4f}` (baseline, treatment=control)  \n"
+        f"- 적용 시 ATE = `{ate_apply:+.4f}` (절삭유 +5% = `do(coolant_temp = −1σ)`)  \n"
+        f"- **인과 효과 차이 Δ = `{ate_delta:+.4f}`** → 적용 시 DEFECT 확률 ↓"
     )
 
     col_metrics, col_chart = st.columns([1, 2])
@@ -731,7 +781,12 @@ def render_simulation_evidence() -> None:
         st.metric("시뮬 가속비", "3h → 1s", help="240× 압축 (DoWhy do(None) trajectory)")
         st.metric("defect_prob 예측", "62% → 95%", delta="+33%p", delta_color="inverse")
         st.metric("결함 발생 예상", "~45분 후", help="motor_temp 100°C SOP 임계 도달")
-        st.caption("📊 보류 trajectory — 운영자 미적용 시 결함 진행 시뮬")
+        st.metric(
+            "🔬 라이브 ATE Δ", f"{ate_delta:+.4f}",
+            delta_color="inverse",
+            help="DoWhy do(coolant_temp=−1σ) − do(=0) — 5k row 합성 데이터 실시간 계산",
+        )
+        st.caption("📊 보류 trajectory + 라이브 DoWhy ATE")
 
     with col_chart:
         minutes = list(range(0, 181, 5))  # 0 ~ 180 분, 5분 간격
