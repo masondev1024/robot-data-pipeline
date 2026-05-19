@@ -488,12 +488,14 @@ def render_marker_timeline(current_marker_idx: int) -> None:
 
 
 # DAG 노드 색상 의미 (legend 와 1:1)
-_COLOR_GREY         = "#cccccc"  # 비활성 / 보류 / 미적용 / baseline
+_COLOR_GREY         = "#cccccc"  # 비활성 / baseline
 _COLOR_FOCUS_ORANGE = "#ff7f0e"  # 인과 모델 핵심 변수 (감지·추천·학습)
+_COLOR_FOCUS_LIGHT  = "#fcd34d"  # 약한 감지 (XGBoost 약 입력)
 _COLOR_PATH_BLUE    = "#1f77b4"  # 원인 path (predecessor·mediator)
 _COLOR_RISK_AMBER   = "#fbbf24"  # 예지 risk (아직 미발현)
 _COLOR_DEFECT_RED   = "#d62728"  # 결함 활성 path (manifest fault)
-_COLOR_HOLD_DIM     = "#9ca3af"  # 보류 미적용 (회색 약간 진하게 — 의도된 비결정)
+_COLOR_SIM_RED      = "#ff9999"  # 시뮬 예측 결함 (연한 빨강 — 아직 실재 X)
+_COLOR_HOLD_DIM     = "#9ca3af"  # 보류 미적용 (의도된 비결정)
 
 
 def _node_colors_for_marker(marker_idx: int) -> dict[str, str]:
@@ -521,9 +523,13 @@ def _node_colors_for_marker(marker_idx: int) -> dict[str, str]:
         # baseline: 전부 회색 (DEFECT 도 회색 — 정상 가동에 빨강은 misleading)
         pass
     elif marker_idx == 1:
-        # 예지: tool_age 감지 + DEFECT amber (아직 미발현 risk)
-        base["tool_age"] = _COLOR_FOCUS_ORANGE
-        base["DEFECT"] = _COLOR_RISK_AMBER
+        # 예지: 라이브 XGBoost 입력 강도 매핑 (_MARKER1_XGB_FEATURES σ 기준)
+        # tool_age 0.6σ (약) · coolant 1.5σ (중) · thermal 1.8σ (강) · dim 1.0σ (중)
+        base["tool_age"] = _COLOR_FOCUS_LIGHT       # 약한 감지
+        base["coolant_temp"] = _COLOR_FOCUS_ORANGE  # 중간 감지
+        base["thermal_drift"] = _COLOR_FOCUS_ORANGE # 가장 강한 입력
+        base["dimension_dev"] = _COLOR_PATH_BLUE    # mediator 활성
+        base["DEFECT"] = _COLOR_RISK_AMBER          # 예지 risk (미발현)
     elif marker_idx == 2:
         # v1 추천: coolant_temp 주황 (추천 변수), 나머지 인과 path (predecessor + mediator) 파랑
         base["tool_age"] = _COLOR_PATH_BLUE
@@ -534,26 +540,27 @@ def _node_colors_for_marker(marker_idx: int) -> dict[str, str]:
         base["dimension_dev"] = _COLOR_PATH_BLUE
         base["DEFECT"] = _COLOR_RISK_AMBER
     elif marker_idx == 3:
-        # 보류: DAG 색은 마커 2 와 동일 (분석 보존). "보류" 는 title amber + caption 으로
+        # 보류: coolant_temp 만 주황 → HOLD_DIM (추천이었으나 보류로 미적용) 시각 변화
         base["tool_age"] = _COLOR_PATH_BLUE
         base["spindle_rpm"] = _COLOR_PATH_BLUE
-        base["coolant_temp"] = _COLOR_FOCUS_ORANGE
+        base["coolant_temp"] = _COLOR_HOLD_DIM  # ⏸ 보류 — 추천 적용 안 함
         base["vibration_xyz"] = _COLOR_PATH_BLUE
         base["thermal_drift"] = _COLOR_PATH_BLUE
         base["dimension_dev"] = _COLOR_PATH_BLUE
         base["DEFECT"] = _COLOR_RISK_AMBER
     elif marker_idx == 4:
-        # fast-forward: coolant dim (보류 미적용) + vibration/thermal/dim/DEFECT 빨강 (결함 진행)
+        # fast-forward 시뮬: 연한 빨강 (시뮬 예측, 실재 X) — 마커 5 와 시각 차별
         base["tool_age"] = _COLOR_PATH_BLUE
         base["spindle_rpm"] = _COLOR_PATH_BLUE
         base["coolant_temp"] = _COLOR_HOLD_DIM
-        base["vibration_xyz"] = _COLOR_DEFECT_RED  # fault progression (mediator 도 활성)
-        base["thermal_drift"] = _COLOR_DEFECT_RED
-        base["dimension_dev"] = _COLOR_DEFECT_RED
-        base["DEFECT"] = _COLOR_DEFECT_RED
+        base["vibration_xyz"] = _COLOR_SIM_RED   # 시뮬 (연한 빨강)
+        base["thermal_drift"] = _COLOR_SIM_RED
+        base["dimension_dev"] = _COLOR_SIM_RED
+        base["DEFECT"] = _COLOR_SIM_RED
     elif marker_idx == 5:
-        # 실 결함: tool_age amber (실 root cause 식별), coolant_temp dim (보류 미적용 path)
-        base["tool_age"] = _COLOR_RISK_AMBER
+        # 실 결함: tool_age 도 fault path 일부 (빨강) — v2 학습 motivation
+        # (v1 은 coolant 만 봤지만 실 fault 는 tool_age 까지 작용 → 마커 6 에서 v2 학습)
+        base["tool_age"] = _COLOR_DEFECT_RED    # 실 fault path (v1 미인지 변수)
         base["spindle_rpm"] = _COLOR_PATH_BLUE
         base["coolant_temp"] = _COLOR_HOLD_DIM
         base["vibration_xyz"] = _COLOR_DEFECT_RED
@@ -638,13 +645,13 @@ def render_causal_dag(marker_idx: int = 0) -> None:
 
 
 _DAG_COLOR_CAPTIONS: dict[int, str] = {
-    0: "🎨 DAG 색 의미: 모든 노드 회색 (정상 — 인과 모델 미활성)",
-    1: "🎨 DAG 색 변화: `tool_age` 주황 (감지) · `DEFECT` amber (예지 risk, 미발현)",
-    2: "🎨 DAG 색 변화: `coolant_temp` 주황 (v1 추천 변수) · `thermal_drift → dimension_dev` 파랑 (v1 path)",
-    3: "🎨 DAG 색 의미: v1 분석 결과 보존 (변경 X) — title 의 amber ⏸ 가 '보류' 신호",
-    4: "🎨 DAG 색 변화: `coolant_temp` **dim 회색** (보류 미적용) · `thermal_drift → dimension_dev → DEFECT` **빨강** (시뮬 결함 진행 path)",
-    5: "🎨 DAG 색 변화: `tool_age` amber (실 root cause 식별) · `vibration/thermal/dim_dev/DEFECT` **빨강** (실 manifest) · `coolant_temp` dim (보류 결과)",
-    6: "🎨 DAG 색 변화: `tool_age + coolant_temp` 주황 (v2 학습 인과 변수) · `vibration/thermal` 파랑 (mediator 로 정확화 — CE 추정 개선)",
+    0: "🎨 DAG 색 의미: 모든 노드 회색 (정상 — risk 미감지)",
+    1: "🎨 DAG 색 변화 (라이브 XGBoost 입력 강도): `thermal_drift` 1.8σ 진주황 · `coolant_temp` 1.5σ 진주황 · `dimension_dev` 1.0σ 파랑 · `tool_age` 0.6σ 약주황 · `DEFECT` amber (예지 risk, 미발현)",
+    2: "🎨 DAG 색 변화: `coolant_temp` 주황 (v1 추천 변수) · 나머지 path 파랑 (predecessor·mediator)",
+    3: "🎨 DAG 색 변화: `coolant_temp` 주황 → **dim 회색** (⏸ 보류 — 추천 적용 안 함) · 분석 path 는 파랑 유지",
+    4: "🎨 DAG 색 변화: `coolant_temp` dim (보류) · `vibration/thermal/dim_dev/DEFECT` **연한 빨강** (시뮬 예측 결함, 실재 X)",
+    5: "🎨 DAG 색 변화: 모든 fault path **진한 빨강** (실 manifest) · `tool_age` 도 빨강 (v1 이 못 본 변수 — 마커 6 v2 학습 motivation)",
+    6: "🎨 DAG 색 변화: `tool_age + coolant_temp` 주황 (v2 학습 인과 변수 — v1 의 coolant 단일 → v2 의 tool_age 추가) · `vibration/thermal` 파랑 (mediator 정확화 → CE 0.78→0.71)",
 }
 
 
@@ -666,10 +673,12 @@ def render_causal_v1_explanation() -> None:
         with st.container(border=True):
             st.markdown("##### 📘 DAG 노드 색상 가이드")
             st.markdown(
-                "- 🟠 **주황** — 인과 모델 핵심 변수 (감지·추천·학습)\n"
+                "- 🟠 **진주황** — 인과 모델 핵심 변수 (감지·추천·학습)\n"
+                "- 🟡 **연주황** — 약한 감지 (XGBoost 약 입력)\n"
                 "- 🔵 **파랑** — 원인 path (predecessor·mediator)\n"
                 "- 🟡 **amber** — 예지 risk (아직 미발현)\n"
-                "- 🔴 **빨강** — 결함 활성 path (manifest fault)\n"
+                "- 🌸 **연빨강** — 시뮬 예측 결함 (실재 X)\n"
+                "- 🔴 **진빨강** — 결함 활성 path (manifest fault)\n"
                 "- ⚪ **회색** — 비활성 / 보류 / 미적용"
             )
     with col_r:
