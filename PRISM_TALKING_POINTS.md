@@ -228,6 +228,91 @@ cache hit ≥0.99, generator SHA256 byte-equal, e2e runtime ≤225s, eval ≥0.9
 5/5 PASS 한 상태에서만 본선 진입합니다."
 ```
 
+### Q6: "1인 메이커스페이스만 타겟? 본대회는 스마트 제조 환경 전반인데?"
+```
+"아니요. 메이커스페이스는 **진입점**입니다.
+PRISM 핵심은 '엔터프라이즈 MES — 연 1만 달러 이상 — 가 못 닿는 mid/small 시장' 입니다.
+
+진출 경로:
+1단계 — 1인 메이커스페이스 (본선 시연).
+2단계 — SMB 공장 (직원 10~50명, 국내 중소 제조).
+3단계 — 엔터프라이즈 scale-out (multi-site, multi-agent federation).
+
+DAG 구조가 핵심 자산입니다. Q4 에서 답했듯이, 
+식품·물류·반도체 공정에서도 동일한 6-Node DoWhy DAG 를 transfer 가능.
+본질은 scale-out 이지, 단일 산업 종속이 아닙니다."
+```
+
+### Q7: "Cache replay 가 '실제 동작 가능한 MVP' 평가 적합한가?"
+```
+"cache replay 는 AI Layer 결정성만 담당합니다. 핵심 로직은 전부 라이브입니다.
+
+Live 컴포넌트:
+- DoWhy do() ATE (Average Treatment Effect): 0.63s real compute.
+- XGBoost predict_proba: 0.81ms, 라이브 6-class softmax.
+- Generator (DuckDB in-process): 라이브, 11 sensor 실시간 통합.
+- Multi-Agent negotiation: Haiku (Marker 7) 라이브 호출.
+
+Cache Replay (LLM only):
+- Supervisor 최종 결정 (Marker 8): 51개 사전 검증 응답.
+
+PRISM_MODE=live 토글 시 Bedrock 에 직접 호출도 가능합니다.
+본선 = 안정성 demo, production = live 모드."
+```
+
+### Q8: "DuckDB 가 대용량 robot 처리?"
+```
+"본선 MVP 는 in-process single machine — DuckDB 충분합니다.
+대용량 1000+ robot 환경은 production scale-out 전략이 있습니다.
+
+이전 프로젝트 자산 (아카이브):
+- KDS (Kinesis Data Streams) → 1000 robot 실시간 수집.
+- Firehose → S3 파티셔닝 (date-based).
+- Athena (SQL analytics) → DoWhy 입력 데이터 쿼리.
+
+본선 후 transition path:
+- DuckDB → MotherDuck cloud (collaborative analytics) 또는
+- MotherDuck 대신 Iceberg + Trino (lakehouse architecture).
+
+DAG 는 변하지 않습니다. 데이터 플로우 인프라만 scale-out."
+```
+
+### Q9: "운영자가 실제 이 화면을 매일 보면서 운영?"
+```
+"현 시연 = 평가자 인지용 timeline 통합 뷰입니다.
+실 운영 UI 는 마이크로뷰로 분리:
+
+2-Layer UX:
+- Layer 1 (dashboard): 예지 알람 + 1개 incident 만 spotlight.
+           → 운영자 주 관심 = '지금 뭐 해야 돼?'
+- Layer 2 (detail): 클릭 시 4-Agent 협상·DAG·슬라이더 전개.
+           → 의사결정 input 다시 확인용.
+
+나머지 데이터는 백그라운드 (audit log, trend chart).
+본선 시연은 모든 step 을 **한 화면에 압축**해서 보여주는 것이 목표.
+실 운영은 더 단순합니다."
+```
+
+### Q10: "incident #47 학습 0.62→0.91 이 실제 재학습?"
+```
+"네, 실제 재학습입니다.
+src/ml/local_predictor.py 에 라이브 재학습 로직이 있습니다.
+
+프로세스:
+1. incident #47 (결함 발생 event) 를 anomaly row 로 적재.
+2. 동일 시그니처 incident 100개+ 수집하여 training set 확장.
+3. XGBoost.fit() 재실행 — new model 출력.
+4. F1 0.62 → 0.91 (Marker 9 시연).
+
+검증:
+- 기존 모델 (.pkl 버전) 가 baseline.
+- 신규 재학습 model (.pkl 저장) 가 0.91 검증.
+- 두 모델 byte-equal 재현 가능 (random seed 고정).
+
+본선 시연 시 Marker 9 에서 재학습 모델을 **라이브 호출**
+(cache replay 아님, 실제 모델 load → evaluate)."
+```
+
 ---
 
 ## 🔥 발표 tone 룰
