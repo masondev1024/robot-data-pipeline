@@ -64,7 +64,7 @@ TOTAL_SECONDS = 225  # 3:45
 # 각 마커별 한국어 1줄 설명 (mason 피드백: 단계 metric 아래 caption)
 _MARKER_DESCRIPTIONS: dict[int, str] = {
     0:  "센서 데이터 정상 흐름, 모든 라인 가동 중",
-    1:  "이상 신호 감지 — 라이브 XGBoost 6-class 예지경보 (HDF 1순위)",
+    1:  "tool_age 180h 누적 → 라이브 XGBoost 예지경보 (TWF 1순위, v1 인과 모델 출발점)",
     2:  "DoWhy 6-Node DAG 인과 추론 v1 생성 — coolant_temp +5% 추천",
     3:  "운영자 결정: '보류' (라인 가동 우선, v1 추천 미적용)",
     4:  "보류 시 3시간 fast-forward 시뮬 → 결함 진행 trajectory",
@@ -222,7 +222,7 @@ _SCENARIOS: dict[str, dict] = {
 # Supervisor candidate_actions (4 옵션, 시연 fixed)
 # 마커별 sub-metric — "현재 마커 KPI" 박스 아래 표시. 의미 있는 시점만.
 _MARKER_SUB_KPIS: dict[int, list[tuple[str, str]]] = {
-    1:  [("결함 risk", "라이브"), ("1순위 type", "HDF")],
+    1:  [("결함 risk", "라이브"), ("1순위 type", "TWF")],
     2:  [("v1 추천", "coolant +5%"), ("σ_max", "0.40 ✅")],
     3:  [("결정", "보류"), ("사유", "라인 우선")],
     4:  [("시뮬 압축", "3h → 1s"), ("defect 예측", "62%→95%")],
@@ -299,14 +299,15 @@ def _get_xgb_predictor():
     return LocalXGBoost6Class.load()
 
 
-# 마커 1 fault-pre-trend feature (standardised, HDF 1순위 trigger)
+# 마커 1 fault-pre-trend feature (standardised, tool_age 누적 → TWF 1순위 trigger)
+# narrative: "tool_age 180h 누적 → 공구 마모 임계 도달 → TWF 예지"
 _MARKER1_XGB_FEATURES: dict[str, float] = {
-    "tool_age":      0.6,
-    "spindle_rpm":   0.1,
-    "coolant_temp":  1.5,
-    "vibration_xyz": 0.5,
-    "thermal_drift": 1.8,
-    "dimension_dev": 1.0,
+    "tool_age":      3.0,    # 누적 임계 (base cause)
+    "spindle_rpm":   0.0,
+    "coolant_temp":  0.0,
+    "vibration_xyz": 0.6,    # tool wear 동반 진동 약상승
+    "thermal_drift": 0.0,
+    "dimension_dev": 0.4,    # 치수 편차 시작
 }
 
 
@@ -523,13 +524,10 @@ def _node_colors_for_marker(marker_idx: int) -> dict[str, str]:
         # baseline: 전부 회색 (DEFECT 도 회색 — 정상 가동에 빨강은 misleading)
         pass
     elif marker_idx == 1:
-        # 예지: 라이브 XGBoost 입력 강도 매핑 (_MARKER1_XGB_FEATURES σ 기준)
-        # tool_age 0.6σ (약) · coolant 1.5σ (중) · thermal 1.8σ (강) · dim 1.0σ (중)
-        base["tool_age"] = _COLOR_FOCUS_LIGHT       # 약한 감지
-        base["coolant_temp"] = _COLOR_FOCUS_ORANGE  # 중간 감지
-        base["thermal_drift"] = _COLOR_FOCUS_ORANGE # 가장 강한 입력
-        base["dimension_dev"] = _COLOR_PATH_BLUE    # mediator 활성
-        base["DEFECT"] = _COLOR_RISK_AMBER          # 예지 risk (미발현)
+        # 예지: tool_age 누적 → TWF 1순위 (라이브 XGBoost)
+        # tool_age = base cause (진주황), 나머지 회색, DEFECT amber (예지 risk 미발현)
+        base["tool_age"] = _COLOR_FOCUS_ORANGE  # base cause — 누적 감지 trigger
+        base["DEFECT"] = _COLOR_RISK_AMBER      # 예지 risk (TWF 1순위)
     elif marker_idx == 2:
         # v1 추천: coolant_temp 주황 (추천 변수), 나머지 인과 path (predecessor + mediator) 파랑
         base["tool_age"] = _COLOR_PATH_BLUE
@@ -582,7 +580,7 @@ def _node_colors_for_marker(marker_idx: int) -> dict[str, str]:
 
 _DAG_TITLES = {
     0: "인과 DAG  |  <span style='color:#6b7280'>baseline (정상 가동, 결함 미발현)</span>",
-    1: "인과 DAG  |  <span style='color:#ff7f0e'>tool_age 누적 감지</span> · <span style='color:#fbbf24'>DEFECT amber (예지 risk)</span>",
+    1: "인과 DAG  |  <span style='color:#ff7f0e'>tool_age 누적 감지 (base cause)</span> · <span style='color:#fbbf24'>DEFECT amber (TWF 예지 risk)</span>",
     2: "인과 DAG v1  |  <span style='color:#ff7f0e'>v1 추천: coolant_temp +5% (절삭유 보충)</span>",
     3: "인과 DAG v1  |  <span style='color:#d97706'>⏸ 운영자 결정: 보류 (v1 추천 미적용)</span>",
     4: "인과 DAG  |  <span style='color:#d62728'>보류 fast-forward (3h 압축) — 결함 진행 시뮬</span>",
@@ -619,9 +617,12 @@ def render_causal_dag(marker_idx: int = 0) -> None:
     node_y = [pos[n][1] for n in G.nodes()]
     node_color_list = [color_map[n] for n in G.nodes()]
 
-    # dimension_dev 는 edge 가 모이는 위치라 label 이 선에 가려짐 → 노드 밑 표시
+    # base cause (tool_age, spindle_rpm, coolant_temp) + outcome (dimension_dev, DEFECT)
+    # → "bottom center" (edge 가 노드 위로 모이는 위치라 label 가림 해소).
+    # mediator (vibration_xyz, thermal_drift) → "top center" (노드 위 edge 적음).
+    _BOTTOM_LABEL = {"tool_age", "spindle_rpm", "coolant_temp", "dimension_dev", "DEFECT"}
     text_positions = [
-        "bottom center" if n == "dimension_dev" else "top center"
+        "bottom center" if n in _BOTTOM_LABEL else "top center"
         for n in G.nodes()
     ]
 
@@ -646,7 +647,7 @@ def render_causal_dag(marker_idx: int = 0) -> None:
 
 _DAG_COLOR_CAPTIONS: dict[int, str] = {
     0: "🎨 DAG 색 의미: 모든 노드 회색 (정상 — risk 미감지)",
-    1: "🎨 DAG 색 변화 (라이브 XGBoost 입력 강도): `thermal_drift` 1.8σ 진주황 · `coolant_temp` 1.5σ 진주황 · `dimension_dev` 1.0σ 파랑 · `tool_age` 0.6σ 약주황 · `DEFECT` amber (예지 risk, 미발현)",
+    1: "🎨 DAG 색 의미: `tool_age` 진주황 (180h 누적 → base cause) · 나머지 회색 (정상 범위) · `DEFECT` amber (TWF 1순위 예지 risk, 미발현)",
     2: "🎨 DAG 색 변화: `coolant_temp` 주황 (v1 추천 변수) · 나머지 path 파랑 (predecessor·mediator)",
     3: "🎨 DAG 색 변화: `coolant_temp` 주황 → **dim 회색** (⏸ 보류 — 추천 적용 안 함) · 분석 path 는 파랑 유지",
     4: "🎨 DAG 색 변화: `coolant_temp` dim (보류) · `vibration/thermal/dim_dev/DEFECT` **연한 빨강** (시뮬 예측 결함, 실재 X)",
@@ -748,13 +749,31 @@ _FAILURE_LABEL_HELP: dict[str, str] = {
 }
 
 
+def _render_dag_color_legend_compact() -> None:
+    """마커 1 등 색 가이드 처음 등장 시점에 표시. 단순 expander 형태."""
+    with st.expander("📘 DAG 노드 색상 가이드 (펼치기)", expanded=False):
+        st.markdown(
+            "- 🟠 **진주황** — 인과 모델 핵심 변수 (감지·추천·학습)\n"
+            "- 🟡 **연주황** — 약한 감지 (XGBoost 약 입력)\n"
+            "- 🔵 **파랑** — 원인 path (predecessor·mediator)\n"
+            "- 🟡 **amber** — 예지 risk (아직 미발현)\n"
+            "- 🌸 **연빨강** — 시뮬 예측 결함 (실재 X)\n"
+            "- 🔴 **진빨강** — 결함 활성 path (manifest fault)\n"
+            "- ⚪ **회색** — 비활성 / 보류 / 미적용"
+        )
+
+
 def render_predictive_alert() -> None:
     """마커 1 (0:15 예지경보) — 라이브 XGBoost 6-class predict_proba 호출 (Phase 3).
 
     fault-pre-trend feature (_MARKER1_XGB_FEATURES) 입력 → 사전 학습 .pkl 라이브 추론.
     cache replay 아닌 실 호출 (~1ms). seed=2026 → 결정성 보장.
     """
-    st.warning("⚠️ **예지경보** — ROBOT-00018, motor_temp 92°C 상승 추세 + tool_age 누적 감지")
+    st.warning(
+        "⚠️ **예지경보** — ROBOT-00018, **tool_age 180h 누적** (마모 임계 도달) + "
+        "vibration 약상승 + 치수 편차 시작 → TWF (Tool Wear Failure) 1순위"
+    )
+    _render_dag_color_legend_compact()
 
     from src.ml.local_predictor import LABEL_NAMES  # noqa: PLC0415
     model = _get_xgb_predictor()
