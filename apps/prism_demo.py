@@ -409,49 +409,95 @@ def render_marker_timeline(current_marker_idx: int) -> None:
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
+# DAG 노드 색상 의미 (legend 와 1:1)
+_COLOR_GREY         = "#cccccc"  # 비활성 / 보류 / 미적용 / baseline
+_COLOR_FOCUS_ORANGE = "#ff7f0e"  # 인과 모델 핵심 변수 (감지·추천·학습)
+_COLOR_PATH_BLUE    = "#1f77b4"  # 원인 path (predecessor·mediator)
+_COLOR_RISK_AMBER   = "#fbbf24"  # 예지 risk (아직 미발현)
+_COLOR_DEFECT_RED   = "#d62728"  # 결함 활성 path (manifest fault)
+_COLOR_HOLD_DIM     = "#9ca3af"  # 보류 미적용 (회색 약간 진하게 — 의도된 비결정)
+
+
 def _node_colors_for_marker(marker_idx: int) -> dict[str, str]:
-    """marker_idx → DAG 노드 색상 (기획서 page 7 정합 narrative).
+    """marker_idx → DAG 노드 색상. 각 단계 narrative 가 색으로 가시 차별화된다.
 
-    - 마커 2 (v1 인과): coolant_temp 주황 (v1 추천 변수) + 나머지 파랑
-    - 마커 3 (인간 결정 = 보류): 동일 (v1 분석 보존, 적용 안 함)
-    - 마커 4 (보류 fast-forward 시뮬): 동일 (DAG 변화 X — trajectory plot 으로 narrative)
-    - 마커 5 (실 결함): vibration/thermal 빨강 (실 path)
-    - 마커 6 (v2): coolant_temp 주황 (CE 정확화) + path 강조
+    Color semantic (legend 와 1:1):
+        🟠 주황 = 인과 모델 핵심 변수 (감지·추천·학습)
+        🔵 파랑 = 원인 path (predecessor·mediator)
+        🟡 amber= 예지 risk (아직 미발현)
+        🔴 빨강 = 결함 활성 path (manifest fault)
+        ⚪ 회색 = 비활성 / 보류 / 미적용
+
+    마커별 narrative:
+        0 baseline    : 전부 회색 (DEFECT 도 회색 — 정상 가동)
+        1 예지경보    : tool_age 주황 (감지) + DEFECT amber (예지 risk)
+        2 v1 추천     : coolant_temp 주황 + thermal/dim 파랑 (v1 path) + DEFECT amber
+        3 보류 결정   : 마커 2 와 동일 색 (분석 보존) + title amber 로 "보류" 신호
+        4 fast-forward: coolant_temp dim (보류 미적용) + thermal/dim/DEFECT 빨강 (시뮬 결함 진행)
+        5 실 결함     : tool_age amber (실 root cause) + coolant_temp dim + vibration/thermal/dim/DEFECT 빨강
+        6 v2 학습     : tool_age + coolant_temp 주황 (학습된 인과 변수) + vibration/thermal 파랑 (정확화 mediator) + DEFECT 빨강
     """
-    base = {n: "#cccccc" for n in DAG_NODES}
-    base["DEFECT"] = "#d62728"
+    base = {n: _COLOR_GREY for n in DAG_NODES}
 
-    if marker_idx == 1:
-        base["tool_age"] = "#ff7f0e"
-    elif marker_idx in (2, 3, 4):
-        # v1 인과 + 인간 보류 + fast-forward 시뮬: coolant 주황 (v1 추천), 나머지 후보 파랑
-        for n in ["tool_age", "spindle_rpm",
-                  "vibration_xyz", "thermal_drift", "dimension_dev"]:
-            base[n] = "#1f77b4"
-        base["coolant_temp"] = "#ff7f0e"  # v1 추천 변수
+    if marker_idx == 0:
+        # baseline: 전부 회색 (DEFECT 도 회색 — 정상 가동에 빨강은 misleading)
+        pass
+    elif marker_idx == 1:
+        # 예지: tool_age 감지 + DEFECT amber (아직 미발현 risk)
+        base["tool_age"] = _COLOR_FOCUS_ORANGE
+        base["DEFECT"] = _COLOR_RISK_AMBER
+    elif marker_idx == 2:
+        # v1 추천: coolant_temp 주황, v1 path (thermal → dim) 파랑
+        base["tool_age"] = _COLOR_PATH_BLUE
+        base["spindle_rpm"] = _COLOR_PATH_BLUE
+        base["coolant_temp"] = _COLOR_FOCUS_ORANGE
+        base["thermal_drift"] = _COLOR_PATH_BLUE
+        base["dimension_dev"] = _COLOR_PATH_BLUE
+        base["DEFECT"] = _COLOR_RISK_AMBER
+    elif marker_idx == 3:
+        # 보류: DAG 색은 마커 2 와 동일 (분석 보존) — "보류" 는 title amber + caption 으로
+        base["tool_age"] = _COLOR_PATH_BLUE
+        base["spindle_rpm"] = _COLOR_PATH_BLUE
+        base["coolant_temp"] = _COLOR_FOCUS_ORANGE
+        base["thermal_drift"] = _COLOR_PATH_BLUE
+        base["dimension_dev"] = _COLOR_PATH_BLUE
+        base["DEFECT"] = _COLOR_RISK_AMBER
+    elif marker_idx == 4:
+        # fast-forward: coolant_temp dim (보류 미적용) + thermal/dim/DEFECT 빨강 (결함 진행 시뮬)
+        base["tool_age"] = _COLOR_PATH_BLUE
+        base["spindle_rpm"] = _COLOR_PATH_BLUE
+        base["coolant_temp"] = _COLOR_HOLD_DIM
+        base["thermal_drift"] = _COLOR_DEFECT_RED
+        base["dimension_dev"] = _COLOR_DEFECT_RED
+        base["DEFECT"] = _COLOR_DEFECT_RED
     elif marker_idx == 5:
-        # 실 결함: vibration/thermal 빨강 (실 path)
-        # coolant_temp 회색 (v1 추천이었으나 보류로 미적용 → 결함 진행 path)
-        base["spindle_rpm"] = "#1f77b4"
-        base["vibration_xyz"] = "#d62728"
-        base["thermal_drift"] = "#d62728"
-        base["dimension_dev"] = "#1f77b4"
+        # 실 결함: tool_age amber (실 root cause 식별), coolant_temp dim (보류 미적용 path)
+        base["tool_age"] = _COLOR_RISK_AMBER
+        base["spindle_rpm"] = _COLOR_PATH_BLUE
+        base["coolant_temp"] = _COLOR_HOLD_DIM
+        base["vibration_xyz"] = _COLOR_DEFECT_RED
+        base["thermal_drift"] = _COLOR_DEFECT_RED
+        base["dimension_dev"] = _COLOR_DEFECT_RED
+        base["DEFECT"] = _COLOR_DEFECT_RED
     elif marker_idx == 6:
-        # v2: coolant_temp 주황 (CE 정확화) + path 강조
-        base["spindle_rpm"] = "#1f77b4"
-        base["coolant_temp"] = "#ff7f0e"  # CE 추정 정확화
-        base["vibration_xyz"] = "#d62728"
-        base["thermal_drift"] = "#d62728"
-        base["dimension_dev"] = "#1f77b4"
+        # v2 학습: tool_age + coolant_temp 둘 다 인과 변수로 정확화 (학습 추가 path)
+        # vibration/thermal 은 이제 mediator 로 정확 인식 (CE 추정 개선)
+        base["tool_age"] = _COLOR_FOCUS_ORANGE
+        base["spindle_rpm"] = _COLOR_PATH_BLUE
+        base["coolant_temp"] = _COLOR_FOCUS_ORANGE
+        base["vibration_xyz"] = _COLOR_PATH_BLUE
+        base["thermal_drift"] = _COLOR_PATH_BLUE
+        base["dimension_dev"] = _COLOR_PATH_BLUE
+        base["DEFECT"] = _COLOR_DEFECT_RED
     return base
 
 
 _DAG_TITLES = {
-    0: "인과 DAG  |  baseline (정상 가동)",
-    1: "인과 DAG  |  <span style='color:#ff7f0e'>tool_age 누적 감지 (예지)</span>",
+    0: "인과 DAG  |  <span style='color:#6b7280'>baseline (정상 가동, 결함 미발현)</span>",
+    1: "인과 DAG  |  <span style='color:#ff7f0e'>tool_age 누적 감지</span> · <span style='color:#fbbf24'>DEFECT amber (예지 risk)</span>",
     2: "인과 DAG v1  |  <span style='color:#ff7f0e'>v1 추천: coolant_temp +5% (절삭유 보충)</span>",
-    3: "인과 DAG v1  |  <span style='color:#1f77b4'>운영자 검토 중 (보류 결정)</span>",
-    4: "인과 DAG  |  <span style='color:#ff7f0e'>보류 시 fast-forward 시뮬 (3h 압축)</span>",
+    3: "인과 DAG v1  |  <span style='color:#d97706'>⏸ 운영자 결정: 보류 (v1 추천 미적용)</span>",
+    4: "인과 DAG  |  <span style='color:#d62728'>보류 fast-forward (3h 압축) — 결함 진행 시뮬</span>",
     5: "인과 DAG  |  <span style='color:#d62728'>실 결함 — 보류 결정의 결과 (예지 적중)</span>",
     6: "인과 DAG v2  |  <span style='color:#ff7f0e'>incident 학습 — CE 0.78 → 0.71 정확화</span>",
 }
@@ -502,6 +548,24 @@ def render_causal_dag(marker_idx: int = 0) -> None:
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
+_DAG_COLOR_CAPTIONS: dict[int, str] = {
+    0: "🎨 DAG 색 의미: 모든 노드 회색 (정상 — 인과 모델 미활성)",
+    1: "🎨 DAG 색 변화: `tool_age` 주황 (감지) · `DEFECT` amber (예지 risk, 미발현)",
+    2: "🎨 DAG 색 변화: `coolant_temp` 주황 (v1 추천 변수) · `thermal_drift → dimension_dev` 파랑 (v1 path)",
+    3: "🎨 DAG 색 의미: v1 분석 결과 보존 (변경 X) — title 의 amber ⏸ 가 '보류' 신호",
+    4: "🎨 DAG 색 변화: `coolant_temp` **dim 회색** (보류 미적용) · `thermal_drift → dimension_dev → DEFECT` **빨강** (시뮬 결함 진행 path)",
+    5: "🎨 DAG 색 변화: `tool_age` amber (실 root cause 식별) · `vibration/thermal/dim_dev/DEFECT` **빨강** (실 manifest) · `coolant_temp` dim (보류 결과)",
+    6: "🎨 DAG 색 변화: `tool_age + coolant_temp` 주황 (v2 학습 인과 변수) · `vibration/thermal` 파랑 (mediator 로 정확화 — CE 추정 개선)",
+}
+
+
+def _render_dag_color_caption(marker_idx: int) -> None:
+    """DAG 아래 색 narrative — 단계별 시각 차별화를 청중이 인지하도록."""
+    cap = _DAG_COLOR_CAPTIONS.get(marker_idx)
+    if cap:
+        st.caption(cap)
+
+
 # ── 마커별 가시 액션 helper (mason 5차 피드백 P0+P1) ──────────────────────────────
 
 def render_causal_v1_explanation() -> None:
@@ -513,10 +577,11 @@ def render_causal_v1_explanation() -> None:
         with st.container(border=True):
             st.markdown("##### 📘 DAG 노드 색상 가이드")
             st.markdown(
-                "- 🔵 **파란색** — 원인 후보 (causal predecessor)\n"
-                "- 🟠 **주황색** — 개입 포인트 (do-intervention)\n"
-                "- 🔴 **빨간색** — 결과 노드 (DEFECT)\n"
-                "- ⚪ **회색** — 현재 비활성"
+                "- 🟠 **주황** — 인과 모델 핵심 변수 (감지·추천·학습)\n"
+                "- 🔵 **파랑** — 원인 path (predecessor·mediator)\n"
+                "- 🟡 **amber** — 예지 risk (아직 미발현)\n"
+                "- 🔴 **빨강** — 결함 활성 path (manifest fault)\n"
+                "- ⚪ **회색** — 비활성 / 보류 / 미적용"
             )
     with col_r:
         with st.container(border=True):
@@ -609,6 +674,10 @@ def render_human_decision() -> None:
     인간 인지 한계 narrative — 라인 가동 우선으로 적용 보류, 결과는 마커 4 fast-forward 시뮬.
     """
     st.info("🧑‍🔧 **운영자 검토** — v1 인과 추천 (절삭유 +5%) 적용 여부")
+    st.caption(
+        "💡 위 DAG 색상은 v1 분석 결과 (coolant_temp 주황 = 추천 변수) 를 그대로 보존. "
+        "보류 결정은 **DAG 적용 X** — 다음 마커 4 에서 보류 시 결함 진행 fast-forward."
+    )
 
     col_candidates, col_decision = st.columns([2, 1])
 
@@ -1122,6 +1191,7 @@ def main() -> None:
         # 마커 0~6: DAG (marker_idx 별 색상) + 단계별 가시 액션
         if marker_idx < 7:
             render_causal_dag(marker_idx)
+            _render_dag_color_caption(marker_idx)
             if marker_idx == 0:
                 st.markdown("---")
                 render_normal_status()
