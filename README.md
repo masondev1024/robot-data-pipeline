@@ -23,19 +23,24 @@ docker compose up --build
 
 ---
 
-## 4분 시연 timeline
+## 시연 timeline (11 마커, 0:00 ~ 3:45)
 
-| 시각 | 마커 | 운영자 동작 | 화면 |
-|---|---|---|---|
-| 0:00 | 1. 정상 운영 | sensor 11 stream watch | 정상 라이브 차트 |
-| 0:15 | 2. 이상 감지 | XGBoost 6-class 라벨 확인 | `tool_wear_imminent` 표시 |
-| 0:30 | 3. 인과 v1 카드 | "절삭유 +5%" 권고 검토 | DoWhy CE=0.78, refute pass |
-| 0:45 | 3. **"보류"** | 보류 버튼 클릭 | timeline 이벤트 기록 |
-| 1:00 | 4. 시뮬 가속 | 3시간 fast-forward | 결함 진행 예측 |
-| 1:15 | 5. 불량 발생 | defect=1 진입 | 보류 결정의 결과 |
-| 1:30 | 6. 인과 v2 | CE 0.78 → 0.71 재추정 | v1↔v2 비교 카드 |
+| idx | 시각 | 라벨 | 라이브 | 핵심 |
+|---|---|---|---|---|
+| 0 | 0:00 | 정상 | — | sensor 11 stream watch |
+| 1 | 0:15 | 예지경보 risk62% | ✅ XGBoost | `predict_proba` ~1ms, HDF 1순위 |
+| 2 | 0:30 | 인과 v1 | — | DoWhy 6-Node DAG, coolant_temp +5% 추천 |
+| 3 | 0:45 | 인간결정 | — | **운영자 "보류"** (라인 가동 우선) |
+| 4 | 1:00 | 시뮬가속 | ✅ DoWhy | `do(coolant_temp=−1σ)` ATE 라이브, 3h→1s 압축 |
+| 5 | 1:15 | 불량 #47 | — | motor_temp 105°C, 보류 결정의 결과 |
+| 6 | 1:30 | 인과 v2 | — | Causal Effect 재추정 CE 0.78 → 0.71 |
+| 7 | 2:15 | 4 Agent | ✅ Bedrock | 품질·안전·설비·생산 동시 분석 (cache_replay) |
+| 8 | 3:00 | Supervisor | ✅ Net Value | α/β/γ slider 라이브 → 최적 액션 권고 |
+| 9 | 3:30 | 재학습 0.62→0.91 | — | 강화학습 모델 재학습 (+47%) |
+| 10 | 3:45 | OEE +35% | — | Closed-Loop 요약 + 비용 임팩트 |
 
-라이브 wiring 4개 + 사전 녹화 2개 → 동작 가능 + 시연 결정론성 양립.
+라이브 wiring 4개 (1·4·7·8) + 정적 narrative 7개 → 동작 검증 + 시연 결정론성 양립.
+Bedrock offline 모드 (`BEDROCK_OFFLINE=true`) 로 네트워크 없이도 재생 가능.
 
 ---
 
