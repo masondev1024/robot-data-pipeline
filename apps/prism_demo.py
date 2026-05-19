@@ -409,27 +409,34 @@ def render_marker_timeline(current_marker_idx: int) -> None:
 
 
 def _node_colors_for_marker(marker_idx: int) -> dict[str, str]:
-    """marker_idx → DAG 노드 색상 매핑 (mason 5차 피드백: 동적 표현)."""
+    """marker_idx → DAG 노드 색상 매핑 (mason 12차 피드백: coolant_temp v1 비가시화).
+
+    v1 (마커 2~5): coolant_temp 회색 = v1 인과 모델이 안 본 변수.
+    v2 (마커 6+): coolant_temp 주황 = incident 학습 후 신규 발견.
+    """
     base = {n: "#cccccc" for n in DAG_NODES}
     base["DEFECT"] = "#d62728"
 
     if marker_idx == 1:
         base["tool_age"] = "#ff7f0e"
     elif marker_idx in (2, 3):
-        for n in ["tool_age", "spindle_rpm", "coolant_temp",
+        # v1 인과 모델: spindle_rpm 중심. coolant_temp 회색 (모델 미반영)
+        for n in ["tool_age", "spindle_rpm",
                   "vibration_xyz", "thermal_drift", "dimension_dev"]:
             base[n] = "#1f77b4"
     elif marker_idx == 4:
-        for n in ["tool_age", "coolant_temp", "vibration_xyz",
-                  "thermal_drift", "dimension_dev"]:
+        # 시뮬 가속: spindle_rpm 주황 (intervention). coolant_temp 여전히 v1 미반영
+        for n in ["tool_age", "vibration_xyz", "thermal_drift", "dimension_dev"]:
             base[n] = "#1f77b4"
         base["spindle_rpm"] = "#ff7f0e"
     elif marker_idx == 5:
-        for n in ["tool_age", "spindle_rpm", "coolant_temp", "dimension_dev"]:
+        # 실 결함: vibration/thermal 빨강 (실 path). coolant_temp 여전히 회색 (v1 안 봄)
+        for n in ["tool_age", "spindle_rpm", "dimension_dev"]:
             base[n] = "#1f77b4"
         base["vibration_xyz"] = "#d62728"
         base["thermal_drift"] = "#d62728"
     elif marker_idx == 6:
+        # v2 학습: coolant_temp 주황 신규 등장 — 시각 임팩트 (v1 회색 → v2 주황)
         for n in ["tool_age", "spindle_rpm", "dimension_dev"]:
             base[n] = "#1f77b4"
         base["coolant_temp"] = "#ff7f0e"
@@ -441,11 +448,11 @@ def _node_colors_for_marker(marker_idx: int) -> dict[str, str]:
 _DAG_TITLES = {
     0: "인과 DAG  |  baseline (정상 가동)",
     1: "인과 DAG  |  <span style='color:#ff7f0e'>tool_age 누적 감지 (예지)</span>",
-    2: "인과 DAG v1  |  <span style='color:#1f77b4'>원인 후보 식별</span>",
-    3: "인과 DAG v1  |  <span style='color:#1f77b4'>운영자 검토 중</span>",
-    4: "인과 DAG  |  <span style='color:#ff7f0e'>spindle_rpm 개입 시뮬 (do-intervention)</span>",
-    5: "인과 DAG  |  <span style='color:#d62728'>thermal/vibration → DEFECT 실재 발생</span>",
-    6: "인과 DAG v2  |  <span style='color:#ff7f0e'>coolant_temp 신규 path 발견 (학습)</span>",
+    2: "인과 DAG v1  |  <span style='color:#1f77b4'>spindle 중심 path 식별 (coolant_temp 회색=미반영)</span>",
+    3: "인과 DAG v1  |  <span style='color:#1f77b4'>운영자 검토 중 (v1 = coolant_temp 미반영)</span>",
+    4: "인과 DAG  |  <span style='color:#ff7f0e'>spindle_rpm 개입 시뮬 (v1 단일 path)</span>",
+    5: "인과 DAG  |  <span style='color:#d62728'>실 결함 — coolant_temp 회색 = v1 미발견 변수</span>",
+    6: "인과 DAG v2  |  <span style='color:#ff7f0e'>coolant_temp 신규 path 발견! (v1 → v2 학습)</span>",
 }
 
 
