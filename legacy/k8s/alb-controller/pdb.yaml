@@ -1,0 +1,27 @@
+# AWS Load Balancer Controller PodDisruptionBudget
+#
+# 컨트롤러는 chart 3.2.2 default 로 replicaCount=2 + podAntiAffinity preferred 가 박혀있다.
+# 그러나 PDB 가 없으면 노드 voluntary disruption(Karpenter 회수, drain, EKS upgrade) 시
+# 동시에 두 pod 모두 evict 가능 → 짧은 시간 컨트롤러 부재 → 새 Pod TargetGroup 미등록
+# (사용자 분석 § 1 시나리오) → 점진적 503 위험.
+#
+# maxUnavailable=1 → 한 번에 1 pod 만 disrupt 가능. 다른 pod 가 항상 살아있어 reconcile 유지.
+# 다른 PDB(coredns, ebs-csi-controller, karpenter, adot-collector) 와 동일 패턴.
+#
+# 회귀 가드: 다음 down/up 사이클이나 chart upgrade 후에도 이 PDB 가 살아있어야 함.
+# helm chart 가 PDB 를 자동 생성하지 않는 이유는 enabled-by-default=false 라서 — values.yaml
+# 의 podDisruptionBudget.enabled=true 로 옮길 수도 있으나 chart 관리 분리 원칙(IRSA 만 IaC)
+# 유지를 위해 별도 manifest 로 둠. 추후 ALB Controller helm_release Terraform 편입 PR 시
+# 같이 통합.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: aws-load-balancer-controller
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: aws-load-balancer-controller

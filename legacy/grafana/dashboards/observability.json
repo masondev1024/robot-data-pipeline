@@ -1,0 +1,262 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": { "tooltip": false, "viz": false, "legend": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "id": 1,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "alias": "P50",
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "dimensions": { "LoadBalancer": "app/k8s-robottel-robottel-6592ec7239/6bbbe585ca861ef0" },
+          "expression": "",
+          "id": "",
+          "matchExact": true,
+          "metricEditorMode": 0,
+          "metricName": "TargetResponseTime",
+          "metricQueryType": 0,
+          "namespace": "AWS/ApplicationELB",
+          "period": "60",
+          "queryMode": "Metrics",
+          "refId": "A",
+          "region": "eu-west-1",
+          "sqlExpression": "",
+          "statistic": "p50"
+        },
+        {
+          "alias": "P95",
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "dimensions": { "LoadBalancer": "app/k8s-robottel-robottel-6592ec7239/6bbbe585ca861ef0" },
+          "expression": "",
+          "id": "",
+          "matchExact": true,
+          "metricEditorMode": 0,
+          "metricName": "TargetResponseTime",
+          "metricQueryType": 0,
+          "namespace": "AWS/ApplicationELB",
+          "period": "60",
+          "queryMode": "Metrics",
+          "refId": "B",
+          "region": "eu-west-1",
+          "sqlExpression": "",
+          "statistic": "p95"
+        },
+        {
+          "alias": "P99",
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "dimensions": { "LoadBalancer": "app/k8s-robottel-robottel-6592ec7239/6bbbe585ca861ef0" },
+          "expression": "",
+          "id": "",
+          "matchExact": true,
+          "metricEditorMode": 0,
+          "metricName": "TargetResponseTime",
+          "metricQueryType": 0,
+          "namespace": "AWS/ApplicationELB",
+          "period": "60",
+          "queryMode": "Metrics",
+          "refId": "C",
+          "region": "eu-west-1",
+          "sqlExpression": "",
+          "statistic": "p99"
+        }
+      ],
+      "title": "Endpoint Latency — /api/chat & /api/predict (P50/P95/P99)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "lineWidth": 2, "drawStyle": "line", "fillOpacity": 10 },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "id": 2,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "alias": "5xx Count",
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "dimensions": { "LoadBalancer": "app/k8s-robottel-robottel-6592ec7239/6bbbe585ca861ef0" },
+          "expression": "",
+          "id": "",
+          "matchExact": true,
+          "metricEditorMode": 0,
+          "metricName": "HTTPCode_Target_5XX_Count",
+          "metricQueryType": 0,
+          "namespace": "AWS/ApplicationELB",
+          "period": "60",
+          "queryMode": "Metrics",
+          "refId": "A",
+          "region": "eu-west-1",
+          "sqlExpression": "",
+          "statistic": "Sum"
+        },
+        {
+          "alias": "Total Requests",
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "dimensions": { "LoadBalancer": "app/k8s-robottel-robottel-6592ec7239/6bbbe585ca861ef0" },
+          "expression": "",
+          "id": "",
+          "matchExact": true,
+          "metricEditorMode": 0,
+          "metricName": "RequestCount",
+          "metricQueryType": 0,
+          "namespace": "AWS/ApplicationELB",
+          "period": "60",
+          "queryMode": "Metrics",
+          "refId": "B",
+          "region": "eu-west-1",
+          "sqlExpression": "",
+          "statistic": "Sum"
+        }
+      ],
+      "title": "Error Rate — 5xx Responses",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "id": 3,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "alias": "PutRecords Avg Latency",
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "dimensions": { "StreamName": "robot-telemetry-stream" },
+          "expression": "",
+          "id": "",
+          "matchExact": true,
+          "metricEditorMode": 0,
+          "metricName": "PutRecords.Latency",
+          "metricQueryType": 0,
+          "namespace": "AWS/Kinesis",
+          "period": "60",
+          "queryMode": "Metrics",
+          "refId": "A",
+          "region": "eu-west-1",
+          "sqlExpression": "",
+          "statistic": "Average"
+        },
+        {
+          "alias": "Successful Records",
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "dimensions": { "StreamName": "robot-telemetry-stream" },
+          "expression": "",
+          "id": "",
+          "matchExact": true,
+          "metricEditorMode": 0,
+          "metricName": "PutRecords.SuccessfulRecords",
+          "metricQueryType": 0,
+          "namespace": "AWS/Kinesis",
+          "period": "60",
+          "queryMode": "Metrics",
+          "refId": "B",
+          "region": "eu-west-1",
+          "sqlExpression": "",
+          "statistic": "Sum"
+        }
+      ],
+      "title": "Generator → Kinesis PutRecords Latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "datasource", "uid": "grafana" },
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "id": 4,
+      "options": {
+        "code": { "language": "html", "showLineNumbers": false, "showMiniMap": false },
+        "content": "<div style=\"display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column\"><p style=\"font-size:14px;color:#aaa\">X-Ray Service Map</p><p style=\"font-size:12px;color:#666\">Open AWS Console → X-Ray → Service Map<br/>Filter: robot-telemetry namespace</p><a href=\"https://eu-west-1.console.aws.amazon.com/xray/home?region=eu-west-1#/service-map\" target=\"_blank\" style=\"color:#5794f2\">View in AWS Console →</a></div>",
+        "mode": "html"
+      },
+      "title": "X-Ray Service Map",
+      "type": "text"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["robot-telemetry", "observability"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "UTC",
+  "title": "Robot Telemetry — Observability",
+  "uid": "robot-observability",
+  "version": 1,
+  "weekStart": ""
+}

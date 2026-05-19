@@ -1,0 +1,27 @@
+---
+# Instrumentation CR — pod annotation 'instrumentation.opentelemetry.io/inject-python: "true"'
+# 가 매칭되면 ADOT Operator 가 init container 로 OTEL Python SDK auto-instrument 주입.
+#
+# Generator (k8s/generator/deployment.yaml:18) + API (k8s/api/deployment.yaml:28) 양쪽 적용 중.
+#
+# OTEL_EXPORTER_OTLP_ENDPOINT 는 위 collector.yaml 의 Service DNS 를 가리킨다.
+# ADOT Operator 가 자동 생성하는 Service 이름: adot-collector.opentelemetry-operator-system.svc.cluster.local
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: robot-telemetry-instrumentation
+  # 모든 namespace 의 pod 가 inject-python annotation 만 있으면 매칭되도록 default 사용 가능.
+  # 다만 본 프로젝트는 robot-telemetry / monitoring / airflow 만 instrument 대상.
+  namespace: opentelemetry-operator-system
+spec:
+  exporter:
+    endpoint: http://adot-collector.opentelemetry-operator-system.svc.cluster.local:4318
+  propagators:
+    - tracecontext
+    - baggage
+    - xray
+  sampler:
+    type: parentbased_traceidratio
+    argument: "0.05"  # 5% 샘플링 (xray.tf sampling rule fixed_rate=0.05 와 정합)
+  python:
+    image: public.ecr.aws/aws-observability/adot-autoinstrumentation-python:v0.4.0

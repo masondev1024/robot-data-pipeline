@@ -64,7 +64,7 @@ TOTAL_SECONDS = 225  # 3:45
 # 각 마커별 한국어 1줄 설명 (mason 피드백: 단계 metric 아래 caption)
 _MARKER_DESCRIPTIONS: dict[int, str] = {
     0:  "센서 데이터 정상 흐름, 모든 라인 가동 중",
-    1:  "이상 신호 감지 — 결함 risk 62% 예지경보 발동",
+    1:  "이상 신호 감지 — 라이브 XGBoost 6-class 예지경보 (HDF 1순위)",
     2:  "DoWhy 6-Node DAG 인과 추론 v1 생성 — coolant_temp +5% 추천",
     3:  "운영자 결정: '보류' (라인 가동 우선, v1 추천 미적용)",
     4:  "보류 시 3시간 fast-forward 시뮬 → 결함 진행 trajectory",
@@ -222,7 +222,7 @@ _SCENARIOS: dict[str, dict] = {
 # Supervisor candidate_actions (4 옵션, 시연 fixed)
 # 마커별 sub-metric — "현재 마커 KPI" 박스 아래 표시. 의미 있는 시점만.
 _MARKER_SUB_KPIS: dict[int, list[tuple[str, str]]] = {
-    1:  [("결함 risk", "62%"), ("1순위 type", "HDF")],
+    1:  [("결함 risk", "라이브"), ("1순위 type", "HDF")],
     2:  [("v1 추천", "coolant +5%"), ("σ_max", "0.40 ✅")],
     3:  [("결정", "보류"), ("사유", "라인 우선")],
     4:  [("시뮬 압축", "3h → 1s"), ("defect 예측", "62%→95%")],
@@ -261,6 +261,26 @@ def _real_supervisor_decision(
         alpha=alpha, beta=beta, gamma=gamma, horizon_h=horizon_h,
     ))
     return sup.negotiate_with_candidates(scenario_context, _CANDIDATE_ACTIONS)
+
+
+# ── XGBoost 6-class 라이브 추론 캐시 (Phase 3: 마커 1 예지경보) ───────────────────
+
+@st.cache_resource(show_spinner="🤖 XGBoost 6-class 모델 로드 중...")
+def _get_xgb_predictor():
+    """LocalXGBoost6Class .pkl 로드 — 시연 시작 1회. predict_proba 라이브 호출용."""
+    from src.ml.local_predictor import LocalXGBoost6Class  # noqa: PLC0415
+    return LocalXGBoost6Class.load()
+
+
+# 마커 1 fault-pre-trend feature (standardised, HDF 1순위 trigger)
+_MARKER1_XGB_FEATURES: dict[str, float] = {
+    "tool_age":      0.6,
+    "spindle_rpm":   0.1,
+    "coolant_temp":  1.5,
+    "vibration_xyz": 0.5,
+    "thermal_drift": 1.8,
+    "dimension_dev": 1.0,
+}
 
 
 # ── DoWhy 라이브 ATE 계산 캐시 (Phase 1: 본선 라이브 do-intervention) ─────────────
@@ -676,29 +696,54 @@ def render_normal_status() -> None:
     st.caption("📡 11 sensor 실시간 통합 · DuckDB in-process · latency < 100ms")
 
 
+_FAILURE_LABEL_HELP: dict[str, str] = {
+    "NONE": "정상",
+    "TWF":  "Tool Wear Failure (공구 마모)",
+    "HDF":  "Heat Dissipation Failure (방열 실패)",
+    "PWF":  "Power Failure (전력)",
+    "OSF":  "Overstrain Failure (과부하)",
+    "RNF":  "Random Failure (랜덤)",
+}
+
+
 def render_predictive_alert() -> None:
-    """마커 1 (0:15 예지경보) — XGBoost 확률 기반 risk 알람 + 6-class 확률 분포."""
+    """마커 1 (0:15 예지경보) — 라이브 XGBoost 6-class predict_proba 호출 (Phase 3).
+
+    fault-pre-trend feature (_MARKER1_XGB_FEATURES) 입력 → 사전 학습 .pkl 라이브 추론.
+    cache replay 아닌 실 호출 (~1ms). seed=2026 → 결정성 보장.
+    """
     st.warning("⚠️ **예지경보** — ROBOT-00018, motor_temp 92°C 상승 추세 + tool_age 누적 감지")
+
+    from src.ml.local_predictor import LABEL_NAMES  # noqa: PLC0415
+    model = _get_xgb_predictor()
+    probs_dict, latency_ms = model.predict_proba_timed(_MARKER1_XGB_FEATURES)
+    probs = [probs_dict[c] for c in LABEL_NAMES]
+    top_class = max(probs_dict, key=probs_dict.get)
+    risk = 1.0 - probs_dict["NONE"]
 
     col_alert, col_chart = st.columns([1, 2])
     with col_alert:
-        st.metric("결함 Risk", "62%", delta="+44%p", delta_color="inverse",
-                  help="XGBoost 6-class 1−P(NONE)")
-        st.metric("1순위 Failure", "HDF",
-                  help="Heat Dissipation Failure")
-        st.caption("📊 단순 임계값 X → ML 확률 예지 (ADR-009)")
+        st.metric(
+            "결함 Risk", f"{risk:.1%}",
+            delta=f"{(risk - 0.18) * 100:+.0f}%p",
+            delta_color="inverse",
+            help="XGBoost 6-class 1−P(NONE) (라이브 호출)",
+        )
+        st.metric(
+            "1순위 Failure", top_class,
+            help=_FAILURE_LABEL_HELP.get(top_class, ""),
+        )
+        st.caption(f"🤖 라이브 XGBoost predict_proba: **{latency_ms:.2f}ms** (PRISM Phase 3)")
 
     with col_chart:
-        classes = ["NONE", "TWF", "HDF", "PWF", "OSF", "RNF"]
-        probs = [0.12, 0.18, 0.62, 0.04, 0.03, 0.01]
-        colors = ["#ff7f0e" if c == "HDF" else "#aec7e8" for c in classes]
+        colors = ["#ff7f0e" if c == top_class else "#aec7e8" for c in LABEL_NAMES]
         fig = go.Figure(go.Bar(
-            x=classes, y=probs, marker_color=colors,
-            text=[f"{p:.0%}" for p in probs], textposition="auto",
+            x=LABEL_NAMES, y=probs, marker_color=colors,
+            text=[f"{p:.1%}" for p in probs], textposition="auto",
         ))
         fig.update_layout(
-            title=dict(text="XGBoost 6-class 확률 분포", font=dict(size=13)),
-            height=240, yaxis=dict(range=[0, 0.8], title="P"),
+            title=dict(text="XGBoost 6-class 확률 분포 (라이브 추론)", font=dict(size=13)),
+            height=240, yaxis=dict(range=[0, max(probs) + 0.1], title="P"),
             margin=dict(l=10, r=10, t=40, b=10), showlegend=False,
         )
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})

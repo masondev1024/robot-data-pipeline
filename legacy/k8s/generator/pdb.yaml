@@ -1,0 +1,12 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: robot-telemetry-generator-pdb
+  namespace: robot-telemetry
+spec:
+  # 10 replicas 시 최소 8 가동 — Karpenter consolidate, spot interrupt, drain 모두 적용.
+  # HPA scale-down (graceful) 은 PDB 영향 안 받음.
+  minAvailable: 80%
+  selector:
+    matchLabels:
+      app: robot-telemetry-generator

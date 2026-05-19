@@ -1,0 +1,97 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Anomaly Count",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": { "tooltip": false, "viz": false, "legend": false },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 10 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "id": 2,
+      "options": {
+        "legend": { "calcs": ["mean", "max", "min"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "connectionArgs": {
+            "catalog": "AwsDataCatalog",
+            "database": "robot_telemetry_db",
+            "region": "eu-west-1",
+            "resultReuseEnabled": false,
+            "resultReuseMaxAgeInMinutes": 60
+          },
+          "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
+          "format": 0,
+          "rawSQL": "-- ADR-009 Flink Z-Score(σ>3) + 다변량 룰 결과 (silver_alerts) — 시연용 분 단위 버킷\n-- §1.A Firehose buffer 300s → 최신 ~5분은 미적재. picker 30m+ 권장.\n-- WHERE 절은 $__timeFilter() 로 Grafana picker 와 연동.\nSELECT DATE_TRUNC('minute', date_parse(window_end, '%Y-%m-%d %H:%i:%s')) AS event_minute,\n       COUNT(*) AS alert_count,\n       COUNT(DISTINCT robot_id) AS distinct_robots\nFROM robot_telemetry_db.silver_alerts\nWHERE ((year = date_format(current_date - INTERVAL '1' DAY, '%Y')\n        AND month = date_format(current_date - INTERVAL '1' DAY, '%m')\n        AND day = date_format(current_date - INTERVAL '1' DAY, '%d'))\n    OR (year = date_format(current_date, '%Y')\n        AND month = date_format(current_date, '%m')\n        AND day = date_format(current_date, '%d')))\n  AND $__timeFilter(date_parse(window_end, '%Y-%m-%d %H:%i:%s'))\nGROUP BY DATE_TRUNC('minute', date_parse(window_end, '%Y-%m-%d %H:%i:%s'))\nORDER BY event_minute ASC",
+          "refId": "A",
+          "table": "silver_alerts"
+        }
+      ],
+      "title": "Anomaly Detection Timeline (Flink 1분 버킷)",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["robot-telemetry", "anomaly"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "UTC",
+  "title": "Anomaly Detection Timeline",
+  "uid": "anomaly-timeline-001",
+  "version": 1,
+  "weekStart": ""
+}

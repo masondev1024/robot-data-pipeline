@@ -1,0 +1,191 @@
+# Apache Airflow Helm chart values — robot-telemetry 시연용
+# chart: apache-airflow/airflow ~1.16.x (Airflow 2.10.x)
+#
+# 주요 결정:
+# - KubernetesExecutor: task마다 worker pod 동적 생성. Helm chart가 만드는
+#   `airflow-worker` SA가 IRSA(robot-telemetry-airflow-irsa)를 assume.
+# - DAG는 GitSync로 main 브랜치를 매분 sync. subPath=dags 지정해도 chart는
+#   repo root 전체를 /opt/airflow/dags/repo/ 로 가져오고 dags_folder를
+#   /opt/airflow/dags/repo/dags 로 설정함. DAG가 `from src.common ...` 으로
+#   repo root의 src 패키지를 import 하므로 PYTHONPATH=/opt/airflow/dags/repo 필수.
+# - boto3는 _PIP_ADDITIONAL_REQUIREMENTS로 worker 시작 시 자동 설치.
+
+# Custom image — boto3 + sagemaker baked-in (docker/airflow/Dockerfile).
+# Why: _PIP_ADDITIONAL_REQUIREMENTS 매 콜드스타트 install 이 webserver 75분
+# CrashLoop (down/up 사이클) 의 root cause. baked-in 으로 옮겨 콜드스타트 단축.
+# 태그 전략: <airflow-version>-r<revision>. revision 갱신 시 helm upgrade 필요.
+defaultAirflowRepository: 827913617635.dkr.ecr.eu-west-1.amazonaws.com/robot-telemetry-airflow
+defaultAirflowTag: 2.10.5-r1
+
+executor: KubernetesExecutor
+
+# 시연용 — 콘솔에서 패스워드 모르면 진입 불가하므로 명시 설정
+# webserver SA 에도 동일 IRSA 부여 — UI 에서 S3 fallback 으로 task 로그 GetObject 시 필요.
+# (KubernetesExecutor 환경에서 worker pod 가 task 종료 후 즉시 사라지면 in-cluster log
+#  HTTP 페치가 NameResolutionError 로 실패하므로, S3 remote logging 으로 fallback 하려면
+#  webserver pod 도 동일 IRSA 로 S3 GetObject 권한을 가져야 함.)
+webserver:
+  defaultUser:
+    enabled: true
+    role: Admin
+    username: admin
+    # 초기 chart install 시 1회만 사용. 설치 후 Airflow UI 의 Security → List Users
+    # 에서 즉시 변경할 것. (chart 가 password rotation 미지원 → defaultUser 는
+    # bootstrap 용도만, 운영 비번은 UI/CLI 로 관리.)
+    password: changeme123
+    email: admin@admin.com
+    firstName: admin
+    lastName: admin
+  serviceAccount:
+    create: true
+    name: airflow-webserver
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::827913617635:role/robot-telemetry-airflow-irsa
+  # Probe 여유 — _PIP_ADDITIONAL_REQUIREMENTS=boto3 다운그레이드 install + Airflow
+  # 2.10.5 providers preload 가 콜드스타트 시 ~60s 이상 소요 → chart default 60s
+  # startupProbe 로는 부족해 connection refused 후 SIGTERM 무한 루프 회귀.
+  # 2026-05-05: down/up 사이클 후 webserver 75분 CrashLoop. failureThreshold 30
+  # × periodSeconds 10 = 최대 5분 허용으로 완화. liveness 도 한 번 응답 늦으면
+  # kill 되지 않게 30s × 10 = 5분 여유.
+  startupProbe:
+    failureThreshold: 30
+    periodSeconds: 10
+    timeoutSeconds: 20
+  livenessProbe:
+    initialDelaySeconds: 15
+    failureThreshold: 10
+    periodSeconds: 30
+    timeoutSeconds: 10
+  readinessProbe:
+    initialDelaySeconds: 15
+    failureThreshold: 10
+    periodSeconds: 30
+    timeoutSeconds: 10
+
+# KubernetesExecutor가 만드는 worker pod에 IRSA 부여.
+# (boto3 + sagemaker 는 custom image baked-in 됐으므로 _PIP_ADDITIONAL_REQUIREMENTS 불요.)
+workers:
+  serviceAccount:
+    create: true
+    name: airflow-worker
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::827913617635:role/robot-telemetry-airflow-irsa
+
+# Remote logging (S3) — KubernetesExecutor ephemeral pod 로그 수집 픽스.
+# Worker pod 가 task 실행 중 로그를 S3 에도 동시 업로드 → pod 삭제되어도 잔존 →
+# webserver 가 in-cluster <pod>:8793 페치 실패 시 S3 에서 fallback 으로 읽음.
+# remote_log_conn_id 는 비워둠 → boto3 default credential chain 사용 → IRSA 의
+# WebIdentity 토큰을 자동으로 픽업 (별도 Airflow Connection 등록 불필요).
+config:
+  logging:
+    remote_logging: "True"
+    remote_base_log_folder: "s3://de-ai-06-smartfactory-bucket/airflow-logs/"
+    remote_log_conn_id: ""
+    encrypt_s3_logs: "False"
+  webserver:
+    # ALB 노출 + Airflow 자체 로그인 wall 있어 봇 스캔 위험은 사실상 0.
+    # /robots.txt 등 스캔 경고만 노이즈 — 끔.
+    warn_deployment_exposure: "False"
+  # REST API basic_auth 활성화 — default 는 session 인증만 받아 curl 401.
+  # 학습용 manual backfill (예: robot_daily_etl 누락 run trigger) 에 필요.
+  api:
+    auth_backends: "airflow.providers.fab.auth_manager.api.auth.backend.basic_auth,airflow.providers.fab.auth_manager.api.auth.backend.session"
+
+# DAG sync — GitSync sidecar가 60초마다 main 브랜치 pull
+dags:
+  persistence:
+    enabled: false
+  gitSync:
+    enabled: true
+    repo: git@github.com:masondev1024/robot-data-pipeline.git
+    branch: main
+    subPath: dags
+    wait: 60
+    sshKeySecret: airflow-ssh-secret
+    knownHosts: |
+      github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
+      github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+      github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+
+# Bundled Postgres metadata DB (8Gi gp2 EBS PVC, 시연용)
+# bitnami가 paid 전환 후 legacy registry 분리 → bitnamilegacy/postgresql 명시.
+postgresql:
+  enabled: true
+  image:
+    repository: bitnamilegacy/postgresql
+  primary:
+    persistence:
+      enabled: true
+      size: 8Gi
+      storageClass: gp2
+
+# KubernetesExecutor에서는 redis/PgBouncer/Triggerer 불필요
+redis:
+  enabled: false
+pgbouncer:
+  enabled: false
+triggerer:
+  enabled: false
+
+# Airflow 환경변수
+# PYTHONPATH: GitSync가 repo root 전체를 /opt/airflow/dags/repo/ 로 가져오므로
+# DAG의 `from src.common.athena import ...` 가 동작하려면 repo root 추가 필수.
+# Step 0(사람): airflow-slack-webhook secret 사전 생성 필요
+#   aws secretsmanager get-secret-value \
+#     --secret-id /robot-telemetry/slack-webhook-url --region eu-west-1 \
+#     --query SecretString --output text \
+#   | kubectl create secret generic airflow-slack-webhook -n airflow \
+#     --from-file=url=/dev/stdin
+# Why CLAUDE.md §1.C: 민감값은 TF_VAR export 금지, Secrets Manager → K8s Secret 직접 read.
+env:
+  - name: PYTHONPATH
+    value: "/opt/airflow/dags/repo"
+  # boto3 + sagemaker 는 custom image baked-in (defaultAirflowRepository/Tag 참조).
+  # 이전엔 _PIP_ADDITIONAL_REQUIREMENTS 글로벌 boto3 + workers.env sagemaker 격리.
+  - name: AWS_DEFAULT_REGION
+    value: "eu-west-1"
+  - name: S3_BUCKET_NAME
+    value: "de-ai-06-smartfactory-bucket"
+  - name: ATHENA_DATABASE
+    value: "robot_telemetry_db"
+  - name: ATHENA_WORKGROUP
+    value: "robot-telemetry-workgroup"
+  - name: ATHENA_OUTPUT_LOCATION
+    value: "s3://de-ai-06-smartfactory-bucket/project-athena-results/"
+  - name: BEDROCK_MODEL_ID
+    value: "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
+  - name: DQ_SNS_TOPIC_ARN
+    value: "arn:aws:sns:eu-west-1:827913617635:robot-anomaly-alerts"
+  - name: SAGEMAKER_ROLE_ARN
+    value: "arn:aws:iam::827913617635:role/robot-telemetry-sagemaker-role"
+
+# K8s Secret 참조 env (chart 의 `env:` 블록은 value-only 스키마라 valueFrom 불가).
+# `extraEnv` 는 templated string 으로 모든 airflow 컨테이너(webserver/scheduler/worker)에 주입.
+extraEnv: |
+  - name: SLACK_WEBHOOK_URL
+    valueFrom:
+      secretKeyRef:
+        name: airflow-slack-webhook
+        key: url
+
+# ALB Ingress — DAG 사이클(트리거/로그/그래프)을 브라우저에서 보기 위해 노출.
+# Airflow 자체 로그인(admin/...) 이 1차 게이트. webserverSecretKey 는 K8s Secret 으로 분리.
+# 봇 스캔 대응: Airflow 는 /login 외 모든 경로 302 redirect → 로그인 안 된 봇은 진입 불가.
+ingress:
+  web:
+    enabled: true
+    ingressClassName: alb
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+      alb.ingress.kubernetes.io/healthcheck-path: /health
+    path: /
+    pathType: Prefix
+
+# 세션 쿠키 서명 — 외부 K8s Secret 참조.
+# Step 0(사람): kubectl create secret generic airflow-webserver-secret-key \
+#   -n airflow --from-literal=webserver-secret-key="$(aws secretsmanager get-secret-value \
+#   --secret-id /robot-telemetry/airflow-webserver-secret --query SecretString --output text)"
+# Why CLAUDE.md §1.C: 민감값은 TF_VAR export 금지, Secrets Manager → K8s Secret 직접 read.
+webserverSecretKeySecretName: airflow-webserver-secret-key
