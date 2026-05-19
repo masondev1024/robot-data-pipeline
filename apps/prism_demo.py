@@ -241,22 +241,6 @@ _CANDIDATE_ACTIONS: list[str] = [
     "halt",                  # 즉시 정지
 ]
 
-# 마커 8 — candidate 별 spindle_rpm do-intervention 값 (standardised σ).
-# 라이브 DoWhy ATE 계산 시 Supervisor 4 Agent 입력 enrich.
-_CANDIDATE_TO_SPINDLE_INTERVENTION: dict[str, float] = {
-    "continue":             0.0,   # 변화 X
-    "schedule_maintenance": -0.3,  # 소프트 감속 + 정비 예약
-    "throttle_50pct":      -1.0,   # 1σ 감속
-    "halt":                -2.0,   # 즉시 정지 (큰 감속)
-}
-
-_CANDIDATE_LABEL_KR: dict[str, str] = {
-    "continue":             "진행 (위험 감수)",
-    "schedule_maintenance": "정비 예약",
-    "throttle_50pct":      "부하 50% 감속",
-    "halt":                "즉시 정지",
-}
-
 
 def _real_supervisor_decision(
     marker_idx: int,
@@ -328,12 +312,12 @@ _MARKER1_XGB_FEATURES: dict[str, float] = {
 
 # ── DoWhy 라이브 ATE 계산 캐시 (Phase 1: 본선 라이브 do-intervention) ─────────────
 
-@st.cache_resource(show_spinner="🔬 DoWhy 6-Node DAG 학습 중... (5k row, ~3초)")
+@st.cache_resource(show_spinner="🔬 DoWhy 6-Node DAG 학습 중... (5k row, ~2초)")
 def _get_causal_artifact() -> dict:
-    """5k row 합성 데이터 + DoWhy CausalModel 2종 (treatment=coolant/spindle) — 시연 시작 1회 학습.
+    """5k row 합성 데이터 + DoWhy CausalModel (treatment=coolant_temp) — 시연 시작 1회 학습.
 
-    streamlit @st.cache_resource 로 process-lifetime 캐시. rerun 시 재계산 X.
-    마커 4 (보류 fast-forward) + 마커 8 (Supervisor candidate ATE) 에서 라이브 호출.
+    @st.cache_resource process-lifetime 캐시. rerun 시 재계산 X.
+    마커 4 (보류 fast-forward) 에서 라이브 do(coolant_temp) ATE 호출.
     """
     import warnings  # noqa: PLC0415
     from src.orchestration.causal_dag import (  # noqa: PLC0415
@@ -344,12 +328,7 @@ def _get_causal_artifact() -> dict:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         model_coolant = fit_causal_model_for(df, dag, treatment="coolant_temp", outcome="DEFECT")
-        model_spindle = fit_causal_model_for(df, dag, treatment="spindle_rpm", outcome="DEFECT")
-    return {
-        "dag": dag, "df": df,
-        "model_coolant": model_coolant,
-        "model_spindle": model_spindle,
-    }
+    return {"dag": dag, "df": df, "model_coolant": model_coolant}
 
 
 # ── CNC stream generator (1 instance, session 유지) ─────────────────────────────
@@ -982,53 +961,6 @@ def _production_badge(p: ProductionAgentOutput) -> str:
     return f"✅ **진행 권장** — UPH {n.throughput_uph:.0f}"
 
 
-def render_candidate_intervention_ate() -> None:
-    """마커 7/8 — 4 candidate action 별 라이브 DoWhy do(spindle_rpm) ATE 표시.
-
-    각 candidate 가 spindle_rpm 에 가하는 intervention (σ 단위) → DoWhy 라이브 ATE.
-    Supervisor 4 Agent 입력의 "실 인과 효과" 근거를 평가자에게 노출.
-    """
-    import warnings  # noqa: PLC0415
-    from src.orchestration.causal_dag import estimate_intervention_effect  # noqa: PLC0415
-    art = _get_causal_artifact()
-
-    rows = []
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        for action in _CANDIDATE_ACTIONS:
-            treat = _CANDIDATE_TO_SPINDLE_INTERVENTION[action]
-            ate = estimate_intervention_effect(
-                art["model_spindle"], treatment_value=treat, control_value=0.0,
-            )
-            rows.append((action, _CANDIDATE_LABEL_KR[action], treat, ate))
-
-    # 가장 큰 음수 ATE (DEFECT 가장 많이 감소) 찾기 — Supervisor 가 참고할 후보
-    best = min(rows, key=lambda r: r[3])
-
-    st.markdown("#### 🔬 candidate 별 라이브 DoWhy do(spindle_rpm) ATE")
-    st.caption(
-        "각 candidate 가 spindle_rpm 에 가하는 do-intervention 의 DEFECT 인과 효과 — "
-        "음수가 클수록 결함 감소. **Supervisor 가 net_value 산정 시 참고하는 실 인과 근거.**"
-    )
-
-    cols = st.columns(len(rows))
-    for col, (action, label_kr, treat, ate) in zip(cols, rows):
-        is_best = (action == best[0]) and (ate < 0)
-        with col:
-            with st.container(border=True):
-                st.markdown(f"##### {'🏆 ' if is_best else ''}{label_kr}")
-                st.metric(
-                    "do(spindle_rpm)", f"{treat:+.1f}σ",
-                    help=f"action_id={action}",
-                )
-                st.metric(
-                    "ATE → DEFECT", f"{ate:+.4f}",
-                    delta=f"{'감소' if ate < 0 else '변화 X' if ate == 0 else '증가'}",
-                    delta_color="inverse" if ate < 0 else "off",
-                    help="DoWhy backdoor.linear_regression 라이브 호출 (5k row)",
-                )
-
-
 def render_4agent_outputs(action: CandidateAction) -> None:
     """4 Domain Agent 협상 — 4 컬럼 bordered container.
 
@@ -1540,9 +1472,6 @@ def main() -> None:
 
         # 마커 7~8: 4 Agent 협상 + Supervisor 결정
         elif marker_idx in (7, 8):
-            # 라이브 candidate × DoWhy do(spindle_rpm) ATE — Supervisor 입력의 인과 근거
-            render_candidate_intervention_ate()
-            st.markdown("---")
             try:
                 if _PRISM_MODE in ("demo", "live"):
                     sup_out, candidates_ordered = _real_supervisor_decision(
