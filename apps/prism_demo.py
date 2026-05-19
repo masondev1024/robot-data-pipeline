@@ -1156,6 +1156,51 @@ def render_supervisor_card(decision: SupervisorOutput) -> None:
             )
 
 
+def _render_sidebar_medallion() -> None:
+    """사이드바 Medallion Lineage 섹션.
+
+    Bronze / Silver / Gold 3 layer 카드 — row count + 최신 ts.
+    각 카드는 expander 로 LIMIT 10 sample row 표 표시.
+    """
+    from src.orchestration.medallion import create_medallion_views, get_medallion_stats  # noqa: PLC0415
+    from src.orchestration.storage import StorageDB  # noqa: PLC0415
+
+    db_path = _ROOT / "data" / "prism_demo.duckdb"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    _LAYER_META = [
+        ("bronze", "bronze_cnc_raw",         "🥉 Bronze — Raw",       "#cd7f32"),
+        ("silver", "silver_cnc_validated",    "🥈 Silver — Validated", "#aaa9ad"),
+        ("gold",   "gold_cnc_window_stats",   "🥇 Gold — Aggregated",  "#ffd700"),
+    ]
+
+    try:
+        with StorageDB(str(db_path)) as db:
+            create_medallion_views(db)
+            stats = get_medallion_stats(db)
+
+            for layer_key, view_name, label, color in _LAYER_META:
+                layer_stats = stats[layer_key]
+                rc = layer_stats["row_count"]
+                lt = layer_stats["latest_ts"] or "—"
+                with st.expander(f"{label}  |  **{rc:,} rows**", expanded=False):
+                    st.caption(f"latest ts: `{lt}`")
+                    if rc > 0:
+                        sample = db.query(
+                            f"SELECT * FROM {view_name} LIMIT 10"  # noqa: S608
+                        )
+                        import pandas as pd  # noqa: PLC0415
+                        st.dataframe(
+                            pd.DataFrame(sample),
+                            use_container_width=True,
+                            hide_index=True,
+                        )
+                    else:
+                        st.info("데이터 없음 — CNC stream 을 시작하세요.")
+    except Exception as exc:
+        st.warning(f"Medallion view 로드 실패: {exc}")
+
+
 def render_sidebar(alpha: float, beta: float, gamma: float) -> tuple[float, float, float]:
     """사이드바 — Causal Robustness 카드 + α/β/γ 슬라이더.
 
@@ -1196,6 +1241,11 @@ def render_sidebar(alpha: float, beta: float, gamma: float) -> tuple[float, floa
             "✅ PRISM = 노트북 1대 in-process · **DB 서버 0 대**"
         )
         st.caption(f"`{status['path']}` · SHA `{status['sha_prefix']}...`")
+
+        # ── Medallion Lineage ────────────────────────────────────────────
+        st.markdown("---")
+        st.markdown("### 📊 Medallion Lineage")
+        _render_sidebar_medallion()
 
         st.markdown("---")
         st.markdown("### 비용 비교")
