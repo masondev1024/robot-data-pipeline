@@ -355,7 +355,7 @@ def _seed_storage_demo() -> dict:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with StorageDB(str(db_path)) as db:
         if db.count("robot_telemetry") == 0:
-            # seed 100 rows (60s timeline + 40s recovery)
+            # robot_telemetry: 100 rows (60s timeline + 40s recovery)
             base_ts = datetime(2026, 5, 22, 3, 0, 0)
             rows = []
             for sec in range(100):
@@ -381,11 +381,56 @@ def _seed_storage_demo() -> dict:
                     "is_faulty": 45 <= sec < 60,
                 })
             db.write_robot(rows)
+        if db.count("cnc_telemetry") == 0:
+            # cnc_telemetry: 100 rows (정상 phase 60s + fault 30s + recover 10s)
+            # 마커 0 (정상) 의 sensor metric 라이브 read 용 + 마커 5 incident timeline
+            base_ts = datetime(2026, 5, 22, 3, 0, 0)
+            cnc_rows = []
+            for sec in range(100):
+                ts = base_ts + timedelta(seconds=sec)
+                # tool_age 누적 (정상 부터 180h 까지 천천히)
+                tool_age = 178.0 + 0.05 * sec
+                spindle_rpm = 8500.0 + (sec % 3 - 1) * 30  # 미세 noise
+                # 정상 (0-59s): coolant 22°C, vibration ~0.8
+                # fault (60-89s): coolant 28°C, vibration ~2.3 (incident #47)
+                # recover (90-99s): coolant 24°C
+                if sec < 60:
+                    coolant = 22.0 + (sec % 5) * 0.1
+                    vibration = 0.8 + (sec % 3) * 0.05
+                    thermal = 5.0 + (sec % 4) * 0.2
+                    dim_dev = 2.0 + (sec % 3) * 0.1
+                    defect = False
+                elif sec < 90:
+                    coolant = 22.0 + (sec - 60) * 0.2
+                    vibration = 0.8 + (sec - 60) * 0.05
+                    thermal = 5.0 + (sec - 60) * 0.5
+                    dim_dev = 2.0 + (sec - 60) * 0.4
+                    defect = (sec >= 75)
+                else:
+                    coolant = 28.0 - (sec - 90) * 0.4
+                    vibration = 2.3 - (sec - 90) * 0.12
+                    thermal = 20.0 - (sec - 90) * 1.2
+                    dim_dev = 14.0 - (sec - 90) * 1.0
+                    defect = False
+                cnc_rows.append({
+                    "ts": ts,
+                    "machine_id": "CNC-01",
+                    "tool_age": tool_age,
+                    "spindle_rpm": spindle_rpm,
+                    "coolant_temp": coolant,
+                    "vibration_xyz": vibration,
+                    "thermal_drift": thermal,
+                    "dimension_dev": dim_dev,
+                    "defect": defect,
+                })
+            db.write_cnc(cnc_rows)
         n_total = db.count("robot_telemetry")
+        cnc_total = db.count("cnc_telemetry")
         sha = db.table_sha256("robot_telemetry")[:12]
     file_size_kb = db_path.stat().st_size / 1024 if db_path.exists() else 0
     return {
         "n_total": n_total,
+        "cnc_total": cnc_total,
         "file_size_kb": file_size_kb,
         "sha_prefix": sha,
         "path": str(db_path.relative_to(_ROOT)),
@@ -728,15 +773,44 @@ def render_causal_v2_explanation() -> None:
 
 
 def render_normal_status() -> None:
-    """마커 0 (0:00 정상) — sensor live 4-grid."""
-    st.info("✅ **정상 가동 중** — 모든 sensor 안전 범위, 라인 가동률 100%")
+    """마커 0 (0:00 정상) — DuckDB cnc_telemetry 정상 phase row 라이브 read.
+
+    advisor 권고 통합: 시연 화면이 DuckDB 와 유기적으로 연결되어 있음을 평가자에게 입증.
+    fallback: DuckDB query 실패 시 하드코딩 표시.
+    """
+    from src.orchestration.storage import StorageDB  # noqa: PLC0415
+
+    st.info("✅ **정상 가동 중** — DuckDB `cnc_telemetry` 정상 phase row 라이브 read")
+
+    db_path = _ROOT / "data" / "prism_demo.duckdb"
+    row = None
+    if db_path.exists():
+        try:
+            with StorageDB(str(db_path)) as db:
+                # 정상 phase (defect=False, 60s 이전 row 중 마지막)
+                result = db.query(
+                    "SELECT * FROM cnc_telemetry WHERE defect = FALSE "
+                    "ORDER BY ts DESC LIMIT 1"
+                )
+                if result:
+                    row = result[0]
+        except Exception:
+            row = None
 
     c1, c2, c3, c4 = st.columns(4)
-    with c1: st.metric("motor_temp", "85°C", help="SOP 임계 100°C 미만")
-    with c2: st.metric("vibration_xyz", "0.8", help="기준 norm < 1.5")
-    with c3: st.metric("RPM", "8,500", help="표준 8500")
-    with c4: st.metric("coolant_temp", "22°C", help="기준 < 25°C")
-    st.caption("📡 11 sensor 실시간 통합 · DuckDB in-process · latency < 100ms")
+    if row:
+        with c1: st.metric("coolant_temp", f"{row['coolant_temp']:.1f}°C", help="DuckDB live · 기준 < 25°C")
+        with c2: st.metric("vibration_xyz", f"{row['vibration_xyz']:.2f}", help="DuckDB live · 기준 norm < 1.5")
+        with c3: st.metric("spindle_rpm", f"{int(row['spindle_rpm']):,}", help="DuckDB live · 표준 8500")
+        with c4: st.metric("tool_age", f"{row['tool_age']:.1f}h", help="DuckDB live · 누적 임계 180h 근접")
+        st.caption(f"📡 DuckDB cnc_telemetry 라이브 read · machine_id={row['machine_id']} · ts={row['ts']}")
+    else:
+        # fallback (DuckDB 없을 때)
+        with c1: st.metric("coolant_temp", "22°C", help="기준 < 25°C")
+        with c2: st.metric("vibration_xyz", "0.8", help="기준 norm < 1.5")
+        with c3: st.metric("spindle_rpm", "8,500", help="표준 8500")
+        with c4: st.metric("tool_age", "178h", help="누적 임계 180h 근접")
+        st.caption("📡 11 sensor — DuckDB 미가동 (fallback 표시)")
 
 
 _FAILURE_LABEL_HELP: dict[str, str] = {
@@ -1049,7 +1123,17 @@ def render_retrain_evidence() -> None:
     Task 2 (본선 라이브): base (5k row) + incident (300 row 극단 outlier) 합본 학습 →
     incident test set 정확도 비교. cache_replay 아닌 실 fit() 호출.
     """
-    st.markdown("##### 🎓 라이브 재학습 결과 — incident #47 패턴 학습")
+    col_title, col_btn = st.columns([2, 1])
+    with col_title:
+        st.markdown("##### 🎓 라이브 재학습 결과 — incident #47 패턴 학습")
+    with col_btn:
+        if st.button(
+            "🔄 재학습 실행 (라이브)",
+            help="cache 우회 → 매번 새 XGBoost fit() 호출 (~1.7s). 평가자 직접 클릭 가능.",
+            use_container_width=True,
+        ):
+            _get_retrain_artifact.clear()
+            st.rerun()
 
     art = _get_retrain_artifact()
     before_acc = art["before_acc"]
@@ -1451,6 +1535,121 @@ def fallback_video() -> None:
 
 # ── 메인 ─────────────────────────────────────────────────────────────────────────
 
+def render_operator_view() -> None:
+    """운영자 대시보드 (mason 의 advisor 권고 — 플랫폼 기획 보강).
+
+    "평소엔 백그라운드, 문제 발생 시 알람 + 승인/거절 버튼" narrative.
+    실 운영자가 매일 보는 production UX (시연 timeline view 와 분리).
+    """
+    from src.orchestration.storage import StorageDB  # noqa: PLC0415
+
+    st.markdown("## 🎛️ 운영자 대시보드 (Production UX)")
+    st.caption(
+        "📡 평소에는 백그라운드로 모니터링 · 문제 발생 시 Slack 알람 + 이 화면 팝업. "
+        "1인 메이커스페이스 운영자가 매일 사용하는 UI."
+    )
+
+    # 라이브 sensor + alarm 상태 (DuckDB cnc_telemetry 라이브 read)
+    db_path = _ROOT / "data" / "prism_demo.duckdb"
+    last_row = None
+    incident_rows: list = []
+    if db_path.exists():
+        try:
+            with StorageDB(str(db_path)) as db:
+                result = db.query("SELECT * FROM cnc_telemetry ORDER BY ts DESC LIMIT 1")
+                if result:
+                    last_row = result[0]
+                # 최근 5 incident (defect=True)
+                incident_rows = db.query(
+                    "SELECT ts, machine_id, coolant_temp, vibration_xyz, dimension_dev "
+                    "FROM cnc_telemetry WHERE defect = TRUE ORDER BY ts DESC LIMIT 5"
+                )
+        except Exception:
+            pass
+
+    # 🚨 ALARM 카드 (큰 글씨)
+    is_alarm = last_row is not None and last_row.get("defect", False)
+    if is_alarm:
+        st.error(
+            f"## 🚨 ALARM — INCIDENT #47 진행 중\n\n"
+            f"**{last_row['machine_id']}**  ·  coolant_temp **{last_row['coolant_temp']:.1f}°C** "
+            f"·  vibration **{last_row['vibration_xyz']:.2f}**  ·  dimension_dev **{last_row['dimension_dev']:.1f}μm**\n\n"
+            f"⚡ TWF (Tool Wear Failure) 예지 + HDF (Heat Dissipation Failure) 진행 — **즉시 의사결정 필요**"
+        )
+    elif last_row:
+        st.success(
+            f"## ✅ 정상 가동 — DuckDB cnc_telemetry 라이브\n\n"
+            f"**{last_row['machine_id']}**  ·  tool_age **{last_row['tool_age']:.1f}h**  ·  "
+            f"coolant **{last_row['coolant_temp']:.1f}°C**  ·  vibration **{last_row['vibration_xyz']:.2f}**"
+        )
+    else:
+        st.warning("⚠️ DuckDB 미가동 — 사이드바의 CNC stream Start 또는 demo 모드 실행 필요")
+
+    # 3 의사결정 버튼 (실 운영자 액션)
+    st.markdown("### 🎯 운영자 의사결정")
+    col_apply, col_hold, col_halt = st.columns(3)
+    with col_apply:
+        if st.button("✅ AI 추천 적용", use_container_width=True, type="primary"):
+            st.toast("✅ coolant_temp +5% 적용됨 — Slack 통보 발송", icon="✅")
+    with col_hold:
+        if st.button("⏸ 보류 (모니터링 계속)", use_container_width=True):
+            st.toast("⏸ 보류 결정 — 운영자 모니터링 모드 유지", icon="⏸")
+    with col_halt:
+        if st.button("🛑 즉시 정지", use_container_width=True):
+            st.toast("🛑 라인 정지 — 정비 요청 발송", icon="🛑")
+
+    st.markdown("---")
+
+    # 최근 5 incident history table
+    col_history, col_chart = st.columns([1, 1])
+    with col_history:
+        st.markdown("##### 📋 최근 5 incident (DuckDB)")
+        if incident_rows:
+            import pandas as pd  # noqa: PLC0415
+            df_inc = pd.DataFrame(incident_rows)
+            st.dataframe(df_inc, use_container_width=True, hide_index=True)
+        else:
+            st.caption("최근 incident 없음 (정상 가동 중)")
+
+    # last 30s sensor mini chart (DuckDB read)
+    with col_chart:
+        st.markdown("##### 📈 최근 30s sensor (DuckDB live)")
+        try:
+            with StorageDB(str(db_path)) as db:
+                recent = db.query(
+                    "SELECT ts, coolant_temp, vibration_xyz FROM cnc_telemetry "
+                    "ORDER BY ts DESC LIMIT 30"
+                )
+            if recent:
+                recent.reverse()  # 시간순 정렬
+                ts_list = [r["ts"] for r in recent]
+                coolant_list = [r["coolant_temp"] for r in recent]
+                vibration_list = [r["vibration_xyz"] for r in recent]
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=ts_list, y=coolant_list, name="coolant",
+                                          line=dict(color="#ff7f0e")))
+                fig.add_trace(go.Scatter(x=ts_list, y=vibration_list, name="vibration",
+                                          line=dict(color="#d62728"), yaxis="y2"))
+                fig.update_layout(
+                    height=240,
+                    yaxis=dict(title="coolant °C", side="left"),
+                    yaxis2=dict(title="vibration", side="right", overlaying="y"),
+                    margin=dict(l=10, r=10, t=20, b=10),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                )
+                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+        except Exception:
+            st.caption("sensor history 없음")
+
+    st.markdown("---")
+    st.info(
+        "💡 **실 운영 narrative**: 평소엔 이 화면 안 봄 — Slack 알람만 받음 (incident 발생 시). "
+        "알람 클릭 → 이 화면 팝업 → 30초 안에 의사결정 (적용/보류/정지). "
+        "**production scale-out 단계**: legacy/grafana/dashboards/* 의 5 dashboard (robot_fleet, "
+        "robot_detail, pipeline_health, observability, anomaly_timeline) 로 enterprise stack 확장."
+    )
+
+
 def main() -> None:
     st.set_page_config(
         layout="wide",
@@ -1460,6 +1659,18 @@ def main() -> None:
 
     render_header()
     st.markdown("---")
+
+    # View 모드 toggle (mason 의 advisor 권고 — Operator View 분리)
+    view_mode = st.radio(
+        "🎛️ View 모드",
+        options=["전체 시연 (Timeline View)", "🚨 운영자 대시보드 (Operator View)"],
+        index=0, horizontal=True,
+        help="Timeline = 평가자용 시연 view · Operator = 실 운영자 production UX",
+    )
+
+    if view_mode == "🚨 운영자 대시보드 (Operator View)":
+        render_operator_view()
+        return
 
     # 마커 인덱스 세션 상태
     if "marker_idx" not in st.session_state:
