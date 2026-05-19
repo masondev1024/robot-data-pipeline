@@ -65,11 +65,11 @@ TOTAL_SECONDS = 225  # 3:45
 _MARKER_DESCRIPTIONS: dict[int, str] = {
     0:  "센서 데이터 정상 흐름, 모든 라인 가동 중",
     1:  "이상 신호 감지 — 결함 risk 62% 예지경보 발동",
-    2:  "DoWhy 6-Node DAG 인과 추론 v1 생성",
-    3:  "운영자가 시뮬레이션 가속 요청",
-    4:  "fast-forward 시뮬 결과 표시",
-    5:  "결함 #47 실제 발생, motor_temp 105°C 도달",
-    6:  "DAG v2 갱신 — spindle_rpm 개입 효과 추가",
+    2:  "DoWhy 6-Node DAG 인과 추론 v1 생성 — coolant_temp +5% 추천",
+    3:  "운영자 결정: '보류' (라인 가동 우선, v1 추천 미적용)",
+    4:  "보류 시 3시간 fast-forward 시뮬 → 결함 진행 trajectory",
+    5:  "결함 #47 실제 발생 — 보류 결정의 결과, motor_temp 105°C",
+    6:  "인과 v2 학습 — Causal Effect 정확화 (CE 0.78 → 0.71)",
     7:  "4 Domain Agent 가 동시 분석 (품질·안전·설비·생산)",
     8:  "Supervisor 가 Net Value 산정 — 최적 액션 권고",
     9:  "강화학습 모델 재학습 완료, 정확도 0.62 → 0.91 (+47%)",
@@ -223,10 +223,11 @@ _SCENARIOS: dict[str, dict] = {
 # 마커별 sub-metric — "현재 마커 KPI" 박스 아래 표시. 의미 있는 시점만.
 _MARKER_SUB_KPIS: dict[int, list[tuple[str, str]]] = {
     1:  [("결함 risk", "62%"), ("1순위 type", "HDF")],
-    2:  [("원인 후보", "6 노드"), ("σ_max", "0.40 ✅")],
-    4:  [("시뮬 가속비", "240×"), ("defect Δ", "-44%p")],
+    2:  [("v1 추천", "coolant +5%"), ("σ_max", "0.40 ✅")],
+    3:  [("결정", "보류"), ("사유", "라인 우선")],
+    4:  [("시뮬 압축", "3h → 1s"), ("defect 예측", "62%→95%")],
     5:  [("motor_temp", "105°C"), ("vibration", "+188%")],
-    6:  [("신규 edge", "+1"), ("DAG 버전", "v2")],
+    6:  [("CE 정확도", "0.78→0.71"), ("σ_max", "0.40→0.38")],
     8:  [("Net Value", "₩100M"), ("권고 강도", "강한")],
     9:  [("정확도", "0.91"), ("개선", "+47%")],
     10: [("OEE", "66%"), ("개선", "+35%")],
@@ -409,39 +410,36 @@ def render_marker_timeline(current_marker_idx: int) -> None:
 
 
 def _node_colors_for_marker(marker_idx: int) -> dict[str, str]:
-    """marker_idx → DAG 노드 색상 매핑 (mason 13차 narrative).
+    """marker_idx → DAG 노드 색상 (기획서 page 7 정합 narrative).
 
-    - 마커 2~3 (v1 인과 + 인간 검토): 모든 6 노드 가시 (선택 전, 후보 표시)
-    - 마커 4 (시뮬 spindle): spindle 주황 + 영향 path 파랑, tool_age 회색
-    - 마커 5 (실 결함): vibration/thermal 빨강, coolant_temp 회색 (v1 미발견)
-    - 마커 6 (v2): coolant_temp 주황 신규 발견
+    - 마커 2 (v1 인과): coolant_temp 주황 (v1 추천 변수) + 나머지 파랑
+    - 마커 3 (인간 결정 = 보류): 동일 (v1 분석 보존, 적용 안 함)
+    - 마커 4 (보류 fast-forward 시뮬): 동일 (DAG 변화 X — trajectory plot 으로 narrative)
+    - 마커 5 (실 결함): vibration/thermal 빨강 (실 path)
+    - 마커 6 (v2): coolant_temp 주황 (CE 정확화) + path 강조
     """
     base = {n: "#cccccc" for n in DAG_NODES}
     base["DEFECT"] = "#d62728"
 
     if marker_idx == 1:
         base["tool_age"] = "#ff7f0e"
-    elif marker_idx in (2, 3):
-        # v1 인과 + 인간 검토: 모든 base/mediator/outcome 파랑 (후보 가시)
-        for n in ["tool_age", "spindle_rpm", "coolant_temp",
+    elif marker_idx in (2, 3, 4):
+        # v1 인과 + 인간 보류 + fast-forward 시뮬: coolant 주황 (v1 추천), 나머지 후보 파랑
+        for n in ["tool_age", "spindle_rpm",
                   "vibration_xyz", "thermal_drift", "dimension_dev"]:
             base[n] = "#1f77b4"
-    elif marker_idx == 4:
-        # 시뮬 spindle: spindle 주황 (intervention) + 영향 path 파랑 (vibration, coolant, thermal, dimension)
-        # tool_age = spindle 영향 외 (회색)
-        base["spindle_rpm"] = "#ff7f0e"
-        for n in ["vibration_xyz", "coolant_temp", "thermal_drift", "dimension_dev"]:
-            base[n] = "#1f77b4"
+        base["coolant_temp"] = "#ff7f0e"  # v1 추천 변수
     elif marker_idx == 5:
-        # 실 결함: vibration/thermal 빨강 (실 path). coolant_temp 회색 (v1 시뮬이 coolant→thermal path 미반영)
+        # 실 결함: vibration/thermal 빨강 (실 path)
+        # coolant_temp 회색 (v1 추천이었으나 보류로 미적용 → 결함 진행 path)
         base["spindle_rpm"] = "#1f77b4"
         base["vibration_xyz"] = "#d62728"
         base["thermal_drift"] = "#d62728"
         base["dimension_dev"] = "#1f77b4"
     elif marker_idx == 6:
-        # v2: coolant_temp 주황 (신규 발견) — 시각 임팩트 (v1 회색 → v2 주황)
+        # v2: coolant_temp 주황 (CE 정확화) + path 강조
         base["spindle_rpm"] = "#1f77b4"
-        base["coolant_temp"] = "#ff7f0e"
+        base["coolant_temp"] = "#ff7f0e"  # CE 추정 정확화
         base["vibration_xyz"] = "#d62728"
         base["thermal_drift"] = "#d62728"
         base["dimension_dev"] = "#1f77b4"
@@ -451,11 +449,11 @@ def _node_colors_for_marker(marker_idx: int) -> dict[str, str]:
 _DAG_TITLES = {
     0: "인과 DAG  |  baseline (정상 가동)",
     1: "인과 DAG  |  <span style='color:#ff7f0e'>tool_age 누적 감지 (예지)</span>",
-    2: "인과 DAG v1  |  <span style='color:#1f77b4'>3 원인 후보 + 영향 path 식별</span>",
-    3: "인과 DAG v1  |  <span style='color:#1f77b4'>운영자 검토 중</span>",
-    4: "인과 DAG  |  <span style='color:#ff7f0e'>spindle_rpm 시뮬 — 영향 path 가시 (tool_age 외)</span>",
-    5: "인과 DAG  |  <span style='color:#d62728'>실 결함 — coolant_temp 회색 = v1 시뮬 미반영 변수</span>",
-    6: "인과 DAG v2  |  <span style='color:#ff7f0e'>coolant_temp 신규 path 발견! (v1 → v2 학습)</span>",
+    2: "인과 DAG v1  |  <span style='color:#ff7f0e'>v1 추천: coolant_temp +5% (절삭유 보충)</span>",
+    3: "인과 DAG v1  |  <span style='color:#1f77b4'>운영자 검토 중 (보류 결정)</span>",
+    4: "인과 DAG  |  <span style='color:#ff7f0e'>보류 시 fast-forward 시뮬 (3h 압축)</span>",
+    5: "인과 DAG  |  <span style='color:#d62728'>실 결함 — 보류 결정의 결과 (예지 적중)</span>",
+    6: "인과 DAG v2  |  <span style='color:#ff7f0e'>incident 학습 — CE 0.78 → 0.71 정확화</span>",
 }
 
 
@@ -534,33 +532,33 @@ def render_causal_v1_explanation() -> None:
 
 
 def render_causal_v2_explanation() -> None:
-    """마커 6 (1:30 인과 v2) — v1 한계 → v2 학습 (B+A narrative).
+    """마커 6 (1:30 v2) — incident #47 학습으로 Causal Effect 추정 정확화 (기획서 page 7 정합).
 
-    PRISM 의 진짜 가치 = 결함 막기 X, **사고로부터 자산화 + 다음 사이클 강해진다**.
+    CE 0.78 → 0.71 — v1 의 시뮬 추정 vs 실 결함 mismatch 해소.
     """
-    st.success("🎓 **인과 v2 학습 완료** — v1 의 단일 path 한계 보완, incident #47 영구 자산화")
+    st.success("🎓 **인과 v2 학습 완료** — Causal Effect 추정 정확화 (CE **0.78 → 0.71**)")
 
     col_l, col_r = st.columns([1, 1])
     with col_l:
         with st.container(border=True):
-            st.markdown("##### 🔄 v1 의 한계 → v2 갱신")
+            st.markdown("##### 📊 v1 vs v2 — Causal Effect (CE)")
             st.markdown(
-                "**v1 (인과 분석 직후)**:\n"
-                "- 🔵 `spindle_rpm` 단일 path 강조\n"
-                "- ❌ `coolant_temp → thermal_drift` 누락\n\n"
+                "**v1 (incident 전)**:\n"
+                "- `coolant_temp → DEFECT` CE = **0.78** (추정)\n"
+                "- 시뮬 가속 결과 vs 실 결함 = **mismatch** (보류 시 결함 진행 실측)\n\n"
                 "**v2 (incident #47 학습 후)**:\n"
-                "- ➕ 신규 edge: `coolant_temp → thermal_drift`\n"
-                "- 🟠 `coolant_temp` 주황 강조 (신규 발견 원인)\n"
-                "- 📊 σ_max 재계산: 0.40 → 0.38 (더 robust)"
+                "- `coolant_temp → DEFECT` CE = **0.71** (실 데이터 반영)\n"
+                "- 시뮬 ↔ 실 데이터 정합성 ↑\n"
+                "- σ_max 재계산: 0.40 → 0.38 (더 robust)"
             )
     with col_r:
         with st.container(border=True):
             st.markdown("##### 💡 PRISM 핵심 가치 — 학습 자산화")
             st.markdown(
-                "❌ **MES**: 결함 발생 → 알람만 → 인간이 매번 처음부터 진단\n\n"
-                "✅ **PRISM**: 결함 발생 → **인과 모델 자동 갱신** → 다음 사이클부터:\n"
-                "- 동일 패턴 **즉시** 인식 (1~2시간 → 수초)\n"
-                "- `coolant_temp` 모니터 우선순위 ↑\n"
+                "❌ **MES**: 사고 발생 → 알람만 → 인간 매번 처음부터 진단\n\n"
+                "✅ **PRISM**: 사고 발생 → **인과 모델 자동 갱신** → 다음 사이클부터:\n"
+                "- 동일 패턴 **즉시** 인식 (1-2h → 수초)\n"
+                "- CE 추정 정확도 ↑ (시뮬 ↔ 실 mismatch 해소)\n"
                 "- 모델은 **노트북에 영구 누적** 자산"
             )
 
@@ -606,67 +604,85 @@ def render_predictive_alert() -> None:
 
 
 def render_human_decision() -> None:
-    """마커 3 (0:45 인간결정) — 3 원인 후보 중 do-intervention 대상 선택 (mason 8차).
+    """마커 3 (0:45 인간결정) — v1 추천 (절삭유 +5%) 보류 결정 (기획서 page 7 정합).
 
-    인과관계 정확 파악 위해 DAG 의 3 base cause 중 spindle_rpm 선택 → 시뮬 가속.
+    인간 인지 한계 narrative — 라인 가동 우선으로 적용 보류, 결과는 마커 4 fast-forward 시뮬.
     """
-    st.info("🧑‍🔧 **운영자 검토** — DAG 가 식별한 3 원인 후보 중 **do-intervention 대상 선택**")
+    st.info("🧑‍🔧 **운영자 검토** — v1 인과 추천 (절삭유 +5%) 적용 여부")
 
     col_candidates, col_decision = st.columns([2, 1])
 
     with col_candidates:
         with st.container(border=True):
-            st.markdown("##### 🎯 3 원인 후보 비교 — DoWhy 시뮬 vs 실 운영 적용")
+            st.markdown("##### 🎯 인과 v1 분석 결과 — 3 원인 후보")
             st.markdown(
-                "| 후보 | DoWhy 시뮬 | 실 운영 적용 방식 | 적용 소요 |\n"
+                "| 후보 | v1 추천 | 실 운영 적용 방식 | 적용 비용 |\n"
                 "|---|---|---|---|\n"
-                "| `tool_age` | ✅ 가능 | 공구 교체 정비 | **4h+** |\n"
-                "| **`spindle_rpm`** | ✅ 가능 | **소프트웨어 명령** | **0 (즉시)** |\n"
-                "| `coolant_temp` | ✅ 가능 | 냉각수 보충/교체 | **1-2h** |\n"
+                "| `tool_age` | 미추천 (시간 의존) | 공구 교체 | 4h+ |\n"
+                "| `spindle_rpm` | 미추천 (직접 path 검증 부족) | 소프트웨어 명령 | 0 |\n"
+                "| **`coolant_temp`** | ✅ **v1 추천: +5%** | **절삭유 보충** | **1-2h** |\n"
             )
             st.caption(
-                "💡 **시뮬은 3 후보 모두 즉시 가능** (DoWhy `do-intervention`, 시뮬 비용 = 0). "
-                "운영자가 1개 우선 골라 시연 시간 + **실 운영 적용 비용** 절약. "
-                "`spindle_rpm` = 가장 빠른 시뮬 검증 + 즉시 적용 path → 우선 시뮬 선택."
+                "💡 **v1 인과 모델 추천**: `coolant_temp` 5% 증가 → defect 확률 ↓. "
+                "단, 실 운영 비용 (1-2h 라인 정지) 발생 — 운영자 결정 필요."
             )
 
     with col_decision:
         with st.container(border=True):
-            st.markdown("##### ✅ 운영자 결정")
-            st.success("**`spindle_rpm` ↓** 우선 시뮬")
-            st.metric("선택 근거", "실 적용 0 비용")
+            st.markdown("##### ⏸️ 운영자 결정")
+            st.warning("**보류** (적용 X)")
+            st.metric("결정 사유", "라인 가동 우선")
             st.caption("📝 maker-space-op-001 · ⏱️ 0:42")
-            st.caption("⚙️ 다음 (마커 4): `do(spindle_rpm = 7650)` 시뮬 가속")
+            st.caption("⚠️ 다음 (마커 4): **'보류 시 3시간 fast-forward'** 시뮬")
 
 
 def render_simulation_evidence() -> None:
-    """마커 4 (1:00 시뮬가속) — DoWhy counterfactual `do(spindle_rpm=7650)` 결과.
+    """마커 4 (1:00 시뮬가속) — 운영자 보류 시 3시간 fast-forward (기획서 page 7 정합).
 
-    ⚠️ 가상 시뮬 — 실 라인 변경 X. 다음 마커에서 v1 모델의 단일 path 한계 노출.
+    counterfactual `do(intervention = None)` — 보류 상태 그대로 시간 압축 → 결함 발생 시뮬.
     """
-    st.success("🎬 **시뮬레이션 가속 완료** — counterfactual `do(spindle_rpm = 7650)` (가상 시뮬, 실 라인 미적용)")
+    st.warning("🎬 **시뮬레이션 가속 — 보류 시 3시간 fast-forward**")
+    st.markdown(
+        "운영자가 v1 추천 **'보류'** 시 어떻게 되는지 시간 가속 시뮬 — "
+        "`do(intervention = None)` counterfactual, **3시간 → 1초 압축**."
+    )
 
     col_metrics, col_chart = st.columns([1, 2])
     with col_metrics:
-        st.metric("vibration_xyz", "0.8 → 0.5", delta="-38%", delta_color="inverse")
-        st.metric("thermal_drift_um", "5 → 3", delta="-40%", delta_color="inverse")
-        st.metric("defect_prob", "62% → 18%", delta="-44%p", delta_color="inverse")
-        st.caption("📊 DoWhy do-intervention (Pearl 1995) — 가상 시뮬, 실 라인은 그대로")
+        st.metric("시뮬 가속비", "3h → 1s", help="240× 압축 (DoWhy do(None) trajectory)")
+        st.metric("defect_prob 예측", "62% → 95%", delta="+33%p", delta_color="inverse")
+        st.metric("결함 발생 예상", "~45분 후", help="motor_temp 100°C SOP 임계 도달")
+        st.caption("📊 보류 trajectory — 운영자 미적용 시 결함 진행 시뮬")
 
     with col_chart:
-        metrics = ["vibration_xyz", "thermal_drift_um", "defect_prob"]
-        baseline = [0.8, 5.0, 0.62]
-        intervention = [0.5, 3.0, 0.18]
+        minutes = list(range(0, 181, 5))  # 0 ~ 180 분, 5분 간격
+        motor_temp = [85 + 0.1 * m + (0.15 * (m - 30) if m >= 30 else 0) for m in minutes]
+        defect_prob = [min(0.62 + 0.005 * m, 0.95) for m in minutes]
+
         fig = go.Figure()
-        fig.add_trace(go.Bar(name="개입 전", x=metrics, y=baseline,
-                             marker_color="#d62728",
-                             text=[f"{v}" for v in baseline], textposition="auto"))
-        fig.add_trace(go.Bar(name="개입 후 (시뮬)", x=metrics, y=intervention,
-                             marker_color="#2ca02c",
-                             text=[f"{v}" for v in intervention], textposition="auto"))
+        fig.add_trace(go.Scatter(
+            x=minutes, y=motor_temp, name="motor_temp (°C)",
+            mode="lines", line=dict(color="#d62728", width=2.5), yaxis="y",
+        ))
+        fig.add_trace(go.Scatter(
+            x=minutes, y=defect_prob, name="defect_prob 예측",
+            mode="lines", line=dict(color="#ff7f0e", width=2.5), yaxis="y2",
+        ))
+        fig.add_hline(
+            y=100, line_dash="dash", line_color="red",
+            annotation_text="SOP 임계 100°C", annotation_position="top right",
+        )
+        fig.add_vline(
+            x=45, line_dash="dot", line_color="#666",
+            annotation_text="45분 시점 → 결함 진입",
+            annotation_position="top left",
+        )
         fig.update_layout(
-            title=dict(text="counterfactual: spindle_rpm 8500 → 7650", font=dict(size=13)),
-            barmode="group", height=270,
+            title=dict(text="3시간 압축 trajectory (do(intervention = None))", font=dict(size=13)),
+            height=270,
+            xaxis=dict(title="elapsed (min)"),
+            yaxis=dict(title="motor_temp (°C)", side="left", range=[80, 115]),
+            yaxis2=dict(title="defect_prob", side="right", overlaying="y", range=[0.5, 1.0]),
             margin=dict(l=10, r=10, t=50, b=10),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         )
