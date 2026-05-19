@@ -1,0 +1,15 @@
+# prism/ 컨테이너 공통 Python deps. 현장 배포 단위 (AWS infra 없이 단일 호스트).
+# 루트 requirements.txt 는 legacy + PRISM 혼합이라 PoC 배포엔 과함 → 본 파일이 minimal set.
+
+streamlit>=1.32,<2.0
+duckdb>=0.10
+plotly>=5.18
+networkx>=3.2
+pandas>=2.0
+numpy>=1.26
+xgboost>=2.0
+scikit-learn>=1.4
+dowhy>=0.8,<0.9
+boto3>=1.34
+pydantic>=2.0
+joblib>=1.3

@@ -69,6 +69,9 @@ DE_SKILLS_LEARNING_JOURNAL.md
 프로젝트 구성될때 물리적 빈틈.md
 프로젝트 정보/
 requirements.txt
+# 단, prism/ 배포 단위 의 requirements 와 .env.example 은 fresh-clone 부팅 위해 추적
+!prism/requirements.txt
+!prism/.env.example
 terraform/tfplan
 학습자료/
 비용절감플랜/
