@@ -72,7 +72,7 @@ _MARKER_DESCRIPTIONS: dict[int, str] = {
     6:  "인과 v2 학습 — Causal Effect 정확화 (CE 0.78 → 0.71)",
     7:  "4 Domain Agent 가 동시 분석 (품질·안전·설비·생산)",
     8:  "Supervisor 가 Net Value 산정 — 최적 액션 권고",
-    9:  "강화학습 모델 재학습 완료, 정확도 0.62 → 0.91 (+47%)",
+    9:  "라이브 XGBoost 재학습 — incident #47 패턴 추가, accuracy 라이브 측정",
     10: "OEE +35% 달성, 시연 완료",
 }
 
@@ -229,7 +229,7 @@ _MARKER_SUB_KPIS: dict[int, list[tuple[str, str]]] = {
     5:  [("motor_temp", "105°C"), ("vibration", "+188%")],
     6:  [("CE 정확도", "0.78→0.71"), ("σ_max", "0.40→0.38")],
     8:  [("Net Value", "₩100M"), ("권고 강도", "강한")],
-    9:  [("정확도", "0.91"), ("개선", "+47%")],
+    9:  [("정확도", "라이브"), ("개선", "라이브 Δ")],
     10: [("OEE", "66%"), ("개선", "+35%")],
 }
 
@@ -240,6 +240,22 @@ _CANDIDATE_ACTIONS: list[str] = [
     "schedule_maintenance",  # 정비 스케줄
     "halt",                  # 즉시 정지
 ]
+
+# 마커 8 — candidate 별 spindle_rpm do-intervention 값 (standardised σ).
+# 라이브 DoWhy ATE 계산 시 Supervisor 4 Agent 입력 enrich.
+_CANDIDATE_TO_SPINDLE_INTERVENTION: dict[str, float] = {
+    "continue":             0.0,   # 변화 X
+    "schedule_maintenance": -0.3,  # 소프트 감속 + 정비 예약
+    "throttle_50pct":      -1.0,   # 1σ 감속
+    "halt":                -2.0,   # 즉시 정지 (큰 감속)
+}
+
+_CANDIDATE_LABEL_KR: dict[str, str] = {
+    "continue":             "진행 (위험 감수)",
+    "schedule_maintenance": "정비 예약",
+    "throttle_50pct":      "부하 50% 감속",
+    "halt":                "즉시 정지",
+}
 
 
 def _real_supervisor_decision(
@@ -261,6 +277,33 @@ def _real_supervisor_decision(
         alpha=alpha, beta=beta, gamma=gamma, horizon_h=horizon_h,
     ))
     return sup.negotiate_with_candidates(scenario_context, _CANDIDATE_ACTIONS)
+
+
+# ── 학습 자산화 라이브 재학습 캐시 (마커 9: 본선 라이브 retrain) ───────────────────
+
+@st.cache_resource(show_spinner="🎓 라이브 재학습 중... (5.3k row, ~2초)")
+def _get_retrain_artifact() -> dict:
+    """incident #47 패턴 추가 → 라이브 XGBoost 재학습 결과 캐시.
+
+    base (5k row) + incident (300 row 극단 outlier) → 합본 학습 → incident test set 정확도 비교.
+    시연 시작 시 1회 학습 (~2초), rerun 시 재계산 X.
+    """
+    from src.ml.local_predictor import (  # noqa: PLC0415
+        synthesize_training_data, synthesize_incident_pattern, retrain_with_incident,
+    )
+    base_df = synthesize_training_data(n=5_000, seed=2026)
+    incident_df = synthesize_incident_pattern(n=300, seed=2026)
+    new_model, before_acc, after_acc, elapsed_s = retrain_with_incident(
+        base_df, incident_df, seed=2026,
+    )
+    return {
+        "new_model": new_model,
+        "before_acc": before_acc,
+        "after_acc": after_acc,
+        "elapsed_s": elapsed_s,
+        "base_rows": len(base_df),
+        "incident_rows": len(incident_df),
+    }
 
 
 # ── XGBoost 6-class 라이브 추론 캐시 (Phase 3: 마커 1 예지경보) ───────────────────
@@ -939,6 +982,53 @@ def _production_badge(p: ProductionAgentOutput) -> str:
     return f"✅ **진행 권장** — UPH {n.throughput_uph:.0f}"
 
 
+def render_candidate_intervention_ate() -> None:
+    """마커 7/8 — 4 candidate action 별 라이브 DoWhy do(spindle_rpm) ATE 표시.
+
+    각 candidate 가 spindle_rpm 에 가하는 intervention (σ 단위) → DoWhy 라이브 ATE.
+    Supervisor 4 Agent 입력의 "실 인과 효과" 근거를 평가자에게 노출.
+    """
+    import warnings  # noqa: PLC0415
+    from src.orchestration.causal_dag import estimate_intervention_effect  # noqa: PLC0415
+    art = _get_causal_artifact()
+
+    rows = []
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for action in _CANDIDATE_ACTIONS:
+            treat = _CANDIDATE_TO_SPINDLE_INTERVENTION[action]
+            ate = estimate_intervention_effect(
+                art["model_spindle"], treatment_value=treat, control_value=0.0,
+            )
+            rows.append((action, _CANDIDATE_LABEL_KR[action], treat, ate))
+
+    # 가장 큰 음수 ATE (DEFECT 가장 많이 감소) 찾기 — Supervisor 가 참고할 후보
+    best = min(rows, key=lambda r: r[3])
+
+    st.markdown("#### 🔬 candidate 별 라이브 DoWhy do(spindle_rpm) ATE")
+    st.caption(
+        "각 candidate 가 spindle_rpm 에 가하는 do-intervention 의 DEFECT 인과 효과 — "
+        "음수가 클수록 결함 감소. **Supervisor 가 net_value 산정 시 참고하는 실 인과 근거.**"
+    )
+
+    cols = st.columns(len(rows))
+    for col, (action, label_kr, treat, ate) in zip(cols, rows):
+        is_best = (action == best[0]) and (ate < 0)
+        with col:
+            with st.container(border=True):
+                st.markdown(f"##### {'🏆 ' if is_best else ''}{label_kr}")
+                st.metric(
+                    "do(spindle_rpm)", f"{treat:+.1f}σ",
+                    help=f"action_id={action}",
+                )
+                st.metric(
+                    "ATE → DEFECT", f"{ate:+.4f}",
+                    delta=f"{'감소' if ate < 0 else '변화 X' if ate == 0 else '증가'}",
+                    delta_color="inverse" if ate < 0 else "off",
+                    help="DoWhy backdoor.linear_regression 라이브 호출 (5k row)",
+                )
+
+
 def render_4agent_outputs(action: CandidateAction) -> None:
     """4 Domain Agent 협상 — 4 컬럼 bordered container.
 
@@ -983,18 +1073,34 @@ def render_4agent_outputs(action: CandidateAction) -> None:
 
 
 def render_retrain_evidence() -> None:
-    """마커 9 (3:30 재학습) 근거 — 정확도 0.62→0.91 + Failure class 별 F1.
+    """마커 9 (3:30 재학습) — 라이브 XGBoost 재학습 + accuracy 측정.
 
-    incident #47 패턴 추가 학습 → XGBoost 6-class 모델 재학습 완료.
+    Task 2 (본선 라이브): base (5k row) + incident (300 row 극단 outlier) 합본 학습 →
+    incident test set 정확도 비교. cache_replay 아닌 실 fit() 호출.
     """
-    st.markdown("##### 🎓 재학습 결과 — incident #47 패턴 학습")
+    st.markdown("##### 🎓 라이브 재학습 결과 — incident #47 패턴 학습")
+
+    art = _get_retrain_artifact()
+    before_acc = art["before_acc"]
+    after_acc = art["after_acc"]
+    delta = after_acc - before_acc
+    delta_pct = (delta / before_acc) * 100 if before_acc > 0 else 0
 
     col_metric, col_chart = st.columns([1, 2])
     with col_metric:
-        st.metric("재학습 전 정확도", "0.62", help="incident #47 발생 시점 모델")
-        st.metric("재학습 후 정확도", "0.91", delta="+0.29 (+47%)",
-                  help="incident #47 패턴 추가 학습 후")
-        st.caption("📊 동일 결함 패턴 재발 예방, 강화학습 루프 검증")
+        st.metric(
+            "재학습 전 정확도", f"{before_acc:.4f}",
+            help=f"base {art['base_rows']} row 만 학습한 모델 — incident pattern 모름",
+        )
+        st.metric(
+            "재학습 후 정확도", f"{after_acc:.4f}",
+            delta=f"+{delta:.4f} ({delta_pct:+.1f}%)",
+            help=f"base + incident {art['incident_rows']} row 합본 학습",
+        )
+        st.caption(
+            f"🔬 라이브 XGBoost fit() 2회 비교 — {art['elapsed_s']:.2f}s "
+            f"(incident extreme outlier {art['incident_rows']} row 자산화)"
+        )
 
     with col_chart:
         class_names = ["NONE", "TWF", "HDF", "PWF", "OSF", "RNF"]
@@ -1434,6 +1540,9 @@ def main() -> None:
 
         # 마커 7~8: 4 Agent 협상 + Supervisor 결정
         elif marker_idx in (7, 8):
+            # 라이브 candidate × DoWhy do(spindle_rpm) ATE — Supervisor 입력의 인과 근거
+            render_candidate_intervention_ate()
+            st.markdown("---")
             try:
                 if _PRISM_MODE in ("demo", "live"):
                     sup_out, candidates_ordered = _real_supervisor_decision(

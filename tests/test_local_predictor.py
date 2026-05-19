@@ -40,6 +40,8 @@ from src.ml.local_predictor import (
     LABEL_NAMES,
     NUM_CLASSES,
     LocalXGBoost6Class,
+    retrain_with_incident,
+    synthesize_incident_pattern,
     synthesize_training_data,
 )
 
@@ -172,3 +174,50 @@ def test_predict_proba_timed_returns_latency(trained_model: LocalXGBoost6Class) 
     assert isinstance(ms, float)
     assert ms >= 0.0
     assert set(probs.keys()) == set(LABEL_NAMES)
+
+
+# ── 8. 학습 자산화 retrain (Task 2: 마커 9 라이브 통합) ──────────────────────
+
+def test_synthesize_incident_pattern_hdf_majority() -> None:
+    """incident pattern: HDF (label=2) 비중 80% 이상."""
+    df = synthesize_incident_pattern(n=300, seed=2026)
+    assert len(df) == 300
+    hdf_ratio = (df["failure_type"] == 2).mean()
+    assert hdf_ratio >= 0.75, f"HDF 비중 0.80 기대, got {hdf_ratio:.2f}"
+
+
+def test_synthesize_incident_pattern_extreme_coolant() -> None:
+    """incident HDF row 의 coolant_temp 는 ~4σ extreme outlier (base ~1.8σ 와 distinct)."""
+    df = synthesize_incident_pattern(n=300, seed=2026)
+    hdf_rows = df[df["failure_type"] == 2]
+    assert hdf_rows["coolant_temp"].mean() >= 3.5, (
+        f"incident HDF coolant_temp 평균 3.5σ 이상 기대, got {hdf_rows['coolant_temp'].mean():.2f}"
+    )
+
+
+def test_retrain_with_incident_improves_accuracy() -> None:
+    """base 만 학습한 모델 vs base+incident 합본 학습 → incident pattern 정확도 ↑.
+
+    학습 자산화 narrative 의 실 입증: extreme outlier 패턴은 base 모델이 misclassify,
+    incident row 추가 학습 시 정확도 명확히 ↑.
+    """
+    base = synthesize_training_data(n=1_000, seed=2026)
+    incident = synthesize_incident_pattern(n=300, seed=2026)
+    _, before_acc, after_acc, elapsed = retrain_with_incident(base, incident, seed=2026)
+    assert after_acc > before_acc, (
+        f"재학습 후 정확도가 더 높아야: before={before_acc:.4f}, after={after_acc:.4f}"
+    )
+    assert (after_acc - before_acc) >= 0.05, (
+        f"학습 효과 5%p 이상 기대: delta={after_acc - before_acc:.4f}"
+    )
+    assert elapsed > 0
+
+
+def test_retrain_with_incident_deterministic() -> None:
+    """seed=2026 → 2회 호출 동일 (before_acc, after_acc)."""
+    base = synthesize_training_data(n=1_000, seed=2026)
+    incident = synthesize_incident_pattern(n=300, seed=2026)
+    _, b1, a1, _ = retrain_with_incident(base, incident, seed=2026)
+    _, b2, a2, _ = retrain_with_incident(base, incident, seed=2026)
+    assert b1 == b2, f"before_acc 결정성 깨짐: {b1} vs {b2}"
+    assert a1 == a2, f"after_acc 결정성 깨짐: {a1} vs {a2}"

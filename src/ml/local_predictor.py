@@ -257,3 +257,97 @@ DEMO_FAULT_SCENARIO: dict[str, float] = {
     "thermal_drift": 1.4,   # thermal 상승
     "dimension_dev": 1.1,   # 치수 편차 상승
 }
+
+
+# ── 학습 자산화: incident pattern 추가 → 재학습 (마커 9 라이브 통합용) ────────────
+
+def synthesize_incident_pattern(n: int = 300, seed: int = 2026) -> pd.DataFrame:
+    """incident #47 패턴 — HDF 극단 outlier row n개 합성 (base 분포 밖).
+
+    분포: HDF 80%, NONE 20%. coolant_temp ~4.5σ extreme (base HDF 분포 ~1.8σ 와 distinct).
+    Why: base 모델이 일반 HDF 는 알지만 incident 극단 패턴은 misclassify → 재학습 효과 입증.
+    """
+    rng = np.random.default_rng(seed + 47)  # incident #47 seed offset
+    n_hdf = int(n * 0.80)
+    n_none = n - n_hdf
+
+    rows: list[dict] = []
+    # HDF — extreme coolant_temp + thermal_drift outlier (base 분포 밖)
+    tool_age     = rng.normal(0.5, 1.0, n_hdf)
+    spindle_rpm  = rng.normal(0.3, 1.0, n_hdf)
+    coolant_temp = rng.normal(4.5, 0.4, n_hdf)   # 극단 outlier (base HDF ~1.8σ 와 distinct)
+    vibration_xyz = 0.4 * tool_age + 0.6 * spindle_rpm + rng.normal(0, 0.3, n_hdf)
+    thermal_drift = 0.7 * coolant_temp + rng.normal(0, 0.3, n_hdf)
+    dimension_dev = 0.5 * vibration_xyz + 0.5 * thermal_drift + rng.normal(0, 0.2, n_hdf)
+    for i in range(n_hdf):
+        rows.append({
+            "tool_age":     float(tool_age[i]),
+            "spindle_rpm":  float(spindle_rpm[i]),
+            "coolant_temp": float(coolant_temp[i]),
+            "vibration_xyz": float(vibration_xyz[i]),
+            "thermal_drift": float(thermal_drift[i]),
+            "dimension_dev": float(dimension_dev[i]),
+            "failure_type": LABEL_MAP["HDF"],
+        })
+    # NONE — incident 시점 근처 정상 row (분포 베이스라인)
+    tool_age     = rng.normal(0.0, 1.0, n_none)
+    spindle_rpm  = rng.normal(0.0, 1.0, n_none)
+    coolant_temp = rng.normal(0.0, 1.0, n_none)
+    vibration_xyz = 0.4 * tool_age + 0.6 * spindle_rpm + rng.normal(0, 0.3, n_none)
+    thermal_drift = 0.7 * coolant_temp + rng.normal(0, 0.3, n_none)
+    dimension_dev = 0.5 * vibration_xyz + 0.5 * thermal_drift + rng.normal(0, 0.2, n_none)
+    for i in range(n_none):
+        rows.append({
+            "tool_age":     float(tool_age[i]),
+            "spindle_rpm":  float(spindle_rpm[i]),
+            "coolant_temp": float(coolant_temp[i]),
+            "vibration_xyz": float(vibration_xyz[i]),
+            "thermal_drift": float(thermal_drift[i]),
+            "dimension_dev": float(dimension_dev[i]),
+            "failure_type": LABEL_MAP["NONE"],
+        })
+    df = pd.DataFrame(rows)
+    return df.sample(frac=1, random_state=seed).reset_index(drop=True)
+
+
+def retrain_with_incident(
+    base_df: pd.DataFrame,
+    incident_df: pd.DataFrame,
+    seed: int = 2026,
+) -> tuple["LocalXGBoost6Class", float, float, float]:
+    """base + incident 합본 재학습 → (new_model, before_acc, after_acc, elapsed_s).
+
+    측정 방식:
+        train/test split (seed 고정) — incident_df 50:50 분할, test = incident 만.
+        base 만 학습한 모델 vs base+incident 합본 학습 모델의 incident pattern 정확도 비교.
+        incident 극단 outlier pattern (base 분포 밖) 이라 학습 자산화 효과 명확.
+    """
+    from sklearn.model_selection import train_test_split  # noqa: PLC0415
+
+    t0 = time.perf_counter()
+
+    train_inc, test_inc = train_test_split(incident_df, test_size=0.5, random_state=seed)
+
+    # before: base 만 학습한 모델 — incident extreme outlier 패턴 모름
+    before_model = LocalXGBoost6Class(seed=seed)
+    before_model.fit(base_df, target_col="failure_type")
+    before_acc = _accuracy(before_model, test_inc)
+
+    # after: base + incident 합본 학습 — 자산화 완료
+    train_combined = pd.concat([base_df, train_inc], ignore_index=True)
+    after_model = LocalXGBoost6Class(seed=seed)
+    after_model.fit(train_combined, target_col="failure_type")
+    after_acc = _accuracy(after_model, test_inc)
+
+    elapsed_s = time.perf_counter() - t0
+    return after_model, before_acc, after_acc, elapsed_s
+
+
+def _accuracy(model: "LocalXGBoost6Class", df: pd.DataFrame) -> float:
+    """test set 정확도 — model._model.predict 직접 호출."""
+    X = df[FEATURE_COLS].values.astype(np.float32)
+    y = df["failure_type"].values.astype(int)
+    if model._model is None:
+        raise RuntimeError("학습되지 않은 모델")
+    pred = model._model.predict(X)
+    return float(np.mean(pred == y))
