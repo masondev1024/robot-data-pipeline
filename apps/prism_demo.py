@@ -589,25 +589,36 @@ def render_predictive_alert() -> None:
 
 
 def render_human_decision() -> None:
-    """마커 3 (0:45 인간결정) — 운영자 의사결정 카드 (Human-in-the-loop)."""
-    st.info("🧑‍🔧 **운영자 검토** — risk 62% 예지 + 인과 DAG 확인 → 적용 전 시뮬 결정")
+    """마커 3 (0:45 인간결정) — 3 원인 후보 중 do-intervention 대상 선택 (mason 8차).
 
-    col_l, col_r = st.columns(2)
-    with col_l:
+    인과관계 정확 파악 위해 DAG 의 3 base cause 중 spindle_rpm 선택 → 시뮬 가속.
+    """
+    st.info("🧑‍🔧 **운영자 검토** — DAG 가 식별한 3 원인 후보 중 **do-intervention 대상 선택**")
+
+    col_candidates, col_decision = st.columns([2, 1])
+
+    with col_candidates:
         with st.container(border=True):
-            st.markdown("##### 📋 검토 요약")
+            st.markdown("##### 🎯 3 원인 후보 비교")
             st.markdown(
-                "- ⚠️ **risk 62%** HDF 예지\n"
-                "- 🔍 **σ_max 0.40** robust (Wright 1991)\n"
-                "- 🛠️ **개입 후보**: `spindle_rpm` ↓\n"
-                "- ❓ **결정**: 즉시 적용? 시뮬?"
+                "| 후보 | 통제 가능성 | 예상 효과 | 개입 비용 |\n"
+                "|---|---|---|---|\n"
+                "| `tool_age` | ❌ 단조 증가 (시간 의존) | 높음 | 정비 4h+ |\n"
+                "| **`spindle_rpm`** | ✅ **즉시 통제** | **가장 높음** | **0 (소프트웨어)** |\n"
+                "| `coolant_temp` | ⚠️ 간접 영향 | 중간 | 1-2h |\n"
             )
-    with col_r:
+            st.caption(
+                "🧠 운영자 판단: `spindle_rpm` 이 **즉시 통제 + 인과 효과 최대 + 비용 0** "
+                "→ 가장 robust 한 intervention point"
+            )
+
+    with col_decision:
         with st.container(border=True):
-            st.markdown("##### ✅ 운영자 선택")
-            st.success("🎬 **'먼저 시뮬레이션 가속'** 선택")
+            st.markdown("##### ✅ 운영자 결정")
+            st.success("**`spindle_rpm` ↓** 선택\n\ndo-intervention 진행")
+            st.metric("선택 근거", "즉시 + 비용 0")
             st.caption("📝 maker-space-op-001 · ⏱️ 0:42")
-            st.caption("⚙️ 적용 전 가상 검증 → 위험 무리한 적용 X")
+            st.caption("⚙️ 다음 (마커 4): `do(spindle_rpm = 7650)` 시뮬 가속")
 
 
 def render_simulation_evidence() -> None:
@@ -1001,11 +1012,12 @@ def render_sidebar(alpha: float, beta: float, gamma: float) -> tuple[float, floa
         status = _seed_storage_demo()
         st.markdown("---")
         st.markdown("### 📦 DuckDB In-Process")
-        st.caption(
-            f"robot_telemetry **{status['n_total']:,} rows** · {status['file_size_kb']:.1f} KB\n\n"
-            f"`{status['path']}`\n\n"
-            f"SHA256: `{status['sha_prefix']}...`"
+        st.markdown(
+            f"**{status['n_total']:,} rows** · **{status['file_size_kb']:.0f} KB**\n\n"
+            "🏭 일반 MES = 별도 DB 서버 + DBA 필요 (월 ₩수십만)\n\n"
+            "✅ PRISM = 노트북 1대 in-process · **DB 서버 0 대**"
         )
+        st.caption(f"`{status['path']}` · SHA `{status['sha_prefix']}...`")
 
         st.markdown("---")
         st.markdown("### 비용 비교")
