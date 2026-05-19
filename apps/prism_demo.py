@@ -599,24 +599,25 @@ def render_human_decision() -> None:
 
     with col_candidates:
         with st.container(border=True):
-            st.markdown("##### 🎯 3 원인 후보 비교")
+            st.markdown("##### 🎯 3 원인 후보 비교 — DoWhy 시뮬 vs 실 운영 적용")
             st.markdown(
-                "| 후보 | 통제 가능성 | 예상 효과 | 개입 비용 |\n"
+                "| 후보 | DoWhy 시뮬 | 실 운영 적용 방식 | 적용 소요 |\n"
                 "|---|---|---|---|\n"
-                "| `tool_age` | ❌ 단조 증가 (시간 의존) | 높음 | 정비 4h+ |\n"
-                "| **`spindle_rpm`** | ✅ **즉시 통제** | **가장 높음** | **0 (소프트웨어)** |\n"
-                "| `coolant_temp` | ⚠️ 간접 영향 | 중간 | 1-2h |\n"
+                "| `tool_age` | ✅ 가능 | 공구 교체 정비 | **4h+** |\n"
+                "| **`spindle_rpm`** | ✅ 가능 | **소프트웨어 명령** | **0 (즉시)** |\n"
+                "| `coolant_temp` | ✅ 가능 | 냉각수 보충/교체 | **1-2h** |\n"
             )
             st.caption(
-                "🧠 운영자 판단: `spindle_rpm` 이 **즉시 통제 + 인과 효과 최대 + 비용 0** "
-                "→ 가장 robust 한 intervention point"
+                "💡 **시뮬은 3 후보 모두 즉시 가능** (DoWhy `do-intervention`, 시뮬 비용 = 0). "
+                "운영자가 1개 우선 골라 시연 시간 + **실 운영 적용 비용** 절약. "
+                "`spindle_rpm` = 가장 빠른 시뮬 검증 + 즉시 적용 path → 우선 시뮬 선택."
             )
 
     with col_decision:
         with st.container(border=True):
             st.markdown("##### ✅ 운영자 결정")
-            st.success("**`spindle_rpm` ↓** 선택\n\ndo-intervention 진행")
-            st.metric("선택 근거", "즉시 + 비용 0")
+            st.success("**`spindle_rpm` ↓** 우선 시뮬")
+            st.metric("선택 근거", "실 적용 0 비용")
             st.caption("📝 maker-space-op-001 · ⏱️ 0:42")
             st.caption("⚙️ 다음 (마커 4): `do(spindle_rpm = 7650)` 시뮬 가속")
 
