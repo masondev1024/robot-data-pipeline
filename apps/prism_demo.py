@@ -263,6 +263,16 @@ def _real_supervisor_decision(
     return sup.negotiate_with_candidates(scenario_context, _CANDIDATE_ACTIONS)
 
 
+# ── CNC stream generator (1 instance, session 유지) ─────────────────────────────
+
+@st.cache_resource(show_spinner=False)
+def _get_cnc_generator():
+    """CNCStreamGenerator 인스턴스 1개를 세션 전체에 공유. seed=2026 고정."""
+    from src.generator.cnc_stream import CNCStreamGenerator  # noqa: PLC0415
+
+    return CNCStreamGenerator(machine_id="CNC-01", seed=2026)
+
+
 # ── DuckDB storage demo helper ───────────────────────────────────────────────────
 
 @st.cache_resource(show_spinner=False)
@@ -1139,6 +1149,62 @@ def render_sidebar(alpha: float, beta: float, gamma: float) -> tuple[float, floa
         st.markdown(f"| PRISM / 월 | **{COST_PRISM_KRW_PER_MONTH}** |")
         st.markdown(f"| MES / 년 | ~~{COST_MES_KRW_PER_YEAR}~~ |")
         st.caption("비용 -98%: 노트북 1대 in-process DuckDB + Bedrock on-demand")
+
+        # ── 🔴 LIVE CNC stream ──────────────────────────────────────────────
+        st.markdown("---")
+        st.markdown("### 🔴 LIVE CNC stream")
+
+        if "cnc_stream_running" not in st.session_state:
+            st.session_state["cnc_stream_running"] = False
+        if "cnc_t" not in st.session_state:
+            st.session_state["cnc_t"] = 0.0
+
+        stream_running: bool = st.session_state["cnc_stream_running"]
+        btn_label = "⏹ Stop stream" if stream_running else "▶ Start stream"
+        if st.button(btn_label, key="cnc_stream_toggle"):
+            st.session_state["cnc_stream_running"] = not stream_running
+            st.rerun()
+
+        if st.session_state["cnc_stream_running"]:
+            import time
+            from src.generator.cnc_stream import CNCStreamGenerator  # noqa: PLC0415
+            from src.orchestration.storage import StorageDB  # noqa: PLC0415
+
+            gen = _get_cnc_generator()
+
+            # 현재 t 에서 1s 진행
+            t = float(st.session_state["cnc_t"])
+            sample = gen.next_sample(t)
+            st.session_state["cnc_t"] = t + 1.0
+
+            # DuckDB 적재
+            db_path = _ROOT / "data" / "prism_demo.duckdb"
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            with StorageDB(str(db_path)) as db:
+                db.write_cnc([sample])
+                cnc_total = db.count("cnc_telemetry")
+
+            st.caption(f"t={t:.0f}s · 총 {cnc_total}행 적재 · machine_id={sample['machine_id']}")
+
+            # last 10s 센서 표
+            history_samples = [gen.next_sample(float(max(0.0, t - 9 + i))) for i in range(10)]
+            import pandas as pd  # noqa: PLC0415
+            df_hist = pd.DataFrame(history_samples)[
+                ["ts", "spindle_rpm", "coolant_temp", "vibration_xyz", "thermal_drift", "dimension_dev"]
+            ]
+            st.dataframe(df_hist.tail(10), use_container_width=True, hide_index=True)
+
+            # 라인 차트 (coolant_temp, vibration_xyz, thermal_drift)
+            st.line_chart(
+                df_hist[["coolant_temp", "vibration_xyz", "thermal_drift"]].reset_index(drop=True),
+                height=160,
+            )
+
+            # 1초 후 자동 갱신
+            time.sleep(1.0)
+            st.rerun()
+        else:
+            st.caption("▶ Start stream 버튼으로 라이브 스트림을 시작합니다.")
 
     return alpha_val, beta_val, gamma_val
 
