@@ -28,11 +28,11 @@ docker compose up --build
 | idx | 시각 | 라벨 | 라이브 | 핵심 |
 |---|---|---|---|---|
 | 0 | 0:00 | 정상 | — | sensor 11 stream watch |
-| 1 | 0:15 | 예지경보 risk62% | ✅ XGBoost | `predict_proba` ~1ms, HDF 1순위 |
-| 2 | 0:30 | 인과 v1 | — | DoWhy 6-Node DAG, coolant_temp +5% 추천 |
-| 3 | 0:45 | 인간결정 | — | **운영자 "보류"** (라인 가동 우선) |
-| 4 | 1:00 | 시뮬가속 | ✅ DoWhy | `do(coolant_temp=−1σ)` ATE 라이브, 3h→1s 압축 |
-| 5 | 1:15 | 불량 #47 | — | motor_temp 105°C, 보류 결정의 결과 |
+| 1 | 0:15 | 예지경보 risk62% | ✅ XGBoost | `predict_proba` ~1ms, TWF 1순위 (tool_age 18h 빠른 마모 추세) |
+| 2 | 0:30 | 인과 v1 | — | DoWhy 6-Node DAG, **공구 교체** (tool_age reset) 추천 — XGBoost 감지 변수와 통일 |
+| 3 | 0:45 | 운영자결정 | — | **운영자 "보류"** (공구 교체 4h 정지 부담) |
+| 4 | 1:00 | 시뮬가속 | ✅ DoWhy | `do(tool_age=−1σ)` ATE 라이브, 3h→1s 압축 |
+| 5 | 1:15 | 불량 #47 | — | motor_temp 105°C (TWF secondary symptom), 보류 결정의 결과 |
 | 6 | 1:30 | 인과 v2 | — | Causal Effect 재추정 CE 0.78 → 0.71 |
 | 7 | 2:15 | 4 Agent | ✅ Bedrock | 품질·안전·설비·생산 동시 분석 (cache_replay) |
 | 8 | 3:00 | Supervisor | ✅ Net Value | α/β/γ slider 라이브 → 최적 액션 권고 |
@@ -72,7 +72,7 @@ Bedrock offline 모드 (`BEDROCK_OFFLINE=true`) 로 네트워크 없이도 재�
 │   └── .env.example
 │
 ├── apps/
-│   └── prism_demo.py    ← Streamlit entry (마커 6개)
+│   └── prism_demo.py    ← Streamlit entry (마커 11개 + Operator View + V3 Enterprise Vision)
 │
 ├── src/
 │   ├── orchestration/   ← causal_dag, causal_card, supervisor, llm_cache, storage
@@ -85,7 +85,7 @@ Bedrock offline 모드 (`BEDROCK_OFFLINE=true`) 로 네트워크 없이도 재�
 ├── docs/                ← PRD, ARCHITECTURE, ADR, hackathon-prism/, UI_GUIDE
 ├── evals/               ← golden_qa, prism_qa, judge_prompt
 ├── metrics/             ← bedrock_tokens, cache_hit_rate, e2e_runtime
-├── tests/               ← PRISM 회귀 (190 tests)
+├── tests/               ← PRISM 회귀 (194 tests)
 │
 ├── presentation/        ← PPTX, 스크린샷
 ├── 학습자료/, 프로젝트 정보/
@@ -140,7 +140,7 @@ PYTHONHASHSEED=2026 python3 -m pytest -q
 
 | 명령 | 용도 |
 |---|---|
-| `python3 -m pytest -q` | PRISM 회귀 (190 tests, ~100s) |
+| `python3 -m pytest -q` | PRISM 회귀 (194 tests, ~100s) |
 | `python3 scripts/verify_demo_determinism.py` | 시연 결정론성 검증 (Bedrock 토큰 / cache hit / e2e 런타임) |
 | `python3 scripts/build_cache_replay.py` | cache_replay.jsonl 재녹화 |
 | `python3 scripts/precompute_causal_refute.py` | causal_refute_v2.json 재생성 |

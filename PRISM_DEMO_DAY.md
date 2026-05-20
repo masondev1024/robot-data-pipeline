@@ -30,7 +30,7 @@
 cd /Users/mason/Desktop/Projects/robot-data-pipeline
 git status                                    # clean working tree
 git pull origin main                          # 최신 commit 동기화
-python3 -m pytest -q                          # 회귀: 346+ PASS, 0 failed
+python3 -m pytest -q                          # 회귀: 194 PASS, 0 failed (legacy 분리 후)
 ls assets/cache_replay.jsonl                  # 51 entries
 ls presentation/prism_demo_master.mp4         # 영상 fallback 존재
 ```
@@ -65,10 +65,10 @@ PYTHONHASHSEED=2026 PRISM_MODE=demo \
 ### 12:00 — 시나리오 인젝션 5개 (mason 리허설)
 | 시점 | 시연 핵심 메시지 |
 |---|---|
-| 0:00 정상 → 0:15 예지 | "단순 임계값 X, ML 확률 62%" |
-| 0:30 인과 v1 → 0:45 인간 결정 | "DAG + 운영자 검증 + 시뮬 요청" |
-| 1:00 시뮬 가속 | "counterfactual `do(spindle_rpm=7650)` — defect 62→18%" |
-| 1:15 결함 → 1:30 DAG v2 | "예지 risk 실제 발현 → 자산화" |
+| 0:00 정상 → 0:15 예지 | "단순 임계값 X, ML 확률 62%, TWF 1순위 (tool_age 18h 빠른 마모)" |
+| 0:30 인과 v1 → 0:45 운영자 결정 | "DAG tool_age 주황 (XGBoost 감지 변수와 통일) + 공구 교체 추천 + 운영자 보류" |
+| 1:00 시뮬 가속 | "라이브 counterfactual `do(tool_age=−1σ)` — defect 62→18%" |
+| 1:15 결함 → 1:30 DAG v2 | "예지 risk 실 발현 (motor_temp 105°C, TWF secondary symptom) → coolant_temp mediator 추가 학습" |
 | 3:00 Supervisor + β slider | "Net Value 명시 협상, β 가산 시 throttle" |
 
 ### 13:00 — verify gate 5/5 PASS 확인 (D-1 에 이미 실행, 재확인)

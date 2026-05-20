@@ -35,8 +35,8 @@ MES 가 motor_temp > 90도 알람을 쏘면, 운영자는 '왜?' 를 답할 수 
 운영자가 알람을 무시하기 시작합니다. 진짜 사고를 놓치게 됩니다.
 
 PRISM 은 두 가지를 답합니다:
-첫째, ML 확률 기반 예지 — risk 62% HDF.
-둘째, 인과 DAG — 'spindle_rpm 을 7650 으로 낮추면 vibration -38%, 결함 확률 -44%포인트'."
+첫째, ML 확률 기반 예지 — risk 62% TWF (Tool Wear Failure), tool_age 18h 빠른 마모 추세.
+둘째, 인과 DAG — '공구를 교체하면 (tool_age reset) defect 확률 -44%포인트'. XGBoost 가 감지한 변수와 DoWhy 가 추천한 intervention 변수가 **동일** — 인과 일관성."
 ```
 
 ### Slide 3 (2:00 ~ 3:00) — Closed-Loop 4-step
@@ -74,7 +74,7 @@ RCA 시간이 4시간에서 24분으로 — 90% 단축됩니다."
 
 ```
 "이제 4분 라이브 시연을 보여드립니다.
-9개 마커, 15초 단위로 진행. 본선 결정성을 위해 LLM cache replay 모드.
+11개 마커, 0:00 ~ 3:45 전구간. 본선 결정성을 위해 LLM cache replay 모드.
 사전 검증된 응답으로 화면에 비결정성 없습니다.
 
 마지막으로 확장성. 동일한 인과 DAG 구조를:
@@ -101,28 +101,31 @@ RCA 시간이 4시간에서 24분으로 — 90% 단축됩니다."
 
 ### Marker 1 (0:15 예지경보)
 ```
-"ML 모델이 위험 신호를 감지했습니다. 결함 위험 62% — HDF, Heat Dissipation Failure.
+"ML 모델이 위험 신호를 감지했습니다. 결함 위험 62% — TWF, Tool Wear Failure 1순위.
+tool_age 18h 누적, 표준 200h 곡선 대비 빠른 마모 추세.
 단순 임계값 알람이 아닙니다. XGBoost 6-class softmax 확률."
 ```
 
 ### Marker 2 (0:30 인과 v1)
 ```
-"여기가 인과 분석 시작. tool_age, spindle_rpm, coolant_temp — 모두 파란색.
-원인 후보로 식별됐습니다. 단순 상관관계가 아니라 causal relationship."
+"여기가 인과 분석 시작. DAG 에서 tool_age 가 주황색 — DoWhy 인과 모델이 핵심 원인 변수로 식별.
+v1 추천 = '공구 교체' (tool_age reset).
+중요한 점: XGBoost 가 감지한 변수 (tool_age) 와 DoWhy 가 추천한 intervention 변수가 동일.
+단순 상관관계가 아니라 인과 일관성을 가진 추천."
 ```
 
-### Marker 3 (0:45 인간 결정)
+### Marker 3 (0:45 운영자 결정)
 ```
 "여기서 자율 AI 가 아닙니다. 운영자가 검토:
-'이게 진짜 원인인가? 적용 전에 먼저 시뮬해보자.' 
-Human-in-the-loop. 1인 메이커스페이스 운영자가 책임자."
+'공구 교체는 4h 라인 정지 부담. 적용 전에 먼저 시뮬해보자.'
+보류 결정 — Human-in-the-loop. 1인 메이커스페이스 운영자가 책임자."
 ```
 
 ### Marker 4 (1:00 시뮬 가속) — 핵심
 ```
-"counterfactual — do(spindle_rpm = 7650) 시뮬레이션.
-vibration -38%, thermal_drift -40%, defect_prob 62% → 18%.
-4시간 분량 시뮬을 1초에. 적용 전 검증 완료."
+"라이브 counterfactual — do(tool_age = −1σ) 시뮬레이션. 공구 교체 시나리오.
+DoWhy ATE 라이브 계산 (5k row, backdoor.linear_regression).
+defect_prob 62% → 18%. 4시간 분량 시뮬을 1초에. 적용 전 검증 완료."
 ```
 
 ### Marker 5 (1:15 결함 발생)

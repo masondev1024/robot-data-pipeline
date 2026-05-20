@@ -22,12 +22,12 @@
 | 항목 | 내용 | ADR v2 처리 |
 |---|---|---|
 | 문제 정의 | 메이커스페이스 1인 운영자 RCA 1~2h → 10s, MES $10K+/년 → $10-20/월 (-98%) | 발표 메시지에 박힘 |
-| Closed-Loop 4-step | 센서통합 → 인과 RCA → Multi-Agent 협상 → 학습 자산화 | 4분 시연 9 마커에 1:1 매핑 |
+| Closed-Loop 4-step | 센서통합 → 인과 RCA → Multi-Agent 협상 → 학습 자산화 | 4분 시연 11 마커에 1:1 매핑 |
 | Agent 구조 | Sonnet Supervisor + Haiku × 4 (품질/안전/설비/생산), ~8초 응답 | `src/orchestration/agents/` (✅ 본체 완료, 도메인 prompt 자리표시자) |
 | 인과 모델 | 6-Node DAG (`tool_age, spindle_rpm, coolant_temp → vibration_xyz, thermal_drift → dimension_dev → DEFECT`) + DoWhy intervention | ⏳ `src/orchestration/causal_dag.py` (background) |
 | 스택 | Streamlit + Plotly / Bedrock / DoWhy + NetworkX / PuLP + ONNX / DuckDB in-process | DuckDB ✅ (`storage.py`), Bedrock ✅ (`agents/`), 나머지 진행 |
 | KPI | OEE +35% / RCA -90% / Defect -50% | ADR Section 1 Drivers + 발표 슬라이드 |
-| 시연 9 마커 (15s 단위) | 0:00 정상 → 1:30 인과v2 → 3:00 Supervisor → 3:45 OEE +35% | ADR Section 5 Pre-mortem 5 + Section 7 Verification gate |
+| 시연 11 마커 (0:00~3:45) | 0:00 정상 → 0:15 예지 (TWF, tool_age 18h) → 0:30 인과v1 (공구 교체 추천) → 0:45 운영자결정 → 1:00 시뮬 do(tool_age) → 1:15 불량 → 1:30 인과v2 → 2:15 4 Agent → 3:00 Supervisor → 3:30 재학습 → 3:45 OEE +35% | ADR Section 5 Pre-mortem 5 + Section 7 Verification gate |
 
 **기획서 약점 3가지 → ADR v2 가 모두 처리**:
 1. Unobserved Confounder 노출 부재 → **Decision 3** Streamlit 사이드바 카드 + DoWhy native expander 토글 + σ_max < 0.5/1.0 임계 (Wright 1991 partial R²).
@@ -218,12 +218,23 @@ python -m scripts.verify_demo_determinism --rehearse=2026-05-21
 - code-reviewer: HIGH 3 — H1 ✅ fix, H2 (mock dead compute, 본선 후 OK), H3 (backward compat keep)
 - M5 ✅ fix — `_build_user_prompt` drift 차단 (cache miss → fallback 회귀 잠재 위험 해소)
 
-### ⏳ D-2 (5/20)
-- `/ultraqa` 9 마커 결정성 byte-equal 3회 검증
-- `/visual-verdict` UI QA
-- `/ai-slop-cleaner --review-only` 4 Agent 슬롭 점검
-- venue 네트워크 SLA 문의 (mason 외부)
-- 영상 fallback 1차 녹화 (mason, OBS Studio)
+### ✅ D-2 (5/20) 완료 — 4 commit + V3 view + narrative drift fix
+
+**OMC 자동 검증 (메인 컨텍스트)**:
+- `/ultraqa` — cross-process SHA256 3회 byte-equal (normal/fault/recover), e2e 8 PASS · cache hit 1.000 · bedrock 0 토큰
+- `/ai-slop-cleaner --review-only` — HIGH 0건, MED 6 / LOW 7 본선 후 정리 (1832줄 hot path)
+- `/visual-verdict` — score 89/pass (static audit, Playwright 부재로 도구 변경 자제)
+
+**핵심 코드 변경**:
+- `6afbf0c` XGBoost·DoWhy 변수 통일 (tool_age) + DAG 4색 신호등 (mason 19차) — `do(coolant_temp)` → `do(tool_age)`, model_tool_age 추가 학습, 8색 → 4색 회색/amber/주황/빨강
+- `9d30ca1` V3 Enterprise Vision view 구현 + IndentationError 복구 (mason 20차) — `render_enterprise_vision()` 신규, 5 layer (KDS/Airflow/Portal/Predict/Bedrock) 사진 카드
+- `6060f89` 마커 3 '인간결정' → '운영자결정' 일관 변경 (mason 21차)
+- `c04ce93` 마커 3 운영자 결정 사유 column overflow fix (mason 22차)
+
+**venue 네트워크**: mason 확인 — wifi 보장. R1 ✅ 해소.
+
+### ⏳ D-2 (5/20) 잔여 — mason 외부
+- 영상 fallback 1차 녹화 (OBS Studio) → `presentation/prism_demo_master.mp4`
 
 ### ⏳ D-1 (5/21)
 - 사람 리허설 ≥3회 (mason)
@@ -238,7 +249,7 @@ python -m scripts.verify_demo_determinism --rehearse=2026-05-21
 
 | ID | 리스크 | 상태 | 대응 |
 |---|---|---|---|
-| R1 | venue 네트워크 SLA 미확인 | ⏳ D-2 | LTE 핫스팟 백업 + `PRISM_OFFLINE=1` |
+| R1 | venue 네트워크 SLA 미확인 | ✅ | mason 확인: venue wifi 보장. + `PRISM_MODE=demo` 시 Bedrock 호출 0회 (cache replay) → offline-safe |
 | R2 | `evals/golden_qa.yaml` PRISM 부적합 | ✅ | `prism_qa.yaml` 12 case 신규 |
 | R3 | Generator RNG 잔재 | ✅ | A5 refactor (115 PASS) |
 | R4 | Streamlit 미경험 | ✅ | mason 6차 click-through 피드백 반영 (timeline/DAG 동적/마커별 액션) |
