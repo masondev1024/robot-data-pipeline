@@ -888,7 +888,8 @@ def render_human_decision() -> None:
         with st.container(border=True):
             st.markdown("##### ⏸️ 운영자 결정")
             st.warning("**보류** (공구 교체 미적용)")
-            st.metric("결정 사유", "라인 가동 우선 (4h 정지 부담)")
+            st.metric("결정 사유", "라인 가동 우선")
+            st.caption("📌 공구 교체 적용 시 4h 라인 정지 부담")
             st.caption("📝 maker-space-op-001 · ⏱️ 0:42")
             st.caption("⚠️ 다음 (마커 4): **'보류 시 3시간 fast-forward'** 시뮬")
 
