@@ -23,7 +23,7 @@ docker compose logs app | tail -20
 | 0 | 0:00 | 정상 | 센서 데이터 정상 흐름, 모든 라인 가동 중 |
 | 1 | 0:15 | 예지경보 risk62% | **라이브 XGBoost 6-class predict_proba** (TWF 1순위, tool_age 18h 누적 — 표준 200h 대비 빠른 마모) |
 | 2 | 0:30 | 인과 v1 | DoWhy 6-Node DAG 인과 추론 v1 — **공구 교체 추천 (tool_age reset)**. XGBoost 감지 변수와 통일 |
-| 3 | 0:45 | 인간결정 | **운영자 "보류"** (공구 교체 4h 정지 부담, v1 추천 미적용) |
+| 3 | 0:45 | 운영자결정 | **운영자 "보류"** (공구 교체 4h 정지 부담, v1 추천 미적용) |
 | 4 | 1:00 | 시뮬가속 | **라이브 DoWhy do(tool_age) ATE** — 3h fast-forward |
 | 5 | 1:15 | 불량 #47 | 결함 #47 실제 발생, motor_temp 105°C (TWF secondary symptom — 공구 마모로 인한 motor 부하 ↑) |
 | 6 | 1:30 | 인과 v2 | Causal Effect 재추정 CE 0.78 → 0.71 |
@@ -70,11 +70,11 @@ BEDROCK_OFFLINE=true
 
 기획서 page 7 (User Case) 정합:
 - v1 추천 = **공구 교체** (tool_age reset — XGBoost·DoWhy 감지·추천 변수 통일)
-- 인간 결정 = **"보류"** (4h 라인 정지 부담)
+- 운영자 결정 = **"보류"** (4h 라인 정지 부담)
 - 시뮬 = **3h 압축** 으로 보류 시 결함 진행 path 미리 보기 (라이브 `do(tool_age)`)
 - 결과 = **불량 #47 발생** → 인과 v2 재추정 (mediator `coolant_temp` 추가 학습, CE 0.78 → 0.71)
 
-"AI 가 옳다는 걸 시연에서 인간 결정으로 증명한다" — 4 Agent Closed-Loop 의 핵심.
+"AI 가 옳다는 걸 시연에서 운영자 결정으로 증명한다" — 4 Agent Closed-Loop 의 핵심.
 
 ## 장애 대응
 

@@ -50,7 +50,7 @@ MARKERS: list[tuple[int, str]] = [
     (0,   "0:00 정상"),
     (15,  "0:15 예지경보 risk62%"),
     (30,  "0:30 인과v1"),
-    (45,  "0:45 인간결정"),
+    (45,  "0:45 운영자결정"),
     (60,  "1:00 시뮬가속"),
     (75,  "1:15 불량 #47"),
     (90,  "1:30 인과v2"),
@@ -170,7 +170,7 @@ _MARKER_TO_SCENARIO: dict[int, str] = {
     0: "normal",   # 0:00 정상
     1: "normal",   # 0:15 예지경보
     2: "normal",   # 0:30 인과 v1
-    3: "normal",   # 0:45 인간 결정
+    3: "normal",   # 0:45 운영자 결정
     4: "normal",   # 1:00 시뮬 가속
     5: "fault",    # 1:15 불량 #47 발생
     6: "fault",    # 1:30 인과 v2
@@ -855,7 +855,7 @@ def render_predictive_alert() -> None:
 
 
 def render_human_decision() -> None:
-    """마커 3 (0:45 인간결정) — v1 추천 (공구 교체) 보류 결정 (기획서 page 7 정합).
+    """마커 3 (0:45 운영자결정) — v1 추천 (공구 교체) 보류 결정 (기획서 page 7 정합).
 
     인간 인지 한계 narrative — 4h 정지 부담으로 적용 보류, 결과는 마커 4 fast-forward 시뮬.
     XGBoost·DoWhy 추천 변수 통일 (tool_age).
