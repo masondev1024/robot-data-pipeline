@@ -387,9 +387,32 @@ src/ml/local_predictor.py:retrain_with_incident() 가 매 실행 시 XGBoost fit
 
 **연습 우선순위 (D-1 리허설)**:
 1. 5 slide 발표 4분 50초 ± 10초
-2. 시연 4분 정확 (timer 옆에 두기)
-3. β slider 시연 timing — marker 8 도착 후 5초 안
-4. Q&A 30초 안에 답변 (timing 연습)
+2. 시연 **7분 03초 ± 10초** (timer 옆에 두기, cumulative 표 기준)
+3. M0 120s 안에 사이드바 2 expander 클릭 + 멘트 전부 마무리
+4. β slider 시연 timing — marker 8 도착 후 5초 안
+5. Q&A 30초 안에 답변 (timing 연습)
+
+---
+
+## 📊 라이브 수치 reference (녹화 검증용)
+
+> **mason narration ↔ 화면 실제 값 cross-check 표** — 녹화 시 화면에 보이는 값과
+> 멘트 숫자가 정합하는지 사전 확인용.
+
+| 마커 | narration 표현 | 실제 화면 값 (라이브) | 출처 |
+|---|---|---|---|
+| M0 사이드바 카드1 | "σ_max 0.40 robust" | σ_max=0.4000, "robust" badge | `assets/causal_refute_v2.json` |
+| M0 사이드바 카드1 [자세히] | "4 Refuter 검증 전부 통과" | 4 `Refute:` 블록 (Placebo / Random Common Cause / Data Subset / σ_max) | `assets/causal_refute_v2.json` raw_print |
+| M1 예지경보 | "결함 위험 62%" | XGBoost predict_proba TWF 클래스 hover (라이브) | `LocalXGBoost6Class.predict_proba` |
+| M4 시뮬 | "defect_prob 62% → 18%" / "ATE Δ" | 라이브 DoWhy `do(tool_age=-1σ)` ATE Δ (5k row, 0.6s) | `compute_intervention_ate()` |
+| M8 Supervisor β=1.0 | "continue, +X억" | Net Value KRW 메트릭 hover | cache_replay (recovery scenario) |
+| M8 Supervisor β=2.0 | "throttle_50pct 로 권고가 바뀝니다" | action_id 자동 변경 | Supervisor 라이브 재계산 |
+| **M9 재학습** | "0.81 → 0.97, +20%" | **0.8067 → 0.9667 (+19.8%)** 라이브 fit() 1.76s | `retrain_with_incident()` |
+| **M9 재학습** | "HDF F1 +6%p" | HDF F1 0.695 → 0.752 (+5.7%p) | `_per_class_f1()` |
+| **M10 OEE** | "0.34 → 0.67, +32%p" | OEE 34.1% → 66.5%, delta `+32.4%p (절대)` | `render_oee_evidence` |
+| M10 비용 | "연 24만원 vs MES 천만원, -98%" | ₩240,000 / ₩10,000,000 메트릭 | `render_cost_impact` |
+
+**규칙**: 화면 숫자가 위 표와 다르면 → 코드/asset drift 확인 후 재시작 + narration 매번 검증.
 
 ---
 

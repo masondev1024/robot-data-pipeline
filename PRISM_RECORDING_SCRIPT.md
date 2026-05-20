@@ -232,25 +232,32 @@ PYTHONHASHSEED=2026 PRISM_MODE=demo \
 
 ### Marker 9 — 재학습 (6:03 ~ 6:25, 22s)
 
-화면 변화: 라이브 incident test 정확도 0.81 → 0.97 + per-class F1 chart (HDF +6%p) + feature importance 변화 (motor_temp_max 0.18 → 0.31).
+화면 변화: 라이브 incident test 정확도 **0.8067 → 0.9667 (+19.8%)** + per-class F1 chart (HDF 0.695 → 0.752 +5.7%p) + feature importance 변화 (motor_temp_max 0.18 → 0.31).
+
+> ⚠️ **앱 시작 시 cache_resource 가 cold 면 첫 M9 진입에 spinner ~2s**.
+> 녹화 전 한 번 M9 까지 navigation 해서 cache warm 시키고 → 처음으로 reset → take.
 
 | cum_t | 액션 | 화면 포커스 |
 |---|---|---|
-| 6:03~6:13 | 🎤 "인시던트 패턴 자동 학습 — incident test 정확도 0.81 → 0.97, 20% 향상. 라이브 XGBoost fit() 1.76s." / 👆 cursor 정확도 metric hover | live accuracy |
-| 6:13~6:23 | 🎤 "HDF F1 +6%p — incident extreme outlier 패턴이 모델 결정 트리에 흡수됐습니다." / 👀 cursor feature importance (motor_temp_max 0.18→0.31 강조) | feature importance |
+| 6:03~6:08 | 화면 안정화 wait (cache warm 가정, instant render) | F1 chart + metric 형성 |
+| 6:08~6:18 | 🎤 "인시던트 패턴 자동 학습 — incident test 정확도 0.81 → 0.97, 20% 향상. 라이브 XGBoost fit() 1.76s." / 👆 cursor `재학습 후 정확도 0.9667` metric + delta `+0.16 (+19.8%)` hover | live accuracy metric |
+| 6:18~6:23 | 🎤 "HDF F1 +6%p — incident extreme outlier 패턴이 모델 결정 트리에 흡수됐습니다." / 👀 cursor F1 chart HDF bar (재학습 전 0.69 / 후 0.75) hover, 그 다음 feature importance motor_temp_max 0.18→0.31 카드 | F1 chart + feature importance |
 | **6:25** | **👆 클릭: `Next ▶`** | M10 진입 |
+
+> 💡 **선택**: 6:23~6:25 사이에 **"🔄 재학습 실행 (라이브)" 버튼 클릭** → 스피너 2s →
+> 같은 결과 재현 (결정성 증거). M10 진입이 6:27 로 살짝 밀리지만 학술 평가자에게 강한 신호.
 
 ---
 
 ### Marker 10 — ⭐ OEE + 클로징 (6:25 ~ 7:03, 38s)
 
-화면 변화: render_oee_evidence (Nakajima 표준) + render_closed_loop_summary + render_cost_impact.
+화면 변화: render_oee_evidence (Nakajima 표준 — OEE 34.1% → 66.5%, delta `+32.4%p (절대)`) + render_closed_loop_summary (재학습 정확도 0.97 카드) + render_cost_impact.
 
 | cum_t | 액션 | 화면 포커스 |
 |---|---|---|
-| 6:25~6:35 | 🎤 "최종 OEE 0.34 → 0.67, +32%p Nakajima 절대 표준. 가용·성능·품질 모두 개선." / 👆 cursor OEE evidence 카드 hover, 3 sub-metric 차례로 | OEE evidence |
-| 6:35~6:50 | 🎤 "비용 임팩트: 연 24만원 PRISM vs MES 천만원 — 98% 감소." / 👆 cursor cost_impact 카드 hover, `-98%` 강조 | 비용 카드 |
-| 6:50~7:00 | 🎤 "1인 메이커스페이스가 엔터프라이즈급 RCA + 인과 추론을 활용합니다." / 👀 cursor closed_loop_summary 카드 전체 sweep | closed-loop 카드 |
+| 6:25~6:35 | 🎤 "최종 OEE 0.34 → 0.67, +32%p Nakajima 절대 표준. 가용·성능·품질 모두 개선." / 👆 cursor OEE evidence 카드 hover, 3 sub-bar (가용 0.75→0.85 / 성능 0.70→0.85 / 품질 0.65→0.92) 차례로 | OEE evidence (Nakajima 1989) |
+| 6:35~6:50 | 🎤 "비용 임팩트: 연 24만원 PRISM vs MES 천만원 — 98% 감소." / 👆 cursor cost_impact 카드 `-97.6%` delta + `연간 절감 ₩9,760,000+` 메트릭 hover | 비용 카드 |
+| 6:50~7:00 | 🎤 "1인 메이커스페이스가 엔터프라이즈급 RCA + 인과 추론을 활용합니다." / 👀 cursor closed_loop_summary 4카드 (센서통합/인과RCA/Multi-Agent/학습자산화) 좌→우 sweep | closed-loop 4카드 |
 | 7:00~7:03 | 🎤 "시연 끝났습니다. 질문 받겠습니다." / 👀 cursor 화면 상단 PRISM 헤더로 복귀 | 헤더 |
 | **7:03** | 녹화 정지 또는 fade-out 추가 take | end |
 
