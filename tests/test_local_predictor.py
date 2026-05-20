@@ -203,7 +203,9 @@ def test_retrain_with_incident_improves_accuracy() -> None:
     """
     base = synthesize_training_data(n=1_000, seed=2026)
     incident = synthesize_incident_pattern(n=300, seed=2026)
-    _, before_acc, after_acc, elapsed = retrain_with_incident(base, incident, seed=2026)
+    _, before_acc, after_acc, elapsed, before_f1, after_f1 = retrain_with_incident(
+        base, incident, seed=2026,
+    )
     assert after_acc > before_acc, (
         f"재학습 후 정확도가 더 높아야: before={before_acc:.4f}, after={after_acc:.4f}"
     )
@@ -211,13 +213,16 @@ def test_retrain_with_incident_improves_accuracy() -> None:
         f"학습 효과 5%p 이상 기대: delta={after_acc - before_acc:.4f}"
     )
     assert elapsed > 0
+    assert len(before_f1) == 6 and len(after_f1) == 6, "6-class F1 list 길이 6"
 
 
 def test_retrain_with_incident_deterministic() -> None:
-    """seed=2026 → 2회 호출 동일 (before_acc, after_acc)."""
+    """seed=2026 → 2회 호출 동일 (before_acc, after_acc, F1)."""
     base = synthesize_training_data(n=1_000, seed=2026)
     incident = synthesize_incident_pattern(n=300, seed=2026)
-    _, b1, a1, _ = retrain_with_incident(base, incident, seed=2026)
-    _, b2, a2, _ = retrain_with_incident(base, incident, seed=2026)
+    _, b1, a1, _, bf1_1, af1_1 = retrain_with_incident(base, incident, seed=2026)
+    _, b2, a2, _, bf1_2, af1_2 = retrain_with_incident(base, incident, seed=2026)
     assert b1 == b2, f"before_acc 결정성 깨짐: {b1} vs {b2}"
     assert a1 == a2, f"after_acc 결정성 깨짐: {a1} vs {a2}"
+    assert bf1_1 == bf1_2, "before_f1 결정성 깨짐"
+    assert af1_1 == af1_2, "after_f1 결정성 깨짐"

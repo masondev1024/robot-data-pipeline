@@ -314,33 +314,39 @@ def retrain_with_incident(
     base_df: pd.DataFrame,
     incident_df: pd.DataFrame,
     seed: int = 2026,
-) -> tuple["LocalXGBoost6Class", float, float, float]:
-    """base + incident 합본 재학습 → (new_model, before_acc, after_acc, elapsed_s).
+) -> tuple["LocalXGBoost6Class", float, float, float, list[float], list[float]]:
+    """base + incident 합본 재학습 → (new_model, before_acc, after_acc, elapsed_s, before_f1, after_f1).
 
     측정 방식:
-        train/test split (seed 고정) — incident_df 50:50 분할, test = incident 만.
-        base 만 학습한 모델 vs base+incident 합본 학습 모델의 incident pattern 정확도 비교.
-        incident 극단 outlier pattern (base 분포 밖) 이라 학습 자산화 효과 명확.
+        - incident_df 50:50 split → train_inc / test_inc
+        - base_df 80:20 split → train_base / test_base (6-class balanced)
+        - **headline accuracy**: test_inc 전용 — "extreme outlier pattern 학습 여부"
+        - **per-class F1**: test_base + test_inc 합본 — 6-class 균형 평가
     """
+    from sklearn.metrics import f1_score  # noqa: PLC0415
     from sklearn.model_selection import train_test_split  # noqa: PLC0415
 
     t0 = time.perf_counter()
 
     train_inc, test_inc = train_test_split(incident_df, test_size=0.5, random_state=seed)
+    train_base, test_base = train_test_split(base_df, test_size=0.2, random_state=seed)
+    test_combined = pd.concat([test_base, test_inc], ignore_index=True)
 
-    # before: base 만 학습한 모델 — incident extreme outlier 패턴 모름
+    # before: base train 만 (incident extreme outlier 패턴 모름)
     before_model = LocalXGBoost6Class(seed=seed)
-    before_model.fit(base_df, target_col="failure_type")
+    before_model.fit(train_base, target_col="failure_type")
     before_acc = _accuracy(before_model, test_inc)
+    before_f1 = _per_class_f1(before_model, test_combined)
 
-    # after: base + incident 합본 학습 — 자산화 완료
-    train_combined = pd.concat([base_df, train_inc], ignore_index=True)
+    # after: base + incident 합본 train (자산화 완료)
+    train_combined_train = pd.concat([train_base, train_inc], ignore_index=True)
     after_model = LocalXGBoost6Class(seed=seed)
-    after_model.fit(train_combined, target_col="failure_type")
+    after_model.fit(train_combined_train, target_col="failure_type")
     after_acc = _accuracy(after_model, test_inc)
+    after_f1 = _per_class_f1(after_model, test_combined)
 
     elapsed_s = time.perf_counter() - t0
-    return after_model, before_acc, after_acc, elapsed_s
+    return after_model, before_acc, after_acc, elapsed_s, before_f1, after_f1
 
 
 def _accuracy(model: "LocalXGBoost6Class", df: pd.DataFrame) -> float:
@@ -351,3 +357,15 @@ def _accuracy(model: "LocalXGBoost6Class", df: pd.DataFrame) -> float:
         raise RuntimeError("학습되지 않은 모델")
     pred = model._model.predict(X)
     return float(np.mean(pred == y))
+
+
+def _per_class_f1(model: "LocalXGBoost6Class", df: pd.DataFrame) -> list[float]:
+    """6-class per-class F1 list — order [NONE,TWF,HDF,PWF,OSF,RNF]."""
+    from sklearn.metrics import f1_score  # noqa: PLC0415
+    X = df[FEATURE_COLS].values.astype(np.float32)
+    y = df["failure_type"].values.astype(int)
+    if model._model is None:
+        raise RuntimeError("학습되지 않은 모델")
+    pred = model._model.predict(X)
+    f1 = f1_score(y, pred, labels=list(range(NUM_CLASSES)), average=None, zero_division=0)
+    return [float(v) for v in f1]

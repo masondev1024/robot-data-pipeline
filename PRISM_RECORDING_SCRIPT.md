@@ -71,7 +71,7 @@ PYTHONHASHSEED=2026 PRISM_MODE=demo \
 | M6 | 4:12 | 4:40 | 28s | 인과 v2 | DAG color 변화 |
 | M7 | 4:40 | 5:18 | 38s | ⭐ 4 Agent | Bedrock latency caption |
 | M8 | 5:18 | 6:03 | 45s | 🔑 β slider | **slider 1.0 → 2.0 → 5.0** |
-| M9 | 6:03 | 6:25 | 22s | 재학습 | F1 0.62→0.91 evidence |
+| M9 | 6:03 | 6:25 | 22s | 재학습 | 라이브 0.81→0.97 evidence |
 | M10 | 6:25 | 7:03 | 38s | OEE+closing | KPI 4장 zoom + 비용 카드 |
 
 ---
@@ -232,12 +232,12 @@ PYTHONHASHSEED=2026 PRISM_MODE=demo \
 
 ### Marker 9 — 재학습 (6:03 ~ 6:25, 22s)
 
-화면 변화: F1 0.62 → 0.91 evidence + feature importance 변화 차트 (motor_temp_max 0.18 → 0.31).
+화면 변화: 라이브 incident test 정확도 0.81 → 0.97 + per-class F1 chart (HDF +6%p) + feature importance 변화 (motor_temp_max 0.18 → 0.31).
 
 | cum_t | 액션 | 화면 포커스 |
 |---|---|---|
-| 6:03~6:13 | 🎤 "인시던트 패턴 자동 학습 — 정확도 0.62 → 0.91, 47% 향상." / 👆 cursor F1 evidence 카드 / 메트릭 hover | F1 evidence |
-| 6:13~6:23 | 🎤 "6-class F1 모두 개선. 결함이 모델 자산으로 흡수됐습니다." / 👀 cursor feature importance bar chart (motor_temp_max 0.31 강조) | feature importance |
+| 6:03~6:13 | 🎤 "인시던트 패턴 자동 학습 — incident test 정확도 0.81 → 0.97, 20% 향상. 라이브 XGBoost fit() 1.76s." / 👆 cursor 정확도 metric hover | live accuracy |
+| 6:13~6:23 | 🎤 "HDF F1 +6%p — incident extreme outlier 패턴이 모델 결정 트리에 흡수됐습니다." / 👀 cursor feature importance (motor_temp_max 0.18→0.31 강조) | feature importance |
 | **6:25** | **👆 클릭: `Next ▶`** | M10 진입 |
 
 ---

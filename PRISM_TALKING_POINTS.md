@@ -219,8 +219,9 @@ DAG v2 로 자동 업데이트. 이게 4단계 학습 자산화의 시작."
 
 ### Marker 9 (3:30 재학습)
 ```
-"인시던트 패턴 자동 학습 — 정확도 0.62 → 0.91, 47% 향상.
-6-class F1 모두 개선. 결함이 모델 자산으로 흡수됐습니다."
+"인시던트 패턴 자동 학습 — incident test 정확도 0.81 → 0.97, **+20% 라이브 측정값**.
+HDF F1 0.69 → 0.75 (+6%p) — incident extreme outlier 패턴이 모델 자산으로 흡수됐습니다.
+화면 숫자는 매번 실행 시 XGBoost fit() 1.76s 라이브 측정 — 사전 캐시 아닙니다."
 ```
 
 ### Marker 10 (3:45 OEE)
@@ -259,7 +260,7 @@ Haiku 일 비용 약 50센트, Sonnet 약 30센트 → 월 25달러, 연 300달�
 
 ### Q3: "RUL 추정 정확도는?"
 ```
-"AI4I 2020 데이터셋 기준 6-class XGBoost, F1 평균 0.62 → 재학습 후 0.91.
+"AI4I 2020 기반 합성 데이터 (5k base + 300 incident outlier), incident test 정확도 0.81 → 0.97 (+20%).
 incident #47 패턴이 motor_temp_max feature 의 importance 를 0.18 → 0.31 로 끌어올림.
 HDF 가 1~2일 내 발생 위험으로 추정되면 즉시 정비.
 실제 maker space 환경에서는 sensor 가 11개 → AI4I 의 5개 변수보다 더 robust."
@@ -353,21 +354,22 @@ DAG 는 변하지 않습니다. 데이터 플로우 인프라만 scale-out."
 실 운영은 더 단순합니다."
 ```
 
-### Q10: "incident #47 학습 0.62→0.91 이 실제 재학습?"
+### Q10: "incident #47 학습 0.81→0.97 이 실제 재학습?"
 ```
-"네, 실제 재학습입니다.
-src/ml/local_predictor.py 에 라이브 재학습 로직이 있습니다.
+"네, 실제 라이브 재학습입니다.
+src/ml/local_predictor.py:retrain_with_incident() 가 매 실행 시 XGBoost fit() 2회 호출.
 
 프로세스:
-1. incident #47 (결함 발생 event) 를 anomaly row 로 적재.
-2. 동일 시그니처 incident 100개+ 수집하여 training set 확장.
-3. XGBoost.fit() 재실행 — new model 출력.
-4. F1 0.62 → 0.91 (Marker 9 시연).
+1. base 5,000 row (AI4I 합성) 80:20 split — train_base, test_base.
+2. incident #47 패턴 300 row (HDF extreme outlier) 50:50 split — train_inc, test_inc.
+3. before model: train_base 만 fit → test_inc 정확도 0.81 (incident 패턴 모름).
+4. after model: train_base + train_inc fit → test_inc 정확도 0.97 (+20%).
+5. per-class F1: test_base + test_inc 합본에서 측정 — HDF +6%p.
 
 검증:
-- 기존 모델 (.pkl 버전) 가 baseline.
-- 신규 재학습 model (.pkl 저장) 가 0.91 검증.
-- 두 모델 byte-equal 재현 가능 (random seed 고정).
+- elapsed 1.76s — 매번 실제 fit() (캐시 replay 아님).
+- seed=2026 고정 → byte-equal 결정성 보장.
+- "재학습 실행 (라이브)" 버튼 = cache clear + 재fit() → 같은 결과 (결정성 증거).
 
 본선 시연 시 Marker 9 에서 재학습 모델을 **라이브 호출**
 (cache replay 아님, 실제 모델 load → evaluate)."

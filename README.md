@@ -37,7 +37,7 @@ docker compose up --build
 | 6 | 1:30 | 인과 v2 | — | Causal Effect 재추정 CE 0.78 → 0.71 |
 | 7 | 2:15 | 4 Agent | ✅ Bedrock | 품질·안전·설비·생산 동시 분석 (cache_replay) |
 | 8 | 3:00 | Supervisor | ✅ Net Value | α/β/γ slider 라이브 → 최적 액션 권고 |
-| 9 | 3:30 | 재학습 0.62→0.91 | — | 강화학습 모델 재학습 (+47%) |
+| 9 | 3:30 | 재학습 0.81→0.97 | ✅ 라이브 fit() | 라이브 XGBoost 재학습 측정값 (+20%) |
 | 10 | 3:45 | OEE +35% | — | Closed-Loop 요약 + 비용 임팩트 |
 
 라이브 wiring 4개 (1·4·7·8) + 정적 narrative 7개 → 동작 검증 + 시연 결정론성 양립.

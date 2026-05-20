@@ -56,7 +56,7 @@ MARKERS: list[tuple[int, str]] = [
     (90,  "1:30 인과v2"),
     (135, "2:15 4 Agent"),
     (180, "3:00 Supervisor"),
-    (210, "3:30 재학습 0.62→0.91"),
+    (210, "3:30 재학습 0.81→0.97"),
     (225, "3:45 OEE +35%"),
 ]
 TOTAL_SECONDS = 225  # 3:45
@@ -183,7 +183,7 @@ _MARKER_TO_SCENARIO: dict[int, str] = {
     6: "fault",    # 1:30 인과 v2
     7: "fault",    # 2:15 4 Agent 협상
     8: "fault",    # 3:00 Supervisor 결정
-    9: "recover",  # 3:30 재학습 0.62→0.91
+    9: "recover",  # 3:30 재학습 (라이브 측정값은 _get_retrain_artifact)
     10: "recover", # 3:45 OEE +35%
 }
 
@@ -284,7 +284,7 @@ def _get_retrain_artifact() -> dict:
     )
     base_df = synthesize_training_data(n=5_000, seed=2026)
     incident_df = synthesize_incident_pattern(n=300, seed=2026)
-    new_model, before_acc, after_acc, elapsed_s = retrain_with_incident(
+    new_model, before_acc, after_acc, elapsed_s, before_f1, after_f1 = retrain_with_incident(
         base_df, incident_df, seed=2026,
     )
     return {
@@ -292,6 +292,8 @@ def _get_retrain_artifact() -> dict:
         "before_acc": before_acc,
         "after_acc": after_acc,
         "elapsed_s": elapsed_s,
+        "before_f1": before_f1,
+        "after_f1": after_f1,
         "base_rows": len(base_df),
         "incident_rows": len(incident_df),
     }
@@ -1198,8 +1200,8 @@ def render_retrain_evidence() -> None:
 
     with col_chart:
         class_names = ["NONE", "TWF", "HDF", "PWF", "OSF", "RNF"]
-        before_f1 = [0.85, 0.45, 0.50, 0.60, 0.55, 0.65]
-        after_f1  = [0.96, 0.88, 0.93, 0.90, 0.85, 0.92]
+        before_f1 = art["before_f1"]
+        after_f1  = art["after_f1"]
         fig = go.Figure()
         fig.add_trace(go.Bar(name="재학습 전", x=class_names, y=before_f1,
                              marker_color="#aec7e8",
@@ -1266,6 +1268,11 @@ def render_closed_loop_summary() -> None:
     """마커 10 신규 — PRISM Closed-Loop 4-step 가치 요약 (발표 메시지)."""
     st.markdown("##### 🔄 PRISM Closed-Loop 4-step — 완주 시간 3:45")
 
+    art = _get_retrain_artifact()
+    before_acc = art["before_acc"]
+    after_acc = art["after_acc"]
+    delta_pct = ((after_acc - before_acc) / before_acc * 100) if before_acc > 0 else 0
+
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         with st.container(border=True):
@@ -1285,8 +1292,8 @@ def render_closed_loop_summary() -> None:
     with c4:
         with st.container(border=True):
             st.markdown("##### 🎓 ④ 학습 자산화")
-            st.metric("재학습 정확도", "0.91", delta="+47%")
-            st.caption("incident #47 → DAG v2 + 모델 갱신")
+            st.metric("재학습 정확도", f"{after_acc:.2f}", delta=f"{delta_pct:+.0f}%")
+            st.caption(f"incident #47 라이브 fit() · {before_acc:.2f}→{after_acc:.2f}")
 
 
 def render_cost_impact() -> None:
@@ -1964,7 +1971,10 @@ def main() -> None:
 
         # 마커 9 재학습 / 마커 10 OEE final
         if marker_idx >= 9:
-            st.success("🎓 재학습: 0.62 → 0.91 (+47%)")
+            _art = _get_retrain_artifact()
+            _b, _a = _art["before_acc"], _art["after_acc"]
+            _d = ((_a - _b) / _b * 100) if _b > 0 else 0
+            st.success(f"🎓 재학습: {_b:.2f} → {_a:.2f} ({_d:+.0f}%)")
         if marker_idx >= 10:
             st.success("🏭 OEE +35% 달성")
 

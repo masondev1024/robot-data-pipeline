@@ -95,7 +95,7 @@ python3 scripts/verify_demo_determinism.py --rehearse=2026-05-22
 - [ ] 예상 질문 5개 답변 연습 (30초 이내):
   1. "왜 DoWhy? 어떻게 시연 결정성 보장?" → "Triple Insurance: 시드 + cache replay + 영상 fallback"
   2. "Bedrock 비용 vs MES?" → "₩240/년 vs ₩10M+/년 = -98%"
-  3. "RUL 추정 정확도?" → "AI4I 6-class, F1 0.62 → 0.91 재학습 (+47%)"
+  3. "RUL 추정 정확도?" → "라이브 XGBoost fit(), incident test 정확도 0.81 → 0.97 (+20%)"
   4. "확장성?" → "동일 DAG 구조 food/logistics/semicon transfer 가능"
   5. "Confounder?" → "σ_max=0.40 robust (Wright 1991 partial R²)"
 

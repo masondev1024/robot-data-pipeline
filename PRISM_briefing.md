@@ -32,7 +32,7 @@
 **기획서 약점 3가지 → ADR v2 가 모두 처리**:
 1. Unobserved Confounder 노출 부재 → **Decision 3** Streamlit 사이드바 카드 + DoWhy native expander 토글 + σ_max < 0.5/1.0 임계 (Wright 1991 partial R²).
 2. 협상 trade-off 함수 모호 → **Decision 1** Single-Scalar Net Value (KRW): `net_value = throughput_gain − α·defect_loss − β·safety_loss − γ·rul_loss`. β default = 1e8 KRW (slider 노출, Synthesis 1).
-3. 재학습 0.62→0.91 시각화 부재 → D-3 closed-loop 통합 단계의 v1/v2 toggle 버튼.
+3. 재학습 0.81→0.97 시각화 부재 → D-3 closed-loop 통합 단계의 v1/v2 toggle 버튼.
 
 ---
 
