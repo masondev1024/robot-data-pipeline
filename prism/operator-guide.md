@@ -14,7 +14,8 @@ docker compose logs app | tail -20
 
 브라우저 접속: <http://localhost:8501>
 콘솔 상단 "PRISM — Predictive Real-time Intelligence for Smart Manufacturing"
-헤더 + KPI 카드 4장(OEE/RCA/Defect/비용) 이 보이면 정상.
+헤더 + KPI 카드 4장(OEE/RCA/Defect/비용) + 그 아래 **🏭 10대 CNC fleet 라이브 모니터링**
+fact line ("현재 incident CNC-01 · 정상 가동 9대") 가 보이면 정상.
 
 ## 시연 timeline (apps/prism_demo.py MARKERS 와 일치)
 

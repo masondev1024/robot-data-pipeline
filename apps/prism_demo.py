@@ -61,6 +61,13 @@ MARKERS: list[tuple[int, str]] = [
 ]
 TOTAL_SECONDS = 225  # 3:45
 
+# CNC fleet (시연 narrative 는 incident 1대 중심, 9대 는 정상 가동 배경 fact).
+# 기획서 "스마트 공장" 의미 충족 + V3 enterprise scale-out 의 정량 anchor.
+FLEET_SIZE = 10
+FLEET_MACHINE_IDS: list[str] = [f"CNC-{i:02d}" for i in range(1, FLEET_SIZE + 1)]
+INCIDENT_MACHINE_ID = "CNC-01"  # narrative 의 단일 incident 머신
+HEALTHY_MACHINE_IDS: list[str] = [m for m in FLEET_MACHINE_IDS if m != INCIDENT_MACHINE_ID]
+
 # 각 마커별 한국어 1줄 설명 (mason 피드백: 단계 metric 아래 caption)
 _MARKER_DESCRIPTIONS: dict[int, str] = {
     0:  "센서 데이터 정상 흐름, 모든 라인 가동 중",
@@ -345,24 +352,102 @@ def _get_cnc_generator():
     """CNCStreamGenerator 인스턴스 1개를 세션 전체에 공유. seed=2026 고정."""
     from src.generator.cnc_stream import CNCStreamGenerator  # noqa: PLC0415
 
-    return CNCStreamGenerator(machine_id="CNC-01", seed=2026)
+    return CNCStreamGenerator(machine_id=INCIDENT_MACHINE_ID, seed=2026)
 
 
 # ── DuckDB storage demo helper ───────────────────────────────────────────────────
 
+def _incident_cnc_row(sec: int, base_ts, tool_age_h0: float = 17.8) -> dict:
+    """INCIDENT_MACHINE_ID 의 100s sensor 타임라인 row 1개.
+
+    0-59s 정상 (tool_age 빠른 마모 추세), 60-89s fault (incident #47),
+    90-99s recover. 기존 timeline 과 비트레벨 동일.
+    """
+    from datetime import timedelta  # noqa: PLC0415
+    ts = base_ts + timedelta(seconds=sec)
+    tool_age = tool_age_h0 + 0.005 * sec  # 정상 추세 + 누적
+    spindle_rpm = 8500.0 + (sec % 3 - 1) * 30
+    if sec < 60:
+        coolant = 22.0 + (sec % 5) * 0.1
+        vibration = 0.8 + (sec % 3) * 0.05
+        thermal = 5.0 + (sec % 4) * 0.2
+        dim_dev = 2.0 + (sec % 3) * 0.1
+        defect = False
+    elif sec < 90:
+        coolant = 22.0 + (sec - 60) * 0.2
+        vibration = 0.8 + (sec - 60) * 0.05
+        thermal = 5.0 + (sec - 60) * 0.5
+        dim_dev = 2.0 + (sec - 60) * 0.4
+        defect = (sec >= 75)
+    else:
+        coolant = 28.0 - (sec - 90) * 0.4
+        vibration = 2.3 - (sec - 90) * 0.12
+        thermal = 20.0 - (sec - 90) * 1.2
+        dim_dev = 14.0 - (sec - 90) * 1.0
+        defect = False
+    return {
+        "ts": ts,
+        "machine_id": INCIDENT_MACHINE_ID,
+        "tool_age": tool_age,
+        "spindle_rpm": spindle_rpm,
+        "coolant_temp": coolant,
+        "vibration_xyz": vibration,
+        "thermal_drift": thermal,
+        "dimension_dev": dim_dev,
+        "defect": defect,
+    }
+
+
+def _healthy_cnc_row(sec: int, machine_id: str, machine_index: int, base_ts) -> dict:
+    """배경 fact 용 정상 가동 머신 sensor row 1개.
+
+    machine_index (1-base) 로 baseline 미세 변동 — 동일 fleet 인데 모두 똑같으면
+    부자연스러움. tool_age baseline 만 머신별 다르고 fault phase 없음.
+    """
+    from datetime import timedelta  # noqa: PLC0415
+    ts = base_ts + timedelta(seconds=sec)
+    # 머신별 tool_age baseline (8h ~ 16h, INCIDENT_MACHINE_ID 가 가장 마모됨)
+    tool_age_h0 = 8.0 + (machine_index % 5) * 1.5
+    tool_age = tool_age_h0 + 0.005 * sec
+    spindle_rpm = 8500.0 + (machine_index * 5) + (sec % 3 - 1) * 20
+    coolant = 22.0 + (machine_index % 4) * 0.15 + (sec % 5) * 0.05
+    vibration = 0.7 + (machine_index % 3) * 0.05 + (sec % 3) * 0.03
+    thermal = 4.5 + (machine_index % 4) * 0.3 + (sec % 4) * 0.1
+    dim_dev = 1.8 + (machine_index % 3) * 0.1 + (sec % 3) * 0.05
+    return {
+        "ts": ts,
+        "machine_id": machine_id,
+        "tool_age": tool_age,
+        "spindle_rpm": spindle_rpm,
+        "coolant_temp": coolant,
+        "vibration_xyz": vibration,
+        "thermal_drift": thermal,
+        "dimension_dev": dim_dev,
+        "defect": False,
+    }
+
+
 @st.cache_resource(show_spinner=False)
 def _seed_storage_demo() -> dict:
-    """incident #47 sensor timeline 100 행 DuckDB 적재 (1회). 사이드바 status 반환."""
-    from datetime import datetime, timedelta
+    """FLEET_SIZE 대 CNC fleet sensor timeline 적재 (1회).
+
+    INCIDENT_MACHINE_ID (CNC-01) = 기존 100s incident timeline (정상 60s + fault 30s + recover 10s).
+    HEALTHY_MACHINE_IDS (CNC-02 ~ CNC-10) = 100s 정상 timeline (per-machine baseline 변동).
+    robot_telemetry (ROBOT-00018) 은 기존 그대로 유지.
+
+    re-seed gate: 기존 단일 머신 DuckDB 가 디스크에 남아 있으면 fleet 부족 → 자동 보충.
+    """
+    from datetime import datetime  # noqa: PLC0415
 
     from src.orchestration.storage import StorageDB  # noqa: PLC0415
 
     db_path = _ROOT / "data" / "prism_demo.duckdb"
     db_path.parent.mkdir(parents=True, exist_ok=True)
+    base_ts = datetime(2026, 5, 22, 3, 0, 0)
     with StorageDB(str(db_path)) as db:
         if db.count("robot_telemetry") == 0:
             # robot_telemetry: 100 rows (60s timeline + 40s recovery)
-            base_ts = datetime(2026, 5, 22, 3, 0, 0)
+            from datetime import timedelta  # noqa: PLC0415
             rows = []
             for sec in range(100):
                 ts = base_ts + timedelta(seconds=sec)
@@ -387,49 +472,22 @@ def _seed_storage_demo() -> dict:
                     "is_faulty": 45 <= sec < 60,
                 })
             db.write_robot(rows)
-        if db.count("cnc_telemetry") == 0:
-            # cnc_telemetry: 100 rows (정상 phase 60s + fault 30s + recover 10s)
-            # 마커 0 (정상) 의 sensor metric 라이브 read 용 + 마커 5 incident timeline
-            base_ts = datetime(2026, 5, 22, 3, 0, 0)
-            cnc_rows = []
-            for sec in range(100):
-                ts = base_ts + timedelta(seconds=sec)
-                # tool_age 누적 (정상 17.8h → 18.x로, 빠른 마모 추세)
-                tool_age = 17.8 + 0.005 * sec
-                spindle_rpm = 8500.0 + (sec % 3 - 1) * 30  # 미세 noise
-                # 정상 (0-59s): coolant 22°C, vibration ~0.8
-                # fault (60-89s): coolant 28°C, vibration ~2.3 (incident #47)
-                # recover (90-99s): coolant 24°C
-                if sec < 60:
-                    coolant = 22.0 + (sec % 5) * 0.1
-                    vibration = 0.8 + (sec % 3) * 0.05
-                    thermal = 5.0 + (sec % 4) * 0.2
-                    dim_dev = 2.0 + (sec % 3) * 0.1
-                    defect = False
-                elif sec < 90:
-                    coolant = 22.0 + (sec - 60) * 0.2
-                    vibration = 0.8 + (sec - 60) * 0.05
-                    thermal = 5.0 + (sec - 60) * 0.5
-                    dim_dev = 2.0 + (sec - 60) * 0.4
-                    defect = (sec >= 75)
-                else:
-                    coolant = 28.0 - (sec - 90) * 0.4
-                    vibration = 2.3 - (sec - 90) * 0.12
-                    thermal = 20.0 - (sec - 90) * 1.2
-                    dim_dev = 14.0 - (sec - 90) * 1.0
-                    defect = False
-                cnc_rows.append({
-                    "ts": ts,
-                    "machine_id": "CNC-01",
-                    "tool_age": tool_age,
-                    "spindle_rpm": spindle_rpm,
-                    "coolant_temp": coolant,
-                    "vibration_xyz": vibration,
-                    "thermal_drift": thermal,
-                    "dimension_dev": dim_dev,
-                    "defect": defect,
-                })
-            db.write_cnc(cnc_rows)
+        # cnc_telemetry: fleet (incident 1대 + healthy 9대). 기존 single-machine seed 도 보충.
+        if db.count("cnc_telemetry") < FLEET_SIZE * 100:
+            cnc_rows: list = []
+            # INCIDENT_MACHINE_ID — 기존 timeline 유지
+            if db.query(
+                f"SELECT COUNT(*) AS n FROM cnc_telemetry WHERE machine_id = '{INCIDENT_MACHINE_ID}'"
+            )[0]["n"] == 0:
+                cnc_rows.extend(_incident_cnc_row(sec, base_ts) for sec in range(100))
+            # HEALTHY_MACHINE_IDS — 누락된 머신만 보충
+            for idx, mid in enumerate(HEALTHY_MACHINE_IDS, start=2):
+                if db.query(
+                    f"SELECT COUNT(*) AS n FROM cnc_telemetry WHERE machine_id = '{mid}'"
+                )[0]["n"] == 0:
+                    cnc_rows.extend(_healthy_cnc_row(sec, mid, idx, base_ts) for sec in range(100))
+            if cnc_rows:
+                db.write_cnc(cnc_rows)
         n_total = db.count("robot_telemetry")
         cnc_total = db.count("cnc_telemetry")
         sha = db.table_sha256("robot_telemetry")[:12]
@@ -463,6 +521,13 @@ def render_header() -> None:
             delta=f"vs MES {COST_MES_KRW_PER_YEAR}/년",
             delta_color="inverse",
         )
+
+    # Fleet 배경 fact — narrative 는 incident 1대 중심, 9대 정상 가동은 배경.
+    st.caption(
+        f"🏭 **{FLEET_SIZE}대 CNC fleet** 라이브 모니터링 (DuckDB cnc_telemetry) · "
+        f"현재 incident **{INCIDENT_MACHINE_ID}** · 정상 가동 **{len(HEALTHY_MACHINE_IDS)}대** "
+        f"({HEALTHY_MACHINE_IDS[0]} ~ {HEALTHY_MACHINE_IDS[-1]})"
+    )
 
 
 def render_marker_timeline(current_marker_idx: int) -> None:
@@ -1523,38 +1588,67 @@ def render_operator_view() -> None:
         "1인 메이커스페이스 운영자가 매일 사용하는 UI."
     )
 
-    # 라이브 sensor + alarm 상태 (DuckDB cnc_telemetry 라이브 read)
+    # 라이브 sensor + alarm 상태 (DuckDB cnc_telemetry 라이브 read).
+    # narrative 안정성을 위해 incident machine 만 조회 — fleet 의 다른 머신은 배경 fact.
     db_path = _ROOT / "data" / "prism_demo.duckdb"
     last_row = None
     incident_rows: list = []
+    fleet_summary: list = []
     if db_path.exists():
         try:
             with StorageDB(str(db_path)) as db:
-                result = db.query("SELECT * FROM cnc_telemetry ORDER BY ts DESC LIMIT 1")
+                result = db.query(
+                    "SELECT * FROM cnc_telemetry "
+                    f"WHERE machine_id = '{INCIDENT_MACHINE_ID}' "
+                    "ORDER BY ts DESC LIMIT 1"
+                )
                 if result:
                     last_row = result[0]
-                # 최근 5 incident (defect=True)
+                # 최근 5 incident (defect=True) — 전 fleet 대상
                 incident_rows = db.query(
                     "SELECT ts, machine_id, coolant_temp, vibration_xyz, dimension_dev "
                     "FROM cnc_telemetry WHERE defect = TRUE ORDER BY ts DESC LIMIT 5"
                 )
+                # fleet status — 머신별 최신 defect 상태 + 마지막 sensor metric
+                fleet_summary = db.query(
+                    "SELECT machine_id, "
+                    "       MAX(CAST(defect AS INTEGER)) AS ever_defect, "
+                    "       COUNT(*) AS n_rows "
+                    "FROM cnc_telemetry GROUP BY machine_id ORDER BY machine_id"
+                )
         except Exception:
             pass
+
+    # Fleet KPI bar — 배경 fact (incident 카운트 / 정상 카운트)
+    n_incident_now = sum(1 for r in fleet_summary if r.get("ever_defect", 0))
+    n_healthy_now = len(fleet_summary) - n_incident_now if fleet_summary else 0
+    if fleet_summary:
+        k1, k2, k3 = st.columns(3)
+        with k1:
+            st.metric("Fleet 규모", f"{len(fleet_summary)}대", help="DuckDB cnc_telemetry distinct machine_id")
+        with k2:
+            st.metric("정상 가동", f"{n_healthy_now}대", delta="OK" if n_healthy_now else None)
+        with k3:
+            st.metric("Incident", f"{n_incident_now}대",
+                      delta=("⚠️ 액션 필요" if n_incident_now else "0"),
+                      delta_color="inverse" if n_incident_now else "normal")
 
     # 🚨 ALARM 카드 (큰 글씨)
     is_alarm = last_row is not None and last_row.get("defect", False)
     if is_alarm:
         st.error(
             f"## 🚨 ALARM — INCIDENT #47 진행 중\n\n"
-            f"**{last_row['machine_id']}**  ·  coolant_temp **{last_row['coolant_temp']:.1f}°C** "
+            f"**{last_row['machine_id']}** (fleet 중 1대)  ·  coolant_temp **{last_row['coolant_temp']:.1f}°C** "
             f"·  vibration **{last_row['vibration_xyz']:.2f}**  ·  dimension_dev **{last_row['dimension_dev']:.1f}μm**\n\n"
-            f"⚡ TWF (Tool Wear Failure) 예지 + HDF (Heat Dissipation Failure) 진행 — **즉시 의사결정 필요**"
+            f"⚡ TWF (Tool Wear Failure) 예지 + HDF (Heat Dissipation Failure) 진행 — **즉시 의사결정 필요**\n\n"
+            f"🏭 다른 {n_healthy_now}대 ({', '.join(HEALTHY_MACHINE_IDS[:3])} 등) 는 정상 가동 중"
         )
     elif last_row:
         st.success(
             f"## ✅ 정상 가동 — DuckDB cnc_telemetry 라이브\n\n"
             f"**{last_row['machine_id']}**  ·  tool_age **{last_row['tool_age']:.1f}h**  ·  "
-            f"coolant **{last_row['coolant_temp']:.1f}°C**  ·  vibration **{last_row['vibration_xyz']:.2f}**"
+            f"coolant **{last_row['coolant_temp']:.1f}°C**  ·  vibration **{last_row['vibration_xyz']:.2f}**\n\n"
+            f"🏭 fleet {len(fleet_summary) or FLEET_SIZE}대 전체 정상"
         )
     else:
         st.warning("⚠️ DuckDB 미가동 — 사이드바의 CNC stream Start 또는 demo 모드 실행 필요")
@@ -1630,19 +1724,19 @@ _V3_LAYERS: list[dict] = [
     {
         "title": "1️⃣  Streaming Layer — Kinesis Data Streams",
         "image": "presentation/screenshots/measure-kds-dashboard.png",
-        "mvp": "In-process DuckDB (노트북 1대)",
+        "mvp": f"In-process DuckDB · 노트북 1대 · CNC fleet {FLEET_SIZE}대 (CNC-01 incident + {len(HEALTHY_MACHINE_IDS)}대 정상)",
         "v3":  "KDS + Firehose, 1000대 robot 실시간 telemetry — GetRecords/PutRecords 처리량 + latency 모니터링",
     },
     {
         "title": "2️⃣  ETL Pipeline — Airflow Medallion",
         "image": "presentation/screenshots/airflow-daily-etl.png",
-        "mvp": "단일 Streamlit narrative",
+        "mvp": f"단일 Streamlit narrative · {FLEET_SIZE}대 fleet sensor 적재",
         "v3":  "Airflow DAG 5 단계 (quality_check → bronze → silver → gold → bedrock_report → cache_refresh) 일별 자동화",
     },
     {
         "title": "3️⃣  Enterprise Portal — 1000대 Fleet Telemetry",
         "image": "presentation/screenshots/portal-overview.png",
-        "mvp": "Streamlit 단일 대시보드",
+        "mvp": f"Streamlit 단일 대시보드 · {FLEET_SIZE}대 fleet 배경 fact",
         "v3":  "FastAPI + Jinja2 Portal — 1K robot KPI · 116 이상치 · 7일 TWF/HDF/PWF/OSF/RNF 분포 · TOP 10 점검 대상",
     },
     {
@@ -1668,8 +1762,9 @@ def render_enterprise_vision() -> None:
     """
     st.markdown("## 🚀 PRISM MVP → V3 Enterprise Scale-out Vision")
     st.info(
-        "💡 **확장 narrative**: PRISM MVP (노트북 1대 + Streamlit + DuckDB + Bedrock cache) 가 "
-        "production 진입 시 동일 인과 DAG 구조를 유지하면서 1000대 robot fleet 으로 확장한 예시. "
+        f"💡 **확장 narrative**: PRISM MVP (노트북 1대 + Streamlit + DuckDB + Bedrock cache · "
+        f"CNC fleet {FLEET_SIZE}대 시연) 가 production 진입 시 동일 인과 DAG 구조를 유지하면서 "
+        "1000대 robot fleet 으로 확장한 예시. "
         "아래 5 layer 는 mason 의 사전 구축 자산 (`legacy/`) 발췌 — **동일 도메인 (제조) 의 layer 별 진화 경로**."
     )
     st.markdown("---")

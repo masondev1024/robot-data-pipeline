@@ -23,7 +23,7 @@ docker compose up --build
 
 | 기존 robot-data-pipeline | PRISM MVP |
 |---|---|
-| Kinesis Data Streams (2 shard) | docker network 안 generator → Streamlit 직접 |
+| Kinesis Data Streams (2 shard) | docker network 안 generator → Streamlit 직접 (CNC fleet 10대) |
 | Firehose → S3 Parquet (Iceberg) | DuckDB 단일 파일 (`data/prism_demo.duckdb`) |
 | Athena workgroup + partition projection | DuckDB SQL in-process |
 | SageMaker Endpoint (XGBoost) | `src/ml/local_predictor.py` 로컬 XGBoost |

@@ -5,6 +5,7 @@ CNC 텔레메트리에서 이상을 감지하고, **인과 추론 카드**로 �
 "보류" 결정 시 **시뮬레이션 fast-forward** 로 결과를 미리 보여주는 운영 콘솔.
 
 > 해커톤 본선 2026-05-22. 노트북 1대 + Docker 만으로 동작하는 lightweight MVP.
+> CNC fleet **10대** 모니터링 (incident 1대 narrative · 9대 정상 가동 배경 fact).
 
 ---
 
@@ -49,7 +50,7 @@ Bedrock offline 모드 (`BEDROCK_OFFLINE=true`) 로 네트워크 없이도 재�
 | 컴포넌트 | 선택 | 이유 |
 |---|---|---|
 | UI | Streamlit | 단일 호스트 콘솔, 실시간 차트 + 의사결정 위젯 |
-| 저장 | DuckDB (in-process) | KDS/S3/Athena 불요. 노트북 1대로 충분 |
+| 저장 | DuckDB (in-process) | KDS/S3/Athena 불요. 노트북 1대로 충분 (10대 fleet × 100s = 1000행) |
 | 인과 추론 | DoWhy | 6-Node DAG (tool_age → spindle_rpm → … → defect), backdoor + IV refute |
 | 분류 | XGBoost 로컬 | 6-class fault label (`src/ml/local_predictor.py`) |
 | LLM | Bedrock Claude (offline 가능) | cache_replay 로 네트워크 끊겨도 시연 결정론적 |
