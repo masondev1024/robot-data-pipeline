@@ -21,11 +21,11 @@ docker compose logs app | tail -20
 | idx | 시각 | 라벨 | 설명 |
 |---|---|---|---|
 | 0 | 0:00 | 정상 | 센서 데이터 정상 흐름, 모든 라인 가동 중 |
-| 1 | 0:15 | 예지경보 risk62% | **라이브 XGBoost 6-class predict_proba** (HDF 1순위) |
-| 2 | 0:30 | 인과 v1 | DoWhy 6-Node DAG 인과 추론 v1 — coolant_temp +5% 추천 |
-| 3 | 0:45 | 인간결정 | **운영자 "보류"** (라인 가동 우선, v1 추천 미적용) |
-| 4 | 1:00 | 시뮬가속 | **라이브 DoWhy do(coolant_temp) ATE** — 3h fast-forward |
-| 5 | 1:15 | 불량 #47 | 결함 #47 실제 발생, motor_temp 105°C |
+| 1 | 0:15 | 예지경보 risk62% | **라이브 XGBoost 6-class predict_proba** (TWF 1순위, tool_age 18h 누적 — 표준 200h 대비 빠른 마모) |
+| 2 | 0:30 | 인과 v1 | DoWhy 6-Node DAG 인과 추론 v1 — **공구 교체 추천 (tool_age reset)**. XGBoost 감지 변수와 통일 |
+| 3 | 0:45 | 인간결정 | **운영자 "보류"** (공구 교체 4h 정지 부담, v1 추천 미적용) |
+| 4 | 1:00 | 시뮬가속 | **라이브 DoWhy do(tool_age) ATE** — 3h fast-forward |
+| 5 | 1:15 | 불량 #47 | 결함 #47 실제 발생, motor_temp 105°C (TWF secondary symptom — 공구 마모로 인한 motor 부하 ↑) |
 | 6 | 1:30 | 인과 v2 | Causal Effect 재추정 CE 0.78 → 0.71 |
 | 7 | 2:15 | 4 Agent | **라이브 4 Domain Agent** (품질·안전·설비·생산, Bedrock cache_replay) |
 | 8 | 3:00 | Supervisor | **라이브 Supervisor Net Value** 산정 — 최적 액션 권고 |
@@ -41,7 +41,7 @@ docker compose logs app | tail -20
 | 1 | XGBoost 6-class | ✅ live | ~1ms | `src/ml/local_predictor.py::predict_proba_timed` |
 | 2 | DAG v1 color narrative | static | — | `_node_colors_for_marker(2)` |
 | 3 | 운영자 결정 UI | static | — | `render_human_decision` |
-| 4 | DoWhy do(coolant_temp) ATE | ✅ live | ~0.6s | `src/orchestration/causal_dag.py::estimate_intervention_effect` |
+| 4 | DoWhy do(tool_age) ATE | ✅ live | ~0.6s | `src/orchestration/causal_dag.py::estimate_intervention_effect` (XGBoost 감지 변수와 통일) |
 | 5 | incident alert | static | — | `render_incident_alert` (DuckDB seed 100 rows) |
 | 6 | DAG v2 narrative | static | — | `causal_refute_v2.json` (사전 계산) |
 | 7 | 4 Domain Agent | ✅ live (Bedrock) | ~3s | `src/orchestration/supervisor.py::negotiate_with_candidates` → `agents/base.py::invoke_claude` |
@@ -69,10 +69,10 @@ BEDROCK_OFFLINE=true
 ## 마커 3 의 "보류" narrative — 발표 핵심 포인트
 
 기획서 page 7 (User Case) 정합:
-- v1 추천 = **절삭유 +5%** (coolant_temp 변경)
-- 인간 결정 = **"보류"** (라인 가동 우선)
-- 시뮬 = **3h 압축** 으로 보류 시 결함 진행 path 미리 보기
-- 결과 = **불량 #47 발생** → 인과 v2 재추정 (CE 0.78 → 0.71)
+- v1 추천 = **공구 교체** (tool_age reset — XGBoost·DoWhy 감지·추천 변수 통일)
+- 인간 결정 = **"보류"** (4h 라인 정지 부담)
+- 시뮬 = **3h 압축** 으로 보류 시 결함 진행 path 미리 보기 (라이브 `do(tool_age)`)
+- 결과 = **불량 #47 발생** → 인과 v2 재추정 (mediator `coolant_temp` 추가 학습, CE 0.78 → 0.71)
 
 "AI 가 옳다는 걸 시연에서 인간 결정으로 증명한다" — 4 Agent Closed-Loop 의 핵심.
 

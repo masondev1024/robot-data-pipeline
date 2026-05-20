@@ -64,8 +64,8 @@ TOTAL_SECONDS = 225  # 3:45
 # 각 마커별 한국어 1줄 설명 (mason 피드백: 단계 metric 아래 caption)
 _MARKER_DESCRIPTIONS: dict[int, str] = {
     0:  "센서 데이터 정상 흐름, 모든 라인 가동 중",
-    1:  "tool_age 180h 누적 → 라이브 XGBoost 예지경보 (TWF 1순위, v1 인과 모델 출발점)",
-    2:  "DoWhy 6-Node DAG 인과 추론 v1 생성 — coolant_temp +5% 추천",
+    1:  "tool_age 18h 누적 (표준 200h 곡선 대비 빠른 마모 추세) → 라이브 XGBoost 예지경보 (TWF 1순위)",
+    2:  "DoWhy 6-Node DAG 인과 추론 v1 생성 — 공구 교체 추천 (tool_age reset, XGBoost 감지 변수와 통일)",
     3:  "운영자 결정: '보류' (라인 가동 우선, v1 추천 미적용)",
     4:  "보류 시 3시간 fast-forward 시뮬 → 결함 진행 trajectory",
     5:  "결함 #47 실제 발생 — 보류 결정의 결과, motor_temp 105°C",
@@ -300,7 +300,7 @@ def _get_xgb_predictor():
 
 
 # 마커 1 fault-pre-trend feature (standardised, tool_age 누적 → TWF 1순위 trigger)
-# narrative: "tool_age 180h 누적 → 공구 마모 임계 도달 → TWF 예지"
+# narrative: "tool_age 18h 누적 → 표준 200h 대비 빠른 마모 추세 → TWF 예지"
 _MARKER1_XGB_FEATURES: dict[str, float] = {
     "tool_age":      3.0,    # 누적 임계 (base cause)
     "spindle_rpm":   0.0,
@@ -313,12 +313,13 @@ _MARKER1_XGB_FEATURES: dict[str, float] = {
 
 # ── DoWhy 라이브 ATE 계산 캐시 (Phase 1: 본선 라이브 do-intervention) ─────────────
 
-@st.cache_resource(show_spinner="🔬 DoWhy 6-Node DAG 학습 중... (5k row, ~2초)")
+@st.cache_resource(show_spinner="🔬 DoWhy 6-Node DAG 학습 중... (5k row, ~3초)")
 def _get_causal_artifact() -> dict:
-    """5k row 합성 데이터 + DoWhy CausalModel (treatment=coolant_temp) — 시연 시작 1회 학습.
+    """5k row 합성 데이터 + DoWhy CausalModel — 시연 시작 1회 학습.
 
     @st.cache_resource process-lifetime 캐시. rerun 시 재계산 X.
-    마커 4 (보류 fast-forward) 에서 라이브 do(coolant_temp) ATE 호출.
+    마커 4 (보류 fast-forward) 에서 라이브 do(tool_age) ATE 호출 — XGBoost·DoWhy 변수 통일.
+    model_coolant 는 마커 6 v2 학습 (mediator 추가) narrative 용.
     """
     import warnings  # noqa: PLC0415
     from src.orchestration.causal_dag import (  # noqa: PLC0415
@@ -328,8 +329,13 @@ def _get_causal_artifact() -> dict:
     df = synthetic_sensor_data(n=5_000, seed=2026)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
+        model_tool_age = fit_causal_model_for(df, dag, treatment="tool_age", outcome="DEFECT")
         model_coolant = fit_causal_model_for(df, dag, treatment="coolant_temp", outcome="DEFECT")
-    return {"dag": dag, "df": df, "model_coolant": model_coolant}
+    return {
+        "dag": dag, "df": df,
+        "model_tool_age": model_tool_age,
+        "model_coolant": model_coolant,
+    }
 
 
 # ── CNC stream generator (1 instance, session 유지) ─────────────────────────────
@@ -388,8 +394,8 @@ def _seed_storage_demo() -> dict:
             cnc_rows = []
             for sec in range(100):
                 ts = base_ts + timedelta(seconds=sec)
-                # tool_age 누적 (정상 부터 180h 까지 천천히)
-                tool_age = 178.0 + 0.05 * sec
+                # tool_age 누적 (정상 17.8h → 18.x로, 빠른 마모 추세)
+                tool_age = 17.8 + 0.005 * sec
                 spindle_rpm = 8500.0 + (sec % 3 - 1) * 30  # 미세 noise
                 # 정상 (0-59s): coolant 22°C, vibration ~0.8
                 # fault (60-89s): coolant 28°C, vibration ~2.3 (incident #47)
@@ -534,103 +540,72 @@ def render_marker_timeline(current_marker_idx: int) -> None:
 
 
 # DAG 노드 색상 의미 (legend 와 1:1)
-_COLOR_GREY         = "#cccccc"  # 비활성 / baseline
-_COLOR_FOCUS_ORANGE = "#ff7f0e"  # 인과 모델 핵심 변수 (감지·추천·학습)
-_COLOR_FOCUS_LIGHT  = "#fcd34d"  # 약한 감지 (XGBoost 약 입력)
-_COLOR_PATH_BLUE    = "#1f77b4"  # 원인 path (predecessor·mediator)
-_COLOR_RISK_AMBER   = "#fbbf24"  # 예지 risk (아직 미발현)
-_COLOR_DEFECT_RED   = "#d62728"  # 결함 활성 path (manifest fault)
-_COLOR_SIM_RED      = "#ff9999"  # 시뮬 예측 결함 (연한 빨강 — 아직 실재 X)
-_COLOR_HOLD_DIM     = "#9ca3af"  # 보류 미적용 (의도된 비결정)
+# 4색 신호등 시스템 (청중 인지 우선):
+#   ⚪ 회색 = 정상 / 비활성 / 보류 미적용
+#   🟡 amber = 예지 risk (아직 미발현)
+#   🟠 주황 = 핵심 인과 변수 (감지·추천·학습)
+#   🔴 빨강 = 결함 활성 (시뮬·실재 공통, 시뮬 vs 실은 caption 으로 구분)
+_COLOR_GREY         = "#9ca3af"
+_COLOR_RISK_AMBER   = "#fbbf24"
+_COLOR_FOCUS_ORANGE = "#ff7f0e"
+_COLOR_DEFECT_RED   = "#d62728"
 
 
 def _node_colors_for_marker(marker_idx: int) -> dict[str, str]:
-    """marker_idx → DAG 노드 색상. 각 단계 narrative 가 색으로 가시 차별화된다.
+    """marker_idx → DAG 노드 색상 (4색 신호등 시스템, tool_age 인과 통일).
 
     Color semantic (legend 와 1:1):
-        🟠 주황 = 인과 모델 핵심 변수 (감지·추천·학습)
-        🔵 파랑 = 원인 path (predecessor·mediator)
-        🟡 amber= 예지 risk (아직 미발현)
-        🔴 빨강 = 결함 활성 path (manifest fault)
-        ⚪ 회색 = 비활성 / 보류 / 미적용
+        ⚪ 회색  = 정상 / 비활성 / 보류
+        🟡 amber = 예지 risk (아직 미발현)
+        🟠 주황 = 핵심 인과 변수 (감지·추천·학습)
+        🔴 빨강 = 결함 활성 (시뮬·실재 공통, caption 으로 구분)
 
-    마커별 narrative:
-        0 baseline    : 전부 회색 (DEFECT 도 회색 — 정상 가동)
-        1 예지경보    : tool_age 주황 (감지) + DEFECT amber (예지 risk)
-        2 v1 추천     : coolant_temp 주황 + thermal/dim 파랑 (v1 path) + DEFECT amber
-        3 보류 결정   : 마커 2 와 동일 색 (분석 보존) + title amber 로 "보류" 신호
-        4 fast-forward: coolant_temp dim (보류 미적용) + thermal/dim/DEFECT 빨강 (시뮬 결함 진행)
-        5 실 결함     : tool_age amber (실 root cause) + coolant_temp dim + vibration/thermal/dim/DEFECT 빨강
-        6 v2 학습     : tool_age + coolant_temp 주황 (학습된 인과 변수) + vibration/thermal 파랑 (정확화 mediator) + DEFECT 빨강
+    마커별 narrative (XGBoost·DoWhy 변수 통일 = tool_age):
+        0 baseline    : 전부 회색
+        1 예지경보    : tool_age 주황 (XGBoost 감지) + DEFECT amber (TWF 예지 risk)
+        2 v1 추천     : tool_age 주황 (DoWhy 추천: 공구 교체) + DEFECT amber
+        3 보류        : tool_age 회색 (⏸ 추천 적용 안 함) + DEFECT amber
+        4 fast-forward: tool_age 회색 (보류 유지) + dimension_dev/DEFECT 빨강 (시뮬 결함)
+        5 실 결함     : tool_age 주황 (root cause 확정) + 결함 path 빨강
+        6 v2 학습     : tool_age + coolant_temp 주황 (v2 mediator 추가 학습) + DEFECT 빨강
     """
     base = {n: _COLOR_GREY for n in DAG_NODES}
 
     if marker_idx == 0:
-        # baseline: 전부 회색 (DEFECT 도 회색 — 정상 가동에 빨강은 misleading)
-        pass
+        pass  # 전부 회색
     elif marker_idx == 1:
-        # 예지: tool_age 누적 → TWF 1순위 (라이브 XGBoost)
-        # tool_age = base cause (진주황), 나머지 회색, DEFECT amber (예지 risk 미발현)
-        base["tool_age"] = _COLOR_FOCUS_ORANGE  # base cause — 누적 감지 trigger
-        base["DEFECT"] = _COLOR_RISK_AMBER      # 예지 risk (TWF 1순위)
+        base["tool_age"] = _COLOR_FOCUS_ORANGE
+        base["DEFECT"] = _COLOR_RISK_AMBER
     elif marker_idx == 2:
-        # v1 추천: coolant_temp 주황 (추천 변수), 나머지 인과 path (predecessor + mediator) 파랑
-        base["tool_age"] = _COLOR_PATH_BLUE
-        base["spindle_rpm"] = _COLOR_PATH_BLUE
-        base["coolant_temp"] = _COLOR_FOCUS_ORANGE
-        base["vibration_xyz"] = _COLOR_PATH_BLUE  # mediator (tool_age + spindle 직하류)
-        base["thermal_drift"] = _COLOR_PATH_BLUE
-        base["dimension_dev"] = _COLOR_PATH_BLUE
+        base["tool_age"] = _COLOR_FOCUS_ORANGE
         base["DEFECT"] = _COLOR_RISK_AMBER
     elif marker_idx == 3:
-        # 보류: coolant_temp 만 주황 → HOLD_DIM (추천이었으나 보류로 미적용) 시각 변화
-        base["tool_age"] = _COLOR_PATH_BLUE
-        base["spindle_rpm"] = _COLOR_PATH_BLUE
-        base["coolant_temp"] = _COLOR_HOLD_DIM  # ⏸ 보류 — 추천 적용 안 함
-        base["vibration_xyz"] = _COLOR_PATH_BLUE
-        base["thermal_drift"] = _COLOR_PATH_BLUE
-        base["dimension_dev"] = _COLOR_PATH_BLUE
         base["DEFECT"] = _COLOR_RISK_AMBER
     elif marker_idx == 4:
-        # fast-forward 시뮬: 연한 빨강 (시뮬 예측, 실재 X) — 마커 5 와 시각 차별
-        base["tool_age"] = _COLOR_PATH_BLUE
-        base["spindle_rpm"] = _COLOR_PATH_BLUE
-        base["coolant_temp"] = _COLOR_HOLD_DIM
-        base["vibration_xyz"] = _COLOR_SIM_RED   # 시뮬 (연한 빨강)
-        base["thermal_drift"] = _COLOR_SIM_RED
-        base["dimension_dev"] = _COLOR_SIM_RED
-        base["DEFECT"] = _COLOR_SIM_RED
+        base["vibration_xyz"] = _COLOR_DEFECT_RED
+        base["dimension_dev"] = _COLOR_DEFECT_RED
+        base["DEFECT"] = _COLOR_DEFECT_RED
     elif marker_idx == 5:
-        # 실 결함: tool_age 도 fault path 일부 (빨강) — v2 학습 motivation
-        # (v1 은 coolant 만 봤지만 실 fault 는 tool_age 까지 작용 → 마커 6 에서 v2 학습)
-        base["tool_age"] = _COLOR_DEFECT_RED    # 실 fault path (v1 미인지 변수)
-        base["spindle_rpm"] = _COLOR_PATH_BLUE
-        base["coolant_temp"] = _COLOR_HOLD_DIM
+        base["tool_age"] = _COLOR_FOCUS_ORANGE
         base["vibration_xyz"] = _COLOR_DEFECT_RED
         base["thermal_drift"] = _COLOR_DEFECT_RED
         base["dimension_dev"] = _COLOR_DEFECT_RED
         base["DEFECT"] = _COLOR_DEFECT_RED
     elif marker_idx == 6:
-        # v2 학습: tool_age + coolant_temp 둘 다 인과 변수로 정확화 (학습 추가 path)
-        # vibration/thermal 은 이제 mediator 로 정확 인식 (CE 추정 개선)
         base["tool_age"] = _COLOR_FOCUS_ORANGE
-        base["spindle_rpm"] = _COLOR_PATH_BLUE
         base["coolant_temp"] = _COLOR_FOCUS_ORANGE
-        base["vibration_xyz"] = _COLOR_PATH_BLUE
-        base["thermal_drift"] = _COLOR_PATH_BLUE
-        base["dimension_dev"] = _COLOR_PATH_BLUE
         base["DEFECT"] = _COLOR_DEFECT_RED
     return base
 
 
 _DAG_TITLES = {
     0: "인과 DAG  |  <span style='color:#6b7280'>baseline (정상 가동, 결함 미발현)</span>",
-    1: "인과 DAG  |  <span style='color:#ff7f0e'>tool_age 누적 감지 (base cause)</span> · <span style='color:#fbbf24'>DEFECT amber (TWF 예지 risk)</span>",
-    2: "인과 DAG v1  |  <span style='color:#ff7f0e'>v1 추천: coolant_temp +5% (절삭유 보충)</span>",
-    3: "인과 DAG v1  |  <span style='color:#d97706'>⏸ 운영자 결정: 보류 (v1 추천 미적용)</span>",
+    1: "인과 DAG  |  <span style='color:#ff7f0e'>tool_age 18h 누적 감지 (XGBoost TWF 1순위)</span> · <span style='color:#fbbf24'>DEFECT amber (예지 risk)</span>",
+    2: "인과 DAG v1  |  <span style='color:#ff7f0e'>v1 추천: 공구 교체 (tool_age reset)</span>",
+    3: "인과 DAG v1  |  <span style='color:#9ca3af'>⏸ 운영자 결정: 보류 (공구 교체 미적용)</span>",
     4: "인과 DAG  |  <span style='color:#d62728'>보류 fast-forward (3h 압축) — 결함 진행 시뮬</span>",
-    5: "인과 DAG  |  <span style='color:#d62728'>실 결함 — 보류 결정의 결과 (예지 적중)</span>",
-    6: "인과 DAG v2  |  <span style='color:#ff7f0e'>incident 학습 — CE 0.78 → 0.71 정확화</span>",
+    5: "인과 DAG  |  <span style='color:#d62728'>실 결함 — 보류 결정의 결과 (TWF 예지 적중)</span>",
+    6: "인과 DAG v2  |  <span style='color:#ff7f0e'>incident 학습 — coolant_temp mediator 추가, CE 0.78 → 0.71</span>",
 }
 
 
@@ -691,13 +666,13 @@ def render_causal_dag(marker_idx: int = 0) -> None:
 
 
 _DAG_COLOR_CAPTIONS: dict[int, str] = {
-    0: "🎨 DAG 색 의미: 모든 노드 회색 (정상 — risk 미감지)",
-    1: "🎨 DAG 색 의미: `tool_age` 진주황 (180h 누적 → base cause) · 나머지 회색 (정상 범위) · `DEFECT` amber (TWF 1순위 예지 risk, 미발현)",
-    2: "🎨 DAG 색 변화: `coolant_temp` 주황 (v1 추천 변수) · 나머지 path 파랑 (predecessor·mediator)",
-    3: "🎨 DAG 색 변화: `coolant_temp` 주황 → **dim 회색** (⏸ 보류 — 추천 적용 안 함) · 분석 path 는 파랑 유지",
-    4: "🎨 DAG 색 변화: `coolant_temp` dim (보류) · `vibration/thermal/dim_dev/DEFECT` **연한 빨강** (시뮬 예측 결함, 실재 X)",
-    5: "🎨 DAG 색 변화: 모든 fault path **진한 빨강** (실 manifest) · `tool_age` 도 빨강 (v1 이 못 본 변수 — 마커 6 v2 학습 motivation)",
-    6: "🎨 DAG 색 변화: `tool_age + coolant_temp` 주황 (v2 학습 인과 변수 — v1 의 coolant 단일 → v2 의 tool_age 추가) · `vibration/thermal` 파랑 (mediator 정확화 → CE 0.78→0.71)",
+    0: "🎨 DAG 색: 전부 회색 (정상 — risk 미감지)",
+    1: "🎨 DAG 색: `tool_age` 주황 (XGBoost가 18h 누적 → TWF 1순위 감지) · `DEFECT` amber (예지 risk, 아직 미발현)",
+    2: "🎨 DAG 색: `tool_age` 주황 (DoWhy v1 추천 변수 — 공구 교체로 reset) · `DEFECT` amber 유지",
+    3: "🎨 DAG 색: `tool_age` 주황 → **회색** (⏸ 보류, 공구 교체 미적용) · `DEFECT` amber 유지",
+    4: "🎨 DAG 색: 결함 path (`vibration/dimension_dev/DEFECT`) **빨강** (시뮬 — 보류 시 trajectory 압축 예측)",
+    5: "🎨 DAG 색: 모든 fault path **빨강** (실 결함 manifest) · `tool_age` 주황 (TWF root cause 확정)",
+    6: "🎨 DAG 색: `tool_age + coolant_temp` 주황 (v2 학습 — tool_age root cause + coolant_temp mediator 추가, CE 0.78→0.71)",
 }
 
 
@@ -717,15 +692,12 @@ def render_causal_v1_explanation() -> None:
     col_l, col_r = st.columns([1, 1])
     with col_l:
         with st.container(border=True):
-            st.markdown("##### 📘 DAG 노드 색상 가이드")
+            st.markdown("##### 📘 DAG 색상 (4색 신호등)")
             st.markdown(
-                "- 🟠 **진주황** — 인과 모델 핵심 변수 (감지·추천·학습)\n"
-                "- 🟡 **연주황** — 약한 감지 (XGBoost 약 입력)\n"
-                "- 🔵 **파랑** — 원인 path (predecessor·mediator)\n"
+                "- ⚪ **회색** — 정상 / 보류 / 비활성\n"
                 "- 🟡 **amber** — 예지 risk (아직 미발현)\n"
-                "- 🌸 **연빨강** — 시뮬 예측 결함 (실재 X)\n"
-                "- 🔴 **진빨강** — 결함 활성 path (manifest fault)\n"
-                "- ⚪ **회색** — 비활성 / 보류 / 미적용"
+                "- 🟠 **주황** — 핵심 인과 변수 (감지·추천·학습)\n"
+                "- 🔴 **빨강** — 결함 활성 (시뮬·실재는 caption으로 구분)"
             )
     with col_r:
         with st.container(border=True):
@@ -802,14 +774,14 @@ def render_normal_status() -> None:
         with c1: st.metric("coolant_temp", f"{row['coolant_temp']:.1f}°C", help="DuckDB live · 기준 < 25°C")
         with c2: st.metric("vibration_xyz", f"{row['vibration_xyz']:.2f}", help="DuckDB live · 기준 norm < 1.5")
         with c3: st.metric("spindle_rpm", f"{int(row['spindle_rpm']):,}", help="DuckDB live · 표준 8500")
-        with c4: st.metric("tool_age", f"{row['tool_age']:.1f}h", help="DuckDB live · 누적 임계 180h 근접")
+        with c4: st.metric("tool_age", f"{row['tool_age']:.1f}h", help="DuckDB live · 표준 200h 곡선 대비 빠른 마모 추세")
         st.caption(f"📡 DuckDB cnc_telemetry 라이브 read · machine_id={row['machine_id']} · ts={row['ts']}")
     else:
         # fallback (DuckDB 없을 때)
         with c1: st.metric("coolant_temp", "22°C", help="기준 < 25°C")
         with c2: st.metric("vibration_xyz", "0.8", help="기준 norm < 1.5")
         with c3: st.metric("spindle_rpm", "8,500", help="표준 8500")
-        with c4: st.metric("tool_age", "178h", help="누적 임계 180h 근접")
+        with c4: st.metric("tool_age", "17.8h", help="표준 200h 곡선 대비 빠른 마모 추세")
         st.caption("📡 11 sensor — DuckDB 미가동 (fallback 표시)")
 
 
@@ -824,16 +796,13 @@ _FAILURE_LABEL_HELP: dict[str, str] = {
 
 
 def _render_dag_color_legend_compact() -> None:
-    """마커 1 등 색 가이드 처음 등장 시점에 표시. 단순 expander 형태."""
-    with st.expander("📘 DAG 노드 색상 가이드 (펼치기)", expanded=False):
+    """마커 1 등 색 가이드 처음 등장 시점에 표시. 4색 신호등."""
+    with st.expander("📘 DAG 색상 가이드 (4색 신호등)", expanded=False):
         st.markdown(
-            "- 🟠 **진주황** — 인과 모델 핵심 변수 (감지·추천·학습)\n"
-            "- 🟡 **연주황** — 약한 감지 (XGBoost 약 입력)\n"
-            "- 🔵 **파랑** — 원인 path (predecessor·mediator)\n"
+            "- ⚪ **회색** — 정상 / 보류 / 비활성\n"
             "- 🟡 **amber** — 예지 risk (아직 미발현)\n"
-            "- 🌸 **연빨강** — 시뮬 예측 결함 (실재 X)\n"
-            "- 🔴 **진빨강** — 결함 활성 path (manifest fault)\n"
-            "- ⚪ **회색** — 비활성 / 보류 / 미적용"
+            "- 🟠 **주황** — 핵심 인과 변수 (감지·추천·학습)\n"
+            "- 🔴 **빨강** — 결함 활성 (시뮬·실재는 caption으로 구분)"
         )
 
 
@@ -844,8 +813,9 @@ def render_predictive_alert() -> None:
     cache replay 아닌 실 호출 (~1ms). seed=2026 → 결정성 보장.
     """
     st.warning(
-        "⚠️ **예지경보** — ROBOT-00018, **tool_age 180h 누적** (마모 임계 도달) + "
-        "vibration 약상승 + 치수 편차 시작 → TWF (Tool Wear Failure) 1순위"
+        "⚠️ **예지경보** — ROBOT-00018, **tool_age 18h 누적** (최근 공구 교체 후, "
+        "표준 200h 곡선 대비 **빠른 마모 추세**) + vibration 약상승 + 치수 편차 시작 → "
+        "TWF (Tool Wear Failure) 1순위"
     )
     _render_dag_color_legend_compact()
 
@@ -885,13 +855,15 @@ def render_predictive_alert() -> None:
 
 
 def render_human_decision() -> None:
-    """마커 3 (0:45 인간결정) — v1 추천 (절삭유 +5%) 보류 결정 (기획서 page 7 정합).
+    """마커 3 (0:45 인간결정) — v1 추천 (공구 교체) 보류 결정 (기획서 page 7 정합).
 
-    인간 인지 한계 narrative — 라인 가동 우선으로 적용 보류, 결과는 마커 4 fast-forward 시뮬.
+    인간 인지 한계 narrative — 4h 정지 부담으로 적용 보류, 결과는 마커 4 fast-forward 시뮬.
+    XGBoost·DoWhy 추천 변수 통일 (tool_age).
     """
-    st.info("🧑‍🔧 **운영자 검토** — v1 인과 추천 (절삭유 +5%) 적용 여부")
+    st.info("🧑‍🔧 **운영자 검토** — v1 인과 추천 (공구 교체) 적용 여부")
     st.caption(
-        "💡 위 DAG 색상은 v1 분석 결과 (coolant_temp 주황 = 추천 변수) 를 그대로 보존. "
+        "💡 위 DAG 의 `tool_age` 주황은 v1 추천 변수. XGBoost 가 감지한 변수와 "
+        "DoWhy 가 추천한 intervention 변수가 **동일** — 인과 일관성 확보. "
         "보류 결정은 **DAG 적용 X** — 다음 마커 4 에서 보류 시 결함 진행 fast-forward."
     )
 
@@ -903,20 +875,20 @@ def render_human_decision() -> None:
             st.markdown(
                 "| 후보 | v1 추천 | 실 운영 적용 방식 | 적용 비용 |\n"
                 "|---|---|---|---|\n"
-                "| `tool_age` | 미추천 (시간 의존) | 공구 교체 | 4h+ |\n"
+                "| **`tool_age`** | ✅ **v1 추천: reset** | **공구 교체 (XGBoost 감지 변수와 통일)** | **4h** |\n"
+                "| `coolant_temp` | 미추천 (mediator) | 절삭유 보충 | 1-2h |\n"
                 "| `spindle_rpm` | 미추천 (직접 path 검증 부족) | 소프트웨어 명령 | 0 |\n"
-                "| **`coolant_temp`** | ✅ **v1 추천: +5%** | **절삭유 보충** | **1-2h** |\n"
             )
             st.caption(
-                "💡 **v1 인과 모델 추천**: `coolant_temp` 5% 증가 → defect 확률 ↓. "
-                "단, 실 운영 비용 (1-2h 라인 정지) 발생 — 운영자 결정 필요."
+                "💡 **v1 인과 모델 추천**: `tool_age` reset (공구 교체) → 누적 마모 path 차단. "
+                "단, 라인 정지 4h 비용 발생 — 운영자 결정 필요."
             )
 
     with col_decision:
         with st.container(border=True):
             st.markdown("##### ⏸️ 운영자 결정")
-            st.warning("**보류** (적용 X)")
-            st.metric("결정 사유", "라인 가동 우선")
+            st.warning("**보류** (공구 교체 미적용)")
+            st.metric("결정 사유", "라인 가동 우선 (4h 정지 부담)")
             st.caption("📝 maker-space-op-001 · ⏱️ 0:42")
             st.caption("⚠️ 다음 (마커 4): **'보류 시 3시간 fast-forward'** 시뮬")
 
@@ -924,35 +896,36 @@ def render_human_decision() -> None:
 def render_simulation_evidence() -> None:
     """마커 4 (1:00 시뮬가속) — 운영자 보류 시 3시간 fast-forward (기획서 page 7 정합).
 
-    Phase 1 (본선 라이브): DoWhy do(coolant_temp) ATE 라이브 호출 — 보류 vs 적용 차이를
-    실 인과추론으로 보여준다. trajectory plot 은 결정성 위해 결정론적 공식 유지.
+    Phase 1 (본선 라이브): DoWhy do(tool_age) ATE 라이브 호출 — 보류 vs 공구 교체 차이를
+    실 인과추론으로 보여준다. XGBoost (마커 1) ·DoWhy 변수 통일 = tool_age.
+    trajectory plot 은 결정성 위해 결정론적 공식 유지.
     """
     st.warning("🎬 **시뮬레이션 가속 — 보류 시 3시간 fast-forward**")
 
-    # ── 라이브 DoWhy do(coolant_temp) ATE — 보류 vs 적용 ────────────────────────
+    # ── 라이브 DoWhy do(tool_age) ATE — 보류 vs 공구 교체 ───────────────────────
     import warnings  # noqa: PLC0415
     from src.orchestration.causal_dag import estimate_intervention_effect  # noqa: PLC0415
     art = _get_causal_artifact()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        # 보류: coolant_temp 변화 X (baseline 유지). treatment=control=0 → ATE=0.
+        # 보류: tool_age 변화 X (baseline 유지). treatment=control=0 → ATE=0.
         ate_hold = estimate_intervention_effect(
-            art["model_coolant"], treatment_value=0.0, control_value=0.0,
+            art["model_tool_age"], treatment_value=0.0, control_value=0.0,
         )
-        # 적용 (절삭유 +5% = coolant_temp −1σ standardised 감소): treatment=−1, control=0.
+        # 적용 (공구 교체 = tool_age −1σ standardised reset): treatment=−1, control=0.
         ate_apply = estimate_intervention_effect(
-            art["model_coolant"], treatment_value=-1.0, control_value=0.0,
+            art["model_tool_age"], treatment_value=-1.0, control_value=0.0,
         )
     ate_delta = ate_apply - ate_hold
 
     st.markdown(
-        "운영자가 v1 추천 **'보류'** 시 어떻게 되는지 시간 가속 시뮬 — "
+        "운영자가 v1 추천 **'공구 교체 보류'** 시 어떻게 되는지 시간 가속 시뮬 — "
         "`do(intervention = None)` counterfactual, **3시간 → 1초 압축**."
     )
     st.success(
         "🔬 **라이브 DoWhy ATE 호출 (5k row, backdoor.linear_regression)**  \n"
         f"- 보류 시 ATE = `{ate_hold:+.4f}` (baseline, treatment=control)  \n"
-        f"- 적용 시 ATE = `{ate_apply:+.4f}` (절삭유 +5% = `do(coolant_temp = −1σ)`)  \n"
+        f"- 적용 시 ATE = `{ate_apply:+.4f}` (공구 교체 = `do(tool_age = −1σ)`, reset)  \n"
         f"- **인과 효과 차이 Δ = `{ate_delta:+.4f}`** → 적용 시 DEFECT 확률 ↓"
     )
 
@@ -960,11 +933,11 @@ def render_simulation_evidence() -> None:
     with col_metrics:
         st.metric("시뮬 가속비", "3h → 1s", help="240× 압축 (DoWhy do(None) trajectory)")
         st.metric("defect_prob 예측", "62% → 95%", delta="+33%p", delta_color="inverse")
-        st.metric("결함 발생 예상", "~45분 후", help="motor_temp 100°C SOP 임계 도달")
+        st.metric("결함 발생 예상", "~45분 후", help="motor_temp 100°C SOP 임계 도달 (TWF secondary symptom)")
         st.metric(
             "🔬 라이브 ATE Δ", f"{ate_delta:+.4f}",
             delta_color="inverse",
-            help="DoWhy do(coolant_temp=−1σ) − do(=0) — 5k row 합성 데이터 실시간 계산",
+            help="DoWhy do(tool_age=−1σ) − do(=0) — 5k row 합성 데이터 실시간 계산",
         )
         st.caption("📊 보류 trajectory + 라이브 DoWhy ATE")
 
@@ -1590,7 +1563,7 @@ def render_operator_view() -> None:
     col_apply, col_hold, col_halt = st.columns(3)
     with col_apply:
         if st.button("✅ AI 추천 적용", use_container_width=True, type="primary"):
-            st.toast("✅ coolant_temp +5% 적용됨 — Slack 통보 발송", icon="✅")
+            st.toast("✅ 공구 교체 명령 발송 (tool_age reset) — Slack 통보", icon="✅")
     with col_hold:
         if st.button("⏸ 보류 (모니터링 계속)", use_container_width=True):
             st.toast("⏸ 보류 결정 — 운영자 모니터링 모드 유지", icon="⏸")
