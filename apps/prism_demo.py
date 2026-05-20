@@ -84,8 +84,9 @@ _MARKER_DESCRIPTIONS: dict[int, str] = {
 }
 
 # PRISM 차별화 KPI
-COST_PRISM_KRW_PER_MONTH = "₩10–20"
-COST_MES_KRW_PER_YEAR = "₩10,000+"
+COST_PRISM_KRW_PER_MONTH = "₩20,000"
+COST_PRISM_KRW_PER_YEAR = "₩240,000"
+COST_MES_KRW_PER_YEAR = "₩10,000,000+"
 
 # 인과 DAG 노드·엣지 (사전 계산, DoWhy 호출 없음)
 DAG_NODES = [
@@ -518,8 +519,8 @@ def render_header() -> None:
         st.metric(label="불량률 감소", value="-50%", delta="Defect")
     with col4:
         st.metric(
-            label="운영 비용 / 월",
-            value=COST_PRISM_KRW_PER_MONTH,
+            label="운영 비용 / 년",
+            value=COST_PRISM_KRW_PER_YEAR,
             delta=f"vs MES {COST_MES_KRW_PER_YEAR}/년",
             delta_color="inverse",
         )
