@@ -1,4 +1,4 @@
-# 인과 추론 강건성 검증 — DoWhy 6-Node DAG
+# 인과 추론 견고성 검증 — DoWhy 6-Node DAG
 
 ## DAG 구조
 
