@@ -1623,6 +1623,80 @@ def render_operator_view() -> None:
     )
 
 
+# ── V3 Enterprise Scale-out Vision ──────────────────────────────────────────────
+
+_V3_LAYERS: list[dict] = [
+    {
+        "title": "1️⃣  Streaming Layer — Kinesis Data Streams",
+        "image": "presentation/screenshots/measure-kds-dashboard.png",
+        "mvp": "In-process DuckDB (노트북 1대)",
+        "v3":  "KDS + Firehose, 1000대 robot 실시간 telemetry — GetRecords/PutRecords 처리량 + latency 모니터링",
+    },
+    {
+        "title": "2️⃣  ETL Pipeline — Airflow Medallion",
+        "image": "presentation/screenshots/airflow-daily-etl.png",
+        "mvp": "단일 Streamlit narrative",
+        "v3":  "Airflow DAG 5 단계 (quality_check → bronze → silver → gold → bedrock_report → cache_refresh) 일별 자동화",
+    },
+    {
+        "title": "3️⃣  Enterprise Portal — 1000대 Fleet Telemetry",
+        "image": "presentation/screenshots/portal-overview.png",
+        "mvp": "Streamlit 단일 대시보드",
+        "v3":  "FastAPI + Jinja2 Portal — 1K robot KPI · 116 이상치 · 7일 TWF/HDF/PWF/OSF/RNF 분포 · TOP 10 점검 대상",
+    },
+    {
+        "title": "4️⃣  ML Inference — 6-Class Failure Predict",
+        "image": "presentation/screenshots/predict-high.png",
+        "mvp": "src/ml/local_predictor.py 라이브 호출 (마커 1)",
+        "v3":  "Production predict UI — 자동 채우기 · HIGH/MEDIUM threshold · TWF 98% HIGH 시 공구 마모 교체 가이드",
+    },
+    {
+        "title": "5️⃣  LLM Operator — Bedrock NL Drill-down",
+        "image": "presentation/screenshots/bedrock-chat.png",
+        "mvp": "Supervisor cache_replay (마커 7~8)",
+        "v3":  "Claude Bedrock 자연어 분석 — '긴급 점검 대상 TOP 3' 동적 리포트 + 개별 robot drill-down 차트",
+    },
+]
+
+
+def render_enterprise_vision() -> None:
+    """V3 view — PRISM MVP 4 차별화 축이 1000대 enterprise stack 으로 확장된 예시.
+
+    legacy/ 의 실 구현 자산을 발췌해 평가자에게 scale-out 비전 시각 증거 제공.
+    본선 4분 timeline 외 toggle view — 평가자 자율 탐색용.
+    """
+    st.markdown("## 🚀 PRISM MVP → V3 Enterprise Scale-out Vision")
+    st.info(
+        "💡 **확장 narrative**: PRISM MVP (노트북 1대 + Streamlit + DuckDB + Bedrock cache) 가 "
+        "production 진입 시 동일 인과 DAG 구조를 유지하면서 1000대 robot fleet 으로 확장한 예시. "
+        "아래 5 layer 는 mason 의 사전 구축 자산 (`legacy/`) 발췌 — **동일 도메인 (제조) 의 layer 별 진화 경로**."
+    )
+    st.markdown("---")
+
+    for layer in _V3_LAYERS:
+        img_path = _ROOT / layer["image"]
+        with st.container(border=True):
+            st.markdown(f"### {layer['title']}")
+            col_img, col_text = st.columns([3, 2])
+            with col_img:
+                if img_path.exists():
+                    st.image(str(img_path), use_container_width=True)
+                else:
+                    st.warning(f"이미지 누락: {layer['image']}")
+            with col_text:
+                st.markdown(f"**MVP (현재)**  \n{layer['mvp']}")
+                st.markdown("")
+                st.markdown(f"**V3 (확장)**  \n{layer['v3']}")
+        st.markdown("")
+
+    st.markdown("---")
+    st.success(
+        "🎯 **scale-out 핵심**: 동일 6-Node 인과 DAG 구조 (`tool_age → vibration/thermal → "
+        "dimension_dev → DEFECT`) 를 식품·물류·반도체 등 타 도메인으로 **transfer 가능** — "
+        "변수만 도메인 맞춤 (온도 → 신선도, 진동 → 진동, 가동시간 → 가동시간), 인과 모델 구조는 재사용."
+    )
+
+
 def main() -> None:
     st.set_page_config(
         layout="wide",
@@ -1636,13 +1710,16 @@ def main() -> None:
     # View 모드 toggle (mason 의 advisor 권고 — Operator View 분리)
     view_mode = st.radio(
         "🎛️ View 모드",
-        options=["전체 시연 (Timeline View)", "🚨 운영자 대시보드 (Operator View)"],
+        options=["전체 시연 (Timeline View)", "🚨 운영자 대시보드 (Operator View)", "🚀 Enterprise Scale-out Vision (V3)"],
         index=0, horizontal=True,
-        help="Timeline = 평가자용 시연 view · Operator = 실 운영자 production UX",
+        help="Timeline = 평가자용 시연 view · Operator = 실 운영자 production UX · Enterprise = 대규모 파이프라인 확장 비전",
     )
 
     if view_mode == "🚨 운영자 대시보드 (Operator View)":
         render_operator_view()
+        return
+    elif view_mode == "🚀 Enterprise Scale-out Vision (V3)":
+        render_enterprise_vision()
         return
 
     # 마커 인덱스 세션 상태
