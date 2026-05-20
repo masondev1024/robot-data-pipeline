@@ -1,4 +1,5 @@
-"""PRISM 4분 시연 e2e 결정성 검증 (ADR v2 §7 Verification Gate, D-1 prep).
+"""PRISM 본선 시연 e2e 결정성 검증 (ADR v2 §7 Verification Gate, D-1 prep).
+앱 마커 auto-advance runtime 측정 (mason narration 시간과 별개).
 
 검증:
 1. assets/cache_replay.jsonl 51 entries

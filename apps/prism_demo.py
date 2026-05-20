@@ -1,4 +1,4 @@
-"""PRISM D-3 본선 4분 시연용 Streamlit app 골격.
+"""PRISM 본선 7분 시연용 Streamlit app 골격.
 
 ADR v2 Section 2 Decision 2/3 + Section 4 (cache architecture) 구현.
 9 마커 timeline + 사이드바 카드 + 메인 영역 KPI + Plotly 인과 DAG + auto-cascade fallback.
@@ -1758,7 +1758,7 @@ def render_enterprise_vision() -> None:
     """V3 view — PRISM MVP 4 차별화 축이 1000대 enterprise stack 으로 확장된 예시.
 
     legacy/ 의 실 구현 자산을 발췌해 평가자에게 scale-out 비전 시각 증거 제공.
-    본선 4분 timeline 외 toggle view — 평가자 자율 탐색용.
+    본선 7분 timeline 외 toggle view — 평가자 자율 탐색용.
     """
     st.markdown("## 🚀 PRISM MVP → V3 Enterprise Scale-out Vision")
     st.info(

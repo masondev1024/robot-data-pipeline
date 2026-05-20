@@ -22,7 +22,7 @@
 | 항목 | 내용 | ADR v2 처리 |
 |---|---|---|
 | 문제 정의 | 메이커스페이스 1인 운영자 RCA 1~2h → 10s, MES $10K+/년 → $10-20/월 (-98%) | 발표 메시지에 박힘 |
-| Closed-Loop 4-step | 센서통합 → 인과 RCA → Multi-Agent 협상 → 학습 자산화 | 4분 시연 11 마커에 1:1 매핑 |
+| Closed-Loop 4-step | 센서통합 → 인과 RCA → Multi-Agent 협상 → 학습 자산화 | 7분 시연 11 마커에 1:1 매핑 |
 | Agent 구조 | Sonnet Supervisor + Haiku × 4 (품질/안전/설비/생산), ~8초 응답 | `src/orchestration/agents/` (✅ 본체 완료, 도메인 prompt 자리표시자) |
 | 인과 모델 | 6-Node DAG (`tool_age, spindle_rpm, coolant_temp → vibration_xyz, thermal_drift → dimension_dev → DEFECT`) + DoWhy intervention | ⏳ `src/orchestration/causal_dag.py` (background) |
 | 스택 | Streamlit + Plotly / Bedrock / DoWhy + NetworkX / PuLP + ONNX / DuckDB in-process | DuckDB ✅ (`storage.py`), Bedrock ✅ (`agents/`), 나머지 진행 |

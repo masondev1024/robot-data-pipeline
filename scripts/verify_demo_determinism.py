@@ -180,10 +180,10 @@ def check_generator_sha256(
 
 
 def check_e2e_runtime(max_seconds: float = THRESHOLDS["e2e_runtime_seconds"]) -> MetricResult:
-    """Streamlit headless 4분 시연 runtime. D-1 까지 stub (pytest e2e 가 측정).
+    """Streamlit headless 시연 마커 auto-advance runtime. D-1 까지 stub (pytest e2e 가 측정).
 
     실제 측정: `streamlit run apps/prism_demo.py --server.headless=true` +
-    Playwright 로 4:00 마커 hit 까지 wall clock.
+    Playwright 로 M10 (3:45) 마커 hit 까지 wall clock. mason narration 7분과 별개.
     """
     log_path = Path("metrics/e2e_runtime.jsonl")
     if not log_path.exists():

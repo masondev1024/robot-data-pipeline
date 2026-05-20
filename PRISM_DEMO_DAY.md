@@ -1,6 +1,6 @@
 # PRISM 본선 D-Day 운영 매뉴얼 (2026-05-22 금)
 
-> 4분 시연 + 5분 발표 = 9분 평가. 사전 결정성 99%+, fallback 영상 swap 자동.
+> 7분 시연 + 5분 발표 = 12분 평가 (+1분 Q&A). 사전 결정성 99%+, fallback 영상 swap 자동.
 > 본 문서 = mason 의 8시간 운영 step-by-step 체크리스트.
 
 ---
@@ -131,7 +131,7 @@ python3 scripts/verify_demo_determinism.py --rehearse=2026-05-22
 
 ### 시나리오 A: Streamlit 화면이 안 뜸
 - 터미널에서 `Ctrl+C` 후 재실행
-- 또는 PPTX 슬라이드만으로 발표 (4분 시연 skip)
+- 또는 PPTX 슬라이드만으로 발표 (7분 시연 skip)
 
 ### 시나리오 B: cache miss → "Cache miss — 영상 fallback 전환"
 - 자동으로 `presentation/prism_demo_master.mp4` 재생
