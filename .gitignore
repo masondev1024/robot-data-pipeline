@@ -43,6 +43,11 @@ data/seed_data.csv
 data/*.zip
 data/*.duckdb
 
+# 시연 녹화 영상 — 용량 커서 git LFS 없이는 절대 commit 금지
+prism/recordings/
+*.mov
+*.mp4
+
 # legacy/ 안의 terraform state 도 동일 보호 (credential leak 방지)
 **/.terraform/
 **/*.tfstate
