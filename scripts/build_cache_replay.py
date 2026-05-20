@@ -257,7 +257,7 @@ RESPONSES: dict[str, dict[str, dict[str, dict]]] = {
             "production": {
                 "numeric": {"throughput_uph": 247.0, "schedule_feasible": True, "lp_solution_id": "lp_continue_recover_a1b2"},
                 "narrative_kr": "[ROBOT-00018] 회복 후 표준 UPH 247 복원. "
-                                "LP lp_continue_recover_a1b2 — 스케줄 실행 가능. OEE +35% 달성.",
+                                "LP lp_continue_recover_a1b2 — 스케줄 실행 가능. OEE +32%p 달성.",
             },
         },
         "halt": {
@@ -390,7 +390,7 @@ SUPERVISOR_RESPONSES: dict[str, dict] = {
             ],
             "rationale_kr": (
                 "continue 채택 — net_value ₩3,892,000 (2순위 대비 +₩3,892,000). "
-                "회복 후 UPH 247 복원. 결함 18%, 안전 위반 5%. OEE +35% 달성."
+                "회복 후 UPH 247 복원. 결함 18%, 안전 위반 5%. OEE +32%p 달성."
             ),
             "tradeoff_breakdown": {
                 "throughput_gain_KRW":  17_784_000.0,

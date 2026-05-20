@@ -248,7 +248,7 @@ PYTHONHASHSEED=2026 PRISM_MODE=demo \
 
 | cum_t | 액션 | 화면 포커스 |
 |---|---|---|
-| 6:25~6:35 | 🎤 "최종 OEE +35%. Nakajima 표준 — 가용, 성능, 품질 모두 개선." / 👆 cursor OEE evidence 카드 hover, 3 sub-metric 차례로 | OEE evidence |
+| 6:25~6:35 | 🎤 "최종 OEE 0.34 → 0.67, +32%p Nakajima 절대 표준. 가용·성능·품질 모두 개선." / 👆 cursor OEE evidence 카드 hover, 3 sub-metric 차례로 | OEE evidence |
 | 6:35~6:50 | 🎤 "비용 임팩트: 연 24만원 PRISM vs MES 천만원 — 98% 감소." / 👆 cursor cost_impact 카드 hover, `-98%` 강조 | 비용 카드 |
 | 6:50~7:00 | 🎤 "1인 메이커스페이스가 엔터프라이즈급 RCA + 인과 추론을 활용합니다." / 👀 cursor closed_loop_summary 카드 전체 sweep | closed-loop 카드 |
 | 7:00~7:03 | 🎤 "시연 끝났습니다. 질문 받겠습니다." / 👀 cursor 화면 상단 PRISM 헤더로 복귀 | 헤더 |

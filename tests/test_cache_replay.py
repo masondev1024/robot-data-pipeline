@@ -273,7 +273,7 @@ def test_fault_scenario_supervisor_recommends_halt():
 
 
 def test_recovery_scenario_supervisor_recommends_continue():
-    """recovery 시나리오 supervisor 가 continue 권고 (OEE +35% 회복)."""
+    """recovery 시나리오 supervisor 가 continue 권고 (OEE +32%p 회복)."""
     entries = _load_entries()
     recovery_sup = json.loads(entries[50]["response"])
     assert recovery_sup["decision"]["action_id"] == "continue", (

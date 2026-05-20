@@ -57,7 +57,7 @@ MARKERS: list[tuple[int, str]] = [
     (135, "2:15 4 Agent"),
     (180, "3:00 Supervisor"),
     (210, "3:30 재학습 0.81→0.97"),
-    (225, "3:45 OEE +35%"),
+    (225, "3:45 OEE +32%p"),
 ]
 TOTAL_SECONDS = 225  # 3:45
 
@@ -80,7 +80,7 @@ _MARKER_DESCRIPTIONS: dict[int, str] = {
     7:  "4 Domain Agent 가 동시 분석 (품질·안전·설비·생산)",
     8:  "Supervisor 가 Net Value 산정 — 최적 액션 권고",
     9:  "라이브 XGBoost 재학습 — incident #47 패턴 추가, accuracy 라이브 측정",
-    10: "OEE +35% 달성, 시연 완료",
+    10: "OEE +32%p 달성, 시연 완료",
 }
 
 # PRISM 차별화 KPI
@@ -184,7 +184,7 @@ _MARKER_TO_SCENARIO: dict[int, str] = {
     7: "fault",    # 2:15 4 Agent 협상
     8: "fault",    # 3:00 Supervisor 결정
     9: "recover",  # 3:30 재학습 (라이브 측정값은 _get_retrain_artifact)
-    10: "recover", # 3:45 OEE +35%
+    10: "recover", # 3:45 OEE +32%p (0.34→0.67 Nakajima 절대)
 }
 
 _SCENARIOS: dict[str, dict] = {
@@ -237,7 +237,7 @@ _MARKER_SUB_KPIS: dict[int, list[tuple[str, str]]] = {
     6:  [("CE 정확도", "0.78→0.71"), ("σ_max", "0.40→0.38")],
     8:  [("Net Value", "₩100M"), ("권고 강도", "강한")],
     9:  [("정확도", "라이브"), ("개선", "라이브 Δ")],
-    10: [("OEE", "66%"), ("개선", "+35%")],
+    10: [("OEE", "66.5%"), ("개선", "+32.4%p")],
 }
 
 
@@ -511,7 +511,7 @@ def render_header() -> None:
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric(label="OEE 개선", value="+35%", delta="목표 달성")
+        st.metric(label="OEE 개선", value="+32%p", delta="목표 달성")
     with col2:
         st.metric(label="RCA 소요시간 단축", value="-90%", delta="4h → 24min")
     with col3:
@@ -1337,8 +1337,8 @@ def render_cost_impact() -> None:
 
 
 def render_oee_evidence() -> None:
-    """마커 10 (3:45 OEE +35%) 근거 — Availability × Performance × Quality (Nakajima 표준)."""
-    st.markdown("##### 🏭 OEE +35% 달성 — Nakajima 3 구성 요소")
+    """마커 10 (3:45 OEE +32%p) 근거 — Availability × Performance × Quality (Nakajima 표준)."""
+    st.markdown("##### 🏭 OEE +32%p 달성 — Nakajima 3 구성 요소")
 
     components = ["Availability<br>(가용률)", "Performance<br>(성능률)", "Quality<br>(품질률)"]
     before = [0.75, 0.70, 0.65]   # OEE = 0.341
@@ -1350,7 +1350,7 @@ def render_oee_evidence() -> None:
     with col_card:
         st.metric("OEE 개선 전", f"{oee_before:.1%}")
         st.metric("OEE 개선 후", f"{oee_after:.1%}",
-                  delta=f"+{(oee_after / oee_before - 1) * 100:.0f}% (relative)")
+                  delta=f"+{(oee_after - oee_before) * 100:.1f}%p (절대)")
         st.caption("OEE = 가용 × 성능 × 품질  (Nakajima 1989)")
 
     with col_chart:
@@ -1976,7 +1976,7 @@ def main() -> None:
             _d = ((_a - _b) / _b * 100) if _b > 0 else 0
             st.success(f"🎓 재학습: {_b:.2f} → {_a:.2f} ({_d:+.0f}%)")
         if marker_idx >= 10:
-            st.success("🏭 OEE +35% 달성")
+            st.success("🏭 OEE +32%p 달성 (0.34→0.67)")
 
     st.markdown("---")
     st.caption(

@@ -31,7 +31,7 @@ fact line ("현재 incident CNC-01 · 정상 가동 9대") 가 보이면 정상.
 | 7 | 2:15 | 4 Agent | **라이브 4 Domain Agent** (품질·안전·설비·생산, Bedrock cache_replay) |
 | 8 | 3:00 | Supervisor | **라이브 Supervisor Net Value** 산정 — 최적 액션 권고 |
 | 9 | 3:30 | 재학습 0.81→0.97 | 라이브 XGBoost fit() 재학습 (+20%) |
-| 10 | 3:45 | OEE +35% | OEE 달성 + Closed-Loop 요약 + 비용 임팩트 |
+| 10 | 3:45 | OEE +32%p | OEE 0.34→0.67 (Nakajima) + Closed-Loop 요약 + 비용 임팩트 |
 
 운영자 조작: 우측 컬럼 **◀ Prev / Next ▶** 버튼으로 마커 이동. "처음으로" 버튼으로 0 으로 리셋.
 

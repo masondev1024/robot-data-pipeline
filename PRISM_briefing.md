@@ -26,8 +26,8 @@
 | Agent 구조 | Sonnet Supervisor + Haiku × 4 (품질/안전/설비/생산), ~8초 응답 | `src/orchestration/agents/` (✅ 본체 완료, 도메인 prompt 자리표시자) |
 | 인과 모델 | 6-Node DAG (`tool_age, spindle_rpm, coolant_temp → vibration_xyz, thermal_drift → dimension_dev → DEFECT`) + DoWhy intervention | ⏳ `src/orchestration/causal_dag.py` (background) |
 | 스택 | Streamlit + Plotly / Bedrock / DoWhy + NetworkX / PuLP + ONNX / DuckDB in-process | DuckDB ✅ (`storage.py`), Bedrock ✅ (`agents/`), 나머지 진행 |
-| KPI | OEE +35% / RCA -90% / Defect -50% | ADR Section 1 Drivers + 발표 슬라이드 |
-| 시연 11 마커 (0:00~3:45) | 0:00 정상 → 0:15 예지 (TWF, tool_age 18h) → 0:30 인과v1 (공구 교체 추천) → 0:45 운영자결정 → 1:00 시뮬 do(tool_age) → 1:15 불량 → 1:30 인과v2 → 2:15 4 Agent → 3:00 Supervisor → 3:30 재학습 → 3:45 OEE +35% | ADR Section 5 Pre-mortem 5 + Section 7 Verification gate |
+| KPI | OEE +32%p / RCA -90% / Defect -50% | ADR Section 1 Drivers + 발표 슬라이드 |
+| 시연 11 마커 (0:00~3:45) | 0:00 정상 → 0:15 예지 (TWF, tool_age 18h) → 0:30 인과v1 (공구 교체 추천) → 0:45 운영자결정 → 1:00 시뮬 do(tool_age) → 1:15 불량 → 1:30 인과v2 → 2:15 4 Agent → 3:00 Supervisor → 3:30 재학습 → 3:45 OEE +32%p | ADR Section 5 Pre-mortem 5 + Section 7 Verification gate |
 
 **기획서 약점 3가지 → ADR v2 가 모두 처리**:
 1. Unobserved Confounder 노출 부재 → **Decision 3** Streamlit 사이드바 카드 + DoWhy native expander 토글 + σ_max < 0.5/1.0 임계 (Wright 1991 partial R²).
