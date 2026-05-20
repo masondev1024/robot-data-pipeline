@@ -1,19 +1,19 @@
 {
   "sigma_max": 0.4,
   "narrative_kr": "4 refuter 통과, effect sign 유지. σ_max=0.40 (robust) — 관측되지 않은 교란변수가 결과 분산의 40% 이하를 설명해야 effect 방향이 역전됩니다.",
-  "raw_print": "Refute: Use a Placebo Treatment\nEstimated effect:0.1179880094458795\nNew effect:0.0\np value:2.0\n\n\nRefute: Add a random common cause\nEstimated effect:0.1179880094458795\nNew effect:0.11798200785940544\np value:0.96\n\n\nRefute: Use a subset of data\nEstimated effect:0.1179880094458795\nNew effect:0.11835776274787492\np value:0.82\n",
+  "raw_print": "Refute: Use a Placebo Treatment\nEstimated effect:0.11798800944587962\nNew effect:0.0\np value:2.0\n\n\nRefute: Add a random common cause\nEstimated effect:0.11798800944587962\nNew effect:0.11798200785940542\np value:0.96\n\n\nRefute: Use a subset of data\nEstimated effect:0.11798800944587962\nNew effect:0.11835776274787485\np value:0.82\n\n\nRefute: Add an Unobserved Common Cause (σ_max = 0.4000, Wright 1991 partial R² proxy, < 0.5 → robust)\nEstimated effect:0.11798800944587962\nNew effect:-0.035083877314061485",
   "method_summary": {
     "placebo": {
       "p_value": 2.0
     },
     "random_common_cause": {
-      "new_effect": 0.11798200785940544
+      "new_effect": 0.11798200785940542
     },
     "unobserved_common_cause": {
       "sigma_max": 0.4
     },
     "data_subset": {
-      "new_effect": 0.11835776274787492
+      "new_effect": 0.11835776274787485
     }
   }
 }

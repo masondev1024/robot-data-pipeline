@@ -46,8 +46,10 @@ def main() -> None:
     print("[precompute] compute_sigma_max 실행 중... (약 1-2분 소요)")
     sigma_max, summary = compute_sigma_max(model, num_simulations=args.num_simulations, seed=args.seed)
 
-    print("[precompute] raw_print 수집 중...")
-    raw_print = _collect_raw_print(model, num_simulations=args.num_simulations, seed=args.seed)
+    print("[precompute] raw_print 수집 중... (4 refuter, σ_max=%.4f 포함)" % sigma_max)
+    raw_print = _collect_raw_print(
+        model, num_simulations=args.num_simulations, seed=args.seed, sigma_max=sigma_max,
+    )
 
     serialize_refute_data(sigma_max=sigma_max, summary=summary, raw_print=raw_print, path=args.out)
 

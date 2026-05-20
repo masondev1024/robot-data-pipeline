@@ -310,9 +310,18 @@ def compute_sigma_max(
     return sigma_max, summary
 
 
-def _collect_raw_print(model: dowhy.CausalModel, num_simulations: int = 100, seed: int = 2026) -> str:
-    """4 refute method 의 str() 결과 concat (causal_card raw_print 필드용)."""
-    import io
+def _collect_raw_print(
+    model: dowhy.CausalModel,
+    num_simulations: int = 100,
+    seed: int = 2026,
+    sigma_max: float | None = None,
+) -> str:
+    """4 refute method 의 str() 결과 concat (causal_card raw_print 필드용).
+
+    sigma_max 가 주어지면 4번째 refuter (add_unobserved_common_cause) 도 σ_max 임계값에서
+    호출해 추가. narrative.md / method_summary 와 raw_print 의 refuter 개수 불일치(3 vs 4)를
+    바로잡는 fix — UI "🔍 자세히" 펼침에서 4개 결과가 모두 보인다.
+    """
     np.random.seed(seed)
 
     identified = model.identify_effect()
@@ -328,6 +337,26 @@ def _collect_raw_print(model: dowhy.CausalModel, num_simulations: int = 100, see
         ]:
             r = model.refute_estimate(identified, estimate, method_name=method, **kwargs)
             lines.append(str(r))
+
+        # 4번째: σ_max 임계점의 unobserved common cause refuter
+        if sigma_max is not None:
+            r_unobs = model.refute_estimate(
+                identified,
+                estimate,
+                method_name="add_unobserved_common_cause",
+                confounders_effect_on_treatment="linear",
+                confounders_effect_on_outcome="linear",
+                effect_strength_on_treatment=sigma_max,
+                effect_strength_on_outcome=sigma_max,
+            )
+            # DoWhy str() 첫 줄 "Refute: Add an Unobserved Common Cause" 를 σ_max annotation
+            # 포함 헤더로 교체 — UI 가독성 (단일 헤더 + 메트릭 본문)
+            r_unobs_str = str(r_unobs)
+            r_unobs_body = "\n".join(r_unobs_str.splitlines()[1:])
+            lines.append(
+                f"Refute: Add an Unobserved Common Cause (σ_max = {sigma_max:.4f}, "
+                f"Wright 1991 partial R² proxy, < 0.5 → robust)\n{r_unobs_body}"
+            )
 
     return "\n\n".join(lines)
 
