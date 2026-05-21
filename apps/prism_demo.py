@@ -1588,44 +1588,37 @@ def render_sidebar(alpha: float, beta: float, gamma: float) -> tuple[float, floa
             st.session_state["cnc_stream_running"] = not stream_running
             st.rerun()
 
+        # display only — 실제 적재 + sleep + rerun loop 은 main() 끝에서 실행
+        # (sidebar 내부에서 rerun 호출하면 Next/Prev/슬라이더 click 이벤트 preempt 됨)
         if st.session_state["cnc_stream_running"]:
-            import time
-            from src.generator.cnc_stream import CNCStreamGenerator  # noqa: PLC0415
             from src.orchestration.storage import StorageDB  # noqa: PLC0415
 
             gen = _get_cnc_generator()
-
-            # 현재 t 에서 1s 진행
             t = float(st.session_state["cnc_t"])
-            sample = gen.next_sample(t)
-            st.session_state["cnc_t"] = t + 1.0
 
-            # DuckDB 적재
+            # DuckDB 현재 누적 row 수만 조회 (write 는 main() loop 에서)
             db_path = _ROOT / "data" / "prism_demo.duckdb"
-            db_path.parent.mkdir(parents=True, exist_ok=True)
-            with StorageDB(str(db_path)) as db:
-                db.write_cnc([sample])
-                cnc_total = db.count("cnc_telemetry")
+            cnc_total = 0
+            if db_path.exists():
+                try:
+                    with StorageDB(str(db_path)) as db:
+                        cnc_total = db.count("cnc_telemetry")
+                except Exception:
+                    pass
 
-            st.caption(f"t={t:.0f}s · 총 {cnc_total}행 적재 · machine_id={sample['machine_id']}")
+            st.caption(f"t={t:.0f}s · 총 {cnc_total}행 적재 (loop active)")
 
-            # last 10s 센서 표
+            # last 10s 센서 표 + 차트 (generator deterministic)
             history_samples = [gen.next_sample(float(max(0.0, t - 9 + i))) for i in range(10)]
             import pandas as pd  # noqa: PLC0415
             df_hist = pd.DataFrame(history_samples)[
                 ["ts", "spindle_rpm", "coolant_temp", "vibration_xyz", "thermal_drift", "dimension_dev"]
             ]
             st.dataframe(df_hist.tail(10), use_container_width=True, hide_index=True)
-
-            # 라인 차트 (coolant_temp, vibration_xyz, thermal_drift)
             st.line_chart(
                 df_hist[["coolant_temp", "vibration_xyz", "thermal_drift"]].reset_index(drop=True),
                 height=160,
             )
-
-            # 1초 후 자동 갱신
-            time.sleep(1.0)
-            st.rerun()
         else:
             st.caption("▶ Start stream 버튼으로 라이브 스트림을 시작합니다.")
 
@@ -2081,6 +2074,26 @@ def main() -> None:
     st.caption(
         f"PRISM v0.1-demo  |  PRISM_MODE={_PRISM_MODE}  |  본선 5/22 시연용"
     )
+
+    # ── 🔴 LIVE CNC stream LOOP ─────────────────────────────────────────
+    # 모든 widget click 이벤트 (Next/Prev/슬라이더/View 모드) 처리 후 마지막에 실행.
+    # 이 위치 보장이 안 되면 sidebar 내부 rerun 이 click 이벤트를 preempt 함.
+    if st.session_state.get("cnc_stream_running"):
+        import time
+        from src.orchestration.storage import StorageDB  # noqa: PLC0415
+
+        gen = _get_cnc_generator()
+        t = float(st.session_state["cnc_t"])
+        sample = gen.next_sample(t)
+        st.session_state["cnc_t"] = t + 1.0
+
+        db_path = _ROOT / "data" / "prism_demo.duckdb"
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        with StorageDB(str(db_path)) as db:
+            db.write_cnc([sample])
+
+        time.sleep(1.0)
+        st.rerun()
 
 
 if __name__ == "__main__":
