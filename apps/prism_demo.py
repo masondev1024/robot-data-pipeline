@@ -250,6 +250,7 @@ _CANDIDATE_ACTIONS: list[str] = [
 ]
 
 
+@st.cache_data(show_spinner="🤖 4 Agent × candidate 협상 중... (병렬 호출, 약 20초)")
 def _real_supervisor_decision(
     marker_idx: int,
     alpha: float,
@@ -1804,7 +1805,7 @@ def render_enterprise_vision() -> None:
 def main() -> None:
     st.set_page_config(
         layout="wide",
-        page_title="PRISM Demo",
+        page_title="PRISM Live" if _PRISM_MODE == "live" else "PRISM Demo",
         page_icon="🏭",
     )
 

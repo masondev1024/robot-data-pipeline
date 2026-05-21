@@ -17,6 +17,7 @@ system_prompt 는 자리표시자. D-3 새벽 사용자 + /ccg 합의 후 fill.
 from __future__ import annotations
 
 import os
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from src.orchestration.agents.base import BaseAgent
 from src.orchestration.agents.equipment import EquipmentAgent
@@ -122,13 +123,19 @@ class Supervisor:
         )
 
     def _fan_out(self, action_id: str, scenario_context: dict) -> CandidateAction:
-        """단일 action 에 대해 4 Agent invoke → CandidateAction 조립."""
+        """단일 action 에 대해 4 Agent invoke → CandidateAction 조립.
+
+        4 agent 호출은 ThreadPoolExecutor 로 병렬 (boto3 client thread-safe).
+        live 모드 응답 시간 4x 단축.
+        """
         user_prompt = self._build_user_prompt(action_id, scenario_context)
 
-        q = self.quality.invoke(user_prompt, context=scenario_context)
-        s = self.safety.invoke(user_prompt, context=scenario_context)
-        e = self.equipment.invoke(user_prompt, context=scenario_context)
-        p = self.production.invoke(user_prompt, context=scenario_context)
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            f_q = ex.submit(self.quality.invoke, user_prompt, context=scenario_context)
+            f_s = ex.submit(self.safety.invoke, user_prompt, context=scenario_context)
+            f_e = ex.submit(self.equipment.invoke, user_prompt, context=scenario_context)
+            f_p = ex.submit(self.production.invoke, user_prompt, context=scenario_context)
+            q, s, e, p = f_q.result(), f_s.result(), f_e.result(), f_p.result()
 
         return CandidateAction(
             action_id=action_id,

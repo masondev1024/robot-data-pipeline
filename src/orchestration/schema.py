@@ -22,7 +22,7 @@ class QualityNumeric(BaseModel):
 class QualityAgentOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     numeric: QualityNumeric
-    narrative_kr: str = Field(..., max_length=300)
+    narrative_kr: str = Field(..., max_length=600)
 
 
 class SafetyNumeric(BaseModel):
@@ -35,7 +35,7 @@ class SafetyNumeric(BaseModel):
 class SafetyAgentOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     numeric: SafetyNumeric
-    narrative_kr: str = Field(..., max_length=300)
+    narrative_kr: str = Field(..., max_length=600)
 
 
 class EquipmentNumeric(BaseModel):
@@ -47,7 +47,7 @@ class EquipmentNumeric(BaseModel):
 class EquipmentAgentOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     numeric: EquipmentNumeric
-    narrative_kr: str = Field(..., max_length=300)
+    narrative_kr: str = Field(..., max_length=600)
 
 
 class ProductionNumeric(BaseModel):
@@ -60,7 +60,7 @@ class ProductionNumeric(BaseModel):
 class ProductionAgentOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     numeric: ProductionNumeric
-    narrative_kr: str = Field(..., max_length=300)
+    narrative_kr: str = Field(..., max_length=600)
 
 
 class CandidateAction(BaseModel):
@@ -98,7 +98,7 @@ class SupervisorDecision(BaseModel):
     action_id: str
     net_value_KRW: float
     alternatives: list[AlternativeAction] = Field(..., max_length=4)
-    rationale_kr: str = Field(..., max_length=300)
+    rationale_kr: str = Field(..., max_length=600)
     tradeoff_breakdown: TradeoffBreakdown
 
 

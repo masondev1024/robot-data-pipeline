@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import sys
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -122,19 +124,24 @@ class BaseAgent(ABC):
 
         raw_text: str = result["response"]
 
-        # Strip markdown fences if model wraps JSON in ```json ... ```
         stripped = raw_text.strip()
-        if stripped.startswith("```"):
-            lines = stripped.splitlines()
-            stripped = "\n".join(
-                lines[1:-1] if lines[-1].strip() == "```" else lines[1:]
-            ).strip()
+        stripped = re.sub(r"^```(?:json)?\s*\n?", "", stripped)
+        stripped = re.sub(r"\n?```\s*$", "", stripped)
+        match = re.search(r"\{.*\}", stripped, re.DOTALL)
+        if match:
+            stripped = match.group(0)
 
         try:
             raw_dict = json.loads(stripped)
         except json.JSONDecodeError as exc:
+            print(
+                f"\n[{self.name}] FAILED JSON parse. FULL raw_text follows:\n"
+                f"{'─' * 60}\n{raw_text}\n{'─' * 60}\n",
+                file=sys.stderr, flush=True,
+            )
             raise ValueError(
-                f"[{self.name}] LLM returned non-JSON: {raw_text[:200]!r}"
+                f"[{self.name}] LLM returned non-JSON (len={len(raw_text)}): "
+                f"{raw_text[:500]!r}"
             ) from exc
 
         # Pydantic validation — raises ValidationError on schema mismatch
