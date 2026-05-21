@@ -14,14 +14,15 @@ docker compose logs app | tail -20
 
 브라우저 접속: <http://localhost:8501>
 콘솔 상단 "PRISM — Predictive Real-time Intelligence for Smart Manufacturing"
-헤더 + KPI 카드 4장(OEE/RCA/Defect/비용) + 그 아래 **🏭 10대 CNC fleet 라이브 모니터링**
-fact line ("현재 incident CNC-01 · 정상 가동 9대") 가 보이면 정상.
+헤더 + **🏭 10대 CNC fleet** caption ("현재 incident CNC-01 · 정상 가동 9대") 이 보이면 정상.
+**KPI 카드 4장 (OEE/RCA/Defect/비용) 은 M10 도달 시 final reveal** — 시연 초반에는 숨김
+(mason 5/21: 결말 spoiler 차단 + fleet 컨텍스트 priority 확보 + 평가자 0초 검증 욕구 자극 차단).
 
 ## 시연 timeline (apps/prism_demo.py MARKERS 와 일치)
 
 | idx | 시각 | 라벨 | 설명 |
 |---|---|---|---|
-| 0 | 0:00 | 정상 | 센서 데이터 정상 흐름, 모든 라인 가동 중 |
+| 0 | 0:00 | 정상 | **fleet overview** (10대 chip + 3 metric: Fleet/정상/Incident) + DAG baseline 회색 + DuckDB cnc_telemetry 정상 phase row 라이브 read |
 | 1 | 0:15 | 예지경보 risk62% | **라이브 XGBoost 6-class predict_proba** (TWF 1순위, tool_age 18h 누적 — 표준 200h 대비 빠른 마모) |
 | 2 | 0:30 | 인과 v1 | DoWhy 6-Node DAG 인과 추론 v1 — **공구 교체 추천 (tool_age reset)**. XGBoost 감지 변수와 통일 |
 | 3 | 0:45 | 운영자결정 | **운영자 "보류"** (공구 교체 4h 정지 부담, v1 추천 미적용) |
@@ -31,7 +32,7 @@ fact line ("현재 incident CNC-01 · 정상 가동 9대") 가 보이면 정상.
 | 7 | 2:15 | 4 Agent | **라이브 4 Domain Agent** (품질·안전·설비·생산, Bedrock cache_replay) |
 | 8 | 3:00 | Supervisor | **라이브 Supervisor Net Value** 산정 — 최적 액션 권고 |
 | 9 | 3:30 | 재학습 0.81→0.97 | 라이브 XGBoost fit() 재학습 (+20%) |
-| 10 | 3:45 | OEE +32%p | OEE 0.34→0.67 (Nakajima) + Closed-Loop 요약 + 비용 임팩트 |
+| 10 | 3:45 | OEE +32%p | **KPI strip final reveal** (4 KPI 첫 등장 — OEE/RCA/Defect/비용) + OEE 0.34→0.67 (Nakajima) + Closed-Loop 요약 + 비용 임팩트 |
 
 운영자 조작: 우측 컬럼 **◀ Prev / Next ▶** 버튼으로 마커 이동. "처음으로" 버튼으로 0 으로 리셋.
 

@@ -106,11 +106,13 @@ def test_invalid_defect_prob_above_1():
         QualityNumeric(defect_prob=1.5, top_failure_type="HDF")
 
 
-def test_invalid_narrative_kr_length_over_300():
+def test_invalid_narrative_kr_length_over_600():
+    # mason 32차 (2026-05-21): schema max_length 300 → 600 확대 (라이브 Bedrock 응답 정합).
+    # 테스트 threshold 도 600 기준으로 동기화.
     with pytest.raises(ValidationError):
         QualityAgentOutput(
             numeric=QualityNumeric(defect_prob=0.5, top_failure_type="HDF"),
-            narrative_kr="가" * 301,
+            narrative_kr="가" * 601,
         )
 
 

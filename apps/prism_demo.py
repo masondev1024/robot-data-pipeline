@@ -508,9 +508,28 @@ def _seed_storage_demo() -> dict:
 # ── UI 컴포넌트 ──────────────────────────────────────────────────────────────────
 
 def render_header() -> None:
-    """상단 KPI 카드 4개 (OEE / RCA / Defect / 비용 비교)."""
+    """상단 PRISM 헤더 + fleet caption (모든 마커·view 공통).
+
+    mason 5/21 피드백: KPI 4장 (OEE/RCA/Defect/비용) 은 M10 final reveal 까지 숨김 —
+    결말 spoiler 방지 + 시연 초반 fleet 컨텍스트 priority 확보. KPI 는 render_kpi_strip()
+    이 M10 도달 시점에 별도 호출.
+    """
     st.markdown("## PRISM — Predictive Real-time Intelligence for Smart Manufacturing")
 
+    # Fleet 배경 fact — narrative 는 incident 1대 중심, 9대 정상 가동은 배경.
+    st.caption(
+        f"🏭 **{FLEET_SIZE}대 CNC fleet** 라이브 모니터링 (DuckDB cnc_telemetry) · "
+        f"현재 incident **{INCIDENT_MACHINE_ID}** · 정상 가동 **{len(HEALTHY_MACHINE_IDS)}대** "
+        f"({HEALTHY_MACHINE_IDS[0]} ~ {HEALTHY_MACHINE_IDS[-1]})"
+    )
+
+
+def render_kpi_strip() -> None:
+    """PRISM 4 KPI final reveal — M10 timeline view 안에서만 호출.
+
+    mason 5/21 직관: KPI 가 모든 마커 상단에 박혀 있으면 결말 spoiler. M10 reveal 로
+    "이게 시연 결과" 임팩트 유지 + 평가자 검증 욕구 자극 차단.
+    """
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric(label="OEE 개선", value="+32%p", delta="목표 달성")
@@ -526,11 +545,56 @@ def render_header() -> None:
             delta_color="inverse",
         )
 
-    # Fleet 배경 fact — narrative 는 incident 1대 중심, 9대 정상 가동은 배경.
+
+def render_fleet_overview() -> None:
+    """M0 fleet 시각화 — 10대 CNC chip + 3 KPI (Fleet/정상/Incident).
+
+    mason 5/21 직관: 시연 도입에서 "10대 fleet 중 1대 incident deep dive" 컨텍스트를
+    결말 KPI 4장 대신 fleet 상황 시각화로 청중에게 우선 전달.
+    """
+    # 3 KPI metric (fleet 컨텍스트)
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("Fleet 규모", f"{FLEET_SIZE}대",
+                  help="DuckDB cnc_telemetry distinct machine_id")
+    with c2:
+        st.metric("정상 가동", f"{len(HEALTHY_MACHINE_IDS)}대", delta="OK")
+    with c3:
+        st.metric("Incident", "1대",
+                  delta=f"⚠️ {INCIDENT_MACHINE_ID}", delta_color="inverse")
+
+    # Fleet chip row (plotly) — 10대 시각화
+    fig = go.Figure()
+    x_pos = list(range(FLEET_SIZE))
+    colors = ["#d62728" if m == INCIDENT_MACHINE_ID else "#2ca02c"
+              for m in FLEET_MACHINE_IDS]
+    fig.add_trace(go.Scatter(
+        x=x_pos, y=[0] * FLEET_SIZE, mode="markers+text",
+        marker=dict(size=44, color=colors, line=dict(width=2, color="white")),
+        text=[m.split("-")[1] for m in FLEET_MACHINE_IDS],
+        textposition="middle center",
+        textfont=dict(color="white", size=12, family="Arial Black"),
+        hovertext=FLEET_MACHINE_IDS,
+        hoverinfo="text",
+    ))
+    fig.add_shape(
+        type="line", x0=0, x1=FLEET_SIZE - 1,
+        y0=0, y1=0, line=dict(color="#cccccc", width=2), layer="below",
+    )
+    fig.update_layout(
+        height=110, margin=dict(l=10, r=10, t=10, b=10),
+        xaxis=dict(visible=False, range=[-0.5, FLEET_SIZE - 0.5]),
+        yaxis=dict(visible=False, range=[-0.5, 0.5]),
+        plot_bgcolor="white", paper_bgcolor="white", showlegend=False,
+    )
+    st.plotly_chart(fig, use_container_width=True,
+                    config={"displayModeBar": False})
+
     st.caption(
-        f"🏭 **{FLEET_SIZE}대 CNC fleet** 라이브 모니터링 (DuckDB cnc_telemetry) · "
-        f"현재 incident **{INCIDENT_MACHINE_ID}** · 정상 가동 **{len(HEALTHY_MACHINE_IDS)}대** "
-        f"({HEALTHY_MACHINE_IDS[0]} ~ {HEALTHY_MACHINE_IDS[-1]})"
+        f"🔴 빨강 = incident ({INCIDENT_MACHINE_ID}, 시연 deep dive 대상) · "
+        f"🟢 초록 = 정상 가동 {len(HEALTHY_MACHINE_IDS)}대 · "
+        "PRISM 은 incident 1대에 스마트 공정 로직 (예지 → 인과 → 협상 → 재학습) 을 "
+        "적용해 청중에게 시각적으로 전달합니다."
     )
 
 
@@ -1852,6 +1916,7 @@ def main() -> None:
             render_causal_dag(marker_idx)
             _render_dag_color_caption(marker_idx)
             if marker_idx == 0:
+                render_fleet_overview()
                 st.markdown("---")
                 render_normal_status()
             elif marker_idx == 1:
@@ -1928,8 +1993,10 @@ def main() -> None:
             st.markdown("---")
             render_feature_importance_change()
 
-        # 마커 10: OEE + Closed-Loop 요약 + 비용 임팩트
+        # 마커 10: ⭐ KPI strip final reveal + OEE + Closed-Loop 요약 + 비용 임팩트
         elif marker_idx == 10:
+            render_kpi_strip()  # ⭐ M10 도달 시 4 KPI final reveal (mason 5/21 spoiler 차단)
+            st.markdown("---")
             render_oee_evidence()
             st.markdown("---")
             render_closed_loop_summary()
