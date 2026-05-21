@@ -915,7 +915,7 @@ def render_normal_status() -> None:
         with c2: st.metric("vibration_xyz", "0.8", help="기준 norm < 1.5")
         with c3: st.metric("spindle_rpm", "8,500", help="표준 8500")
         with c4: st.metric("tool_age", "17.8h", help="표준 200h 곡선 대비 빠른 마모 추세")
-        st.caption("📡 11 sensor — DuckDB 미가동 (fallback 표시)")
+        st.caption("📡 6 sensor — DuckDB 미가동 (fallback 표시)")
 
 
 _FAILURE_LABEL_HELP: dict[str, str] = {
@@ -1344,7 +1344,7 @@ def render_closed_loop_summary() -> None:
         with st.container(border=True):
             st.markdown("##### 📡 ① 센서통합")
             st.metric("처리 latency", "< 100ms")
-            st.caption("DuckDB in-process · 11 sensor 실시간")
+            st.caption("DuckDB in-process · 6 sensor 실시간")
     with c2:
         with st.container(border=True):
             st.markdown("##### 🔍 ② 인과 RCA")
