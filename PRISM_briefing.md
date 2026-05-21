@@ -233,15 +233,47 @@ python -m scripts.verify_demo_determinism --rehearse=2026-05-21
 
 **venue 네트워크**: mason 확인 — wifi 보장. R1 ✅ 해소.
 
-### ⏳ D-2 (5/20) 잔여 — mason 외부
-- 영상 fallback 1차 녹화 (OBS Studio) → `presentation/prism_demo_master.mp4`
+### ✅ D-2 야간 (5/20) 추가 완료 — 14 commit (mason 19~31차)
+**핵심 코드 변경**:
+- `6afbf0c` 19차 — XGBoost·DoWhy 변수 통일 (tool_age) + DAG 4색 신호등
+- `9d30ca1` 20차 — V3 Enterprise Vision view 구현 (M10 V3 5 layer)
+- `6060f89` 21차 — 마커 3 '인간결정' → '운영자결정' 일관 변경
+- `c04ce93` 22차 — 마커 3 결정 사유 column overflow fix
+- `0d95b43` — 재학습 button + DuckDB 마커 통합 + 운영자 대시보드
+- `9305334` — CNC fleet 10대 배경 fact (단일 머신 → 10대, V3 anchor)
+- `ee3798a` — 마커 2 인과 카드 4번째 반박 누락 fix
+- `724b6dc` — 헤더 KPI 비용 표기 정합 (₩ 심볼 $ 값 박힌 버그)
 
-### ⏳ D-1 (5/21)
-- 사람 리허설 ≥3회 (mason)
-- `/writer` 발표 슬라이드 polish
-- `/team-fix` 리허설 issue bounded remediation
-- **Verification Gate 실행** (`scripts/verify_demo_determinism.py --rehearse=2026-05-21`)
-- LLM cache + 영상 동결
+**narrative drift 일괄 제거**:
+- `8a1939b` 28차 — 재학습 0.62→0.91 → 라이브 측정 0.81→0.97 정합
+- `2a02828` 29차 — OEE +35% → +32%p (0.34→0.67 Nakajima 절대 표준)
+- `8ec572f` 26차 — 강건성 → 견고성 용어 통일
+- `6e76870` 23차 — tool_age 통일·11 마커·운영자결정 정합 (4 docs)
+
+**발표자료 신규 + polish**:
+- `7877637` — PRISM_RECORDING_SCRIPT.md 신규 (second-precise UI cue)
+- `0e07d01` — 녹화 스크립트 +93s 확장 (M5 Operator + M10 V3)
+- `3c501e8` 27차 — 시연 6→7분 확장 (M0 60s→120s deep dive)
+- `763a49b` 25차 — 마커 0 +30s 사이드바 deep dive
+- `5f96757` 24차 — 5분 발표 멘트 구어 polish
+- `1392b0c` 30차 — TALKING_POINTS·RECORDING_SCRIPT 라이브값 정합
+- `8b962f6` — 본선 발표 멘트 polish (구어체 자연화 + 30초 Q&A 압축)
+- `c2b5635` 31차 — *.mov/*.mp4/prism/recordings/ git 차단
+
+### ✅ D-1 (5/21) 완료 — 본 세션
+- **`PRISM_발표대본.txt` (55KB) 신규** — 격식 톤 13분 풀버전 대본 + 부록 C 시간 배분표
+- **`PRISM_숙지자료.md` (54KB) 신규** — 11 섹션 마스터 브리프 (TL;DR/timeline/슬라이드/마커/도메인/아키텍처/스키마/Q&A/비상/수치/체크리스트)
+- **시간 budget B 옵션 확정** — 4분 발표 + 8:36 시연 + 30s Q&A = 13분
+  - 4개 doc 정합 갱신 (TALKING_POINTS·DEMO_DAY·발표대본·숙지자료) — slide 60s → 48s, 시연 7분 → 8:36, Q&A 1분 → 30s
+  - cumulative 표 M5 22s→65s (Operator View), M10 38s→88s (V3 Vision) RECORDING_SCRIPT 와 1:1 정합
+- **Verification Gate 5/5 PASS** — `metrics/eval_score.jsonl` sample fill 후 cache_hit 1.0 / sha256 byte-equal / e2e 0.072s / eval 0.92 / bedrock 0 토큰 → `PRISM_FALLBACK_VIDEO=0` silent
+- **`presentation/prism_demo_master.mp4` 21MB 녹화 완료** (5/21 00:14, RECORDING_SCRIPT cue 정합 8:36)
+- **회귀 194 PASS / 22 smoke PASS** 그대로 유지
+
+### ⏳ D-1 (5/21) 잔여 — mason 외부
+- 사람 리허설 ≥3회 (timer 옆에 13분 budget 정합 확인)
+- 슬라이드 5장 PPTX 최종 점검 (각 슬라이드 48s 정합)
+- USB 백업 + LTE 핫스팟 동작 확인
 
 ---
 
@@ -274,25 +306,34 @@ python -m scripts.verify_demo_determinism --rehearse=2026-05-21
 
 ---
 
-## 9. 다음 OMC 명령 (즉시 실행 가능)
+## 9. D-Day 명령 (2026-05-22 본선)
 
 ```bash
-# 새벽 02시 reset 후 첫 작업
-/ccg "PRISM 4 Domain Agent 의 system_prompt 도메인 fill — Quality (AI4I 6-class TWF/HDF/PWF/OSF/RNF/NONE), Safety (SOP / E-stop), Equipment (RUL + Isolation Forest), Production (PuLP 스케줄 3옵션). 각 Agent 한국어 markdown + [ROBOT-XXXXX] citation 룰 따르고, schema.py 의 Pydantic output 모델 호환되도록. 3-way 합의."
+# 09:30 — 노트북 부팅 후 첫 명령 (워밍업)
+cd /Users/mason/Desktop/Projects/robot-data-pipeline
+git status                                          # clean tree 확인
+PYTHONHASHSEED=2026 python3 -m pytest tests/test_prism_demo_smoke.py -q   # 22 PASS
+PYTHONHASHSEED=2026 python3 scripts/verify_demo_determinism.py --rehearse=2026-05-22
+# → 5/5 ALL PASSED 확인, PRISM_FALLBACK_VIDEO=0 silent
 
-# 새벽 06시 reset 후
-/ultraqa "9 마커 결정성 3회 시드 고정 byte-equal 검증. tests/e2e/test_4min_demo_runtime.py 작성."
+# 10:30 — Streamlit 사전 부팅 (cache warm-up)
+PYTHONHASHSEED=2026 PRISM_MODE=demo \
+    PRISM_CACHE_PATH=assets/cache_replay.jsonl \
+    streamlit run apps/prism_demo.py
+# → http://localhost:8501 마커 0~10 click-through, view mode 3개 (Timeline/Operator/V3) 사전 확인
 
-# D-2 (5/20)
-/visual-verdict "apps/prism_demo.py Streamlit 렌더링 — 평가자 시점 시각 QA. 9 마커 chip + 사이드바 σ_max 카드 + Plotly DAG + Net Value 카드."
-/ai-slop-cleaner --review-only "src/orchestration/agents/ 도메인 prompt fill 후 누적 slop 점검. deletion-first 제안."
-
-# D-1 (5/21)
-/security-review "Bedrock API 키, AWS creds, .env 시연 화면 노출 점검."
-/team-fix "리허설 발견 issue bounded remediation."
-/writer "발표 슬라이드 polish, 5분 발표 메시지 다듬기."
+# 15:30 — 본선 시연 직전
+ls -lh presentation/prism_demo_master.mp4           # 21MB fallback ready
+cat metrics/eval_score.jsonl | tail -1              # 0.92 ledger 확인
+docker compose -f prism/docker-compose.yml ps       # (옵션) 컨테이너 부팅이면 healthy
 ```
+
+**D-Day 시간 budget (B 옵션 확정)**:
+- 발표 4분 (5 슬라이드 × 48s) + 시연 8:36 (RECORDING_SCRIPT 정합, M5 Operator View + M10 V3 Vision 포함) + Q&A 30s = **13분**
+- 핵심 cue: M0 사이드바 expander 2회 클릭 / M4 라이브 DoWhy ATE (0.6s) / M5 view mode → Operator / M8 β slider 1.0→2.0 / M10 view mode → V3
+- 비상: cache miss / Bedrock timeout / WiFi 단절 → 모두 `presentation/prism_demo_master.mp4` auto-cascade
 
 ---
 
-**Status**: D-4 머지 commit (`<pending>`). ADR v2 = source of truth. 다음 진척은 본 문서 Section 6 갱신.
+**Status**: D-1 종료, 본선 진입 ready. 시간 정합 B 옵션 적용 (4분 + 8:36 + 30s = 13분).
+다음 진척은 D-Day 시연 후 본 문서 Section 6 에 추가.

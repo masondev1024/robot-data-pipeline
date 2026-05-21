@@ -1,6 +1,6 @@
 # PRISM 본선 D-Day 운영 매뉴얼 (2026-05-22 금)
 
-> 7분 시연 + 5분 발표 = 12분 평가 (+1분 Q&A). 사전 결정성 99%+, fallback 영상 swap 자동.
+> 4분 발표 + 8:36 시연 + 30s Q&A = 13분 평가. 사전 결정성 99%+, fallback 영상 swap 자동.
 > 본 문서 = mason 의 8시간 운영 step-by-step 체크리스트.
 
 ---
@@ -12,7 +12,7 @@
 | **Phase 1 데이터 워밍업** | 09:30 ~ 11:30 | 노트북 setup, LTE 백업, Generator 가동, cache hit 99%+ 검증 |
 | **Phase 2 인과 검증** | 11:30 ~ 13:30 | DoWhy DAG 최적화, Confounder 검증, 시나리오 인젝션 5개 (시드 fixed) |
 | **Phase 3 시뮬/UI 튜닝** | 13:30 ~ 15:30 | 4분 리허설 ×3, σ_max 라벨 확인 |
-| **Phase 4 심사위원 시연** | 15:30 ~ 17:30 | 5분 발표 + 4분 closed-loop + Q&A |
+| **Phase 4 심사위원 시연** | 15:30 ~ 17:30 | 4분 발표 + 8:36 closed-loop 시연 + 30s Q&A (총 13분) |
 
 ---
 
@@ -80,12 +80,12 @@ python3 scripts/verify_demo_determinism.py --rehearse=2026-05-22
 
 ---
 
-## 🎬 Phase 3: 4분 리허설 ×3 (13:30 ~ 15:30, 2h)
+## 🎬 Phase 3: 8:36 시연 리허설 ×3 (13:30 ~ 15:30, 2h)
 
-### 13:30 — 리허설 #1 (full 4분 mock)
+### 13:30 — 리허설 #1 (full 8:36 mock)
 - [ ] timer 시작 → 마커 0 click → ... → 마커 10
-- [ ] 각 마커 발표 멘트 (5초 이내)
-- [ ] 종료 시점 4:00 ± 15초
+- [ ] M0 사이드바 deep dive 120s + M5 Operator View 전환 + M10 V3 Vision 전환 cue 숙지
+- [ ] 종료 시점 8:36 ± 15초
 
 ### 14:30 — 리허설 #2 (β slider 시연 강화)
 - [ ] 마커 8 에서 β=1.0 → 2.0 → 5.0 시연
@@ -110,19 +110,19 @@ python3 scripts/verify_demo_determinism.py --rehearse=2026-05-22
 
 ### 16:30 ~ 17:30 — 실 시연 (9분)
 ```
-[5분 발표]
-  - 슬라이드 1: PRISM 한 줄 (메시지)
-  - 슬라이드 2: 문제 (1인 운영자 RCA 1~2h, MES $10K+)
-  - 슬라이드 3: 솔루션 (Closed-Loop 4-step)
-  - 슬라이드 4: 차별화 4축
-  - 슬라이드 5: 본선 시연 시작
+[4분 발표] — 각 슬라이드 48s
+  - 슬라이드 1 (0:00~0:48): PRISM 한 줄 (메시지)
+  - 슬라이드 2 (0:48~1:36): 문제 (1인 운영자 RCA 1~2h, MES $10K+)
+  - 슬라이드 3 (1:36~2:24): 솔루션 (Closed-Loop 4-step)
+  - 슬라이드 4 (2:24~3:12): 차별화 4축
+  - 슬라이드 5 (3:12~4:00): 본선 시연 예고 + 확장성
 
-[4분 closed-loop 시연]
-  Marker 0 → 1 → ... → 10 (15초 단위)
-  β slider 시연 at marker 8
+[8:36 closed-loop 시연] — RECORDING_SCRIPT.md cue sheet 정합
+  Marker 0 (120s) → 1 → ... → M5 (65s, Operator View 전환) → ... → M8 (45s, β slider)
+  → M9 → M10 (88s, OEE + V3 Enterprise Vision)
 
-[Q&A 30초~1분]
-  위 예상 질문 5개 답변
+[30s Q&A]
+  위 예상 질문 1~2개 압축 답변
 ```
 
 ---
@@ -131,7 +131,7 @@ python3 scripts/verify_demo_determinism.py --rehearse=2026-05-22
 
 ### 시나리오 A: Streamlit 화면이 안 뜸
 - 터미널에서 `Ctrl+C` 후 재실행
-- 또는 PPTX 슬라이드만으로 발표 (7분 시연 skip)
+- 또는 PPTX 슬라이드만으로 발표 (8:36 시연 skip)
 
 ### 시나리오 B: cache miss → "Cache miss — 영상 fallback 전환"
 - 자동으로 `presentation/prism_demo_master.mp4` 재생
@@ -156,7 +156,7 @@ python3 scripts/verify_demo_determinism.py --rehearse=2026-05-22
 - [ ] presentation/prism_demo_master.mp4 존재
 - [ ] PPTX 5 슬라이드 준비
 - [ ] 외부 모니터 + HDMI 케이블
-- [ ] 발표 멘트 5분 × 3회 연습 완료
+- [ ] 발표 멘트 4분 × 3회 연습 완료 (각 슬라이드 48s)
 - [ ] β slider 시연 timing 숙지
 - [ ] Q&A 예상 5개 답변 메모
 

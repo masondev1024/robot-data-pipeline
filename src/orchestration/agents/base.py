@@ -85,7 +85,7 @@ class BaseAgent(ABC):
             system=system_prompt,
             model_id=model_id,
             cache_system=True,
-            max_tokens=kwargs.get("max_tokens", 512),
+            max_tokens=kwargs.get("max_tokens", 1024),
         )
 
     # Build the replay-decorated version lazily (once per instance)

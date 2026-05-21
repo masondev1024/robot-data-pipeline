@@ -89,3 +89,6 @@ docs/
 presentation/
 발표자료.md
 
+# 런타임 로그 (시연 중 stdout/stderr 누적, 결정성 무관)
+logs/
+
