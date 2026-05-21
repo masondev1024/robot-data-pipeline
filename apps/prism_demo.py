@@ -1647,13 +1647,17 @@ def fallback_video() -> None:
 
 # ── 메인 ─────────────────────────────────────────────────────────────────────────
 
-def render_operator_view() -> None:
-    """운영자 대시보드 (mason 의 advisor 권고 — 플랫폼 기획 보강).
+def render_operator_view(marker_idx: int = 0) -> None:
+    """운영자 대시보드 (Production UX) — 마커 시점에 따라 incident phase 분기.
 
-    "평소엔 백그라운드, 문제 발생 시 알람 + 승인/거절 버튼" narrative.
-    실 운영자가 매일 보는 production UX (시연 timeline view 와 분리).
+    M0-M4 (정상/예지): 정상 banner + 예지 risk 추세 노출
+    M5-M8 (incident 진행): ALARM banner + 결함 sensor 값 + AI 추천 적용 primary highlight
+    M9-M10 (회복+자산화): 회복 banner + 학습 자산화 진행 메시지
     """
     from src.orchestration.storage import StorageDB  # noqa: PLC0415
+
+    in_incident_phase = 5 <= marker_idx <= 8
+    in_recovery_phase = 9 <= marker_idx <= 10
 
     st.markdown("## 🎛️ 운영자 대시보드 (Production UX)")
     st.caption(
@@ -1662,7 +1666,8 @@ def render_operator_view() -> None:
     )
 
     # 라이브 sensor + alarm 상태 (DuckDB cnc_telemetry 라이브 read).
-    # narrative 안정성을 위해 incident machine 만 조회 — fleet 의 다른 머신은 배경 fact.
+    # 마커별 분기: incident phase (M5-M8) → defect=TRUE row 강제 선택 (결함 진행 중 banner).
+    # 그 외 (M0-M4 정상 / M9-M10 회복) → 일반 last row.
     db_path = _ROOT / "data" / "prism_demo.duckdb"
     last_row = None
     incident_rows: list = []
@@ -1670,13 +1675,22 @@ def render_operator_view() -> None:
     if db_path.exists():
         try:
             with StorageDB(str(db_path)) as db:
-                result = db.query(
-                    "SELECT * FROM cnc_telemetry "
-                    f"WHERE machine_id = '{INCIDENT_MACHINE_ID}' "
-                    "ORDER BY ts DESC LIMIT 1"
-                )
-                if result:
-                    last_row = result[0]
+                if in_incident_phase:
+                    result = db.query(
+                        "SELECT * FROM cnc_telemetry "
+                        f"WHERE machine_id = '{INCIDENT_MACHINE_ID}' AND defect = TRUE "
+                        "ORDER BY ts DESC LIMIT 1"
+                    )
+                    if result:
+                        last_row = result[0]
+                if last_row is None:
+                    result = db.query(
+                        "SELECT * FROM cnc_telemetry "
+                        f"WHERE machine_id = '{INCIDENT_MACHINE_ID}' "
+                        "ORDER BY ts DESC LIMIT 1"
+                    )
+                    if result:
+                        last_row = result[0]
                 # 최근 5 incident (defect=True) — 전 fleet 대상
                 incident_rows = db.query(
                     "SELECT ts, machine_id, coolant_temp, vibration_xyz, dimension_dev "
@@ -1692,7 +1706,7 @@ def render_operator_view() -> None:
         except Exception:
             pass
 
-    # Fleet KPI bar — 배경 fact (incident 카운트 / 정상 카운트)
+    # Fleet KPI bar — phase 와 무관한 누적 fleet 상태 (배경 fact)
     n_incident_now = sum(1 for r in fleet_summary if r.get("ever_defect", 0))
     n_healthy_now = len(fleet_summary) - n_incident_now if fleet_summary else 0
     if fleet_summary:
@@ -1702,13 +1716,17 @@ def render_operator_view() -> None:
         with k2:
             st.metric("정상 가동", f"{n_healthy_now}대", delta="OK" if n_healthy_now else None)
         with k3:
+            # incident metric — incident phase 일 때만 "액션 필요" 강조, 그 외엔 누적 카운트만
+            delta_label = ("⚠️ 액션 필요" if in_incident_phase and n_incident_now else
+                           ("✅ 회복" if in_recovery_phase and n_incident_now else "0"))
+            delta_color = ("inverse" if in_incident_phase and n_incident_now else "normal")
             st.metric("Incident", f"{n_incident_now}대",
-                      delta=("⚠️ 액션 필요" if n_incident_now else "0"),
-                      delta_color="inverse" if n_incident_now else "normal")
+                      delta=delta_label,
+                      delta_color=delta_color)
 
-    # 🚨 ALARM 카드 (큰 글씨)
-    is_alarm = last_row is not None and last_row.get("defect", False)
-    if is_alarm:
+    # 🚨 banner — 마커별 3-way 분기
+    if in_incident_phase and last_row is not None:
+        # M5-M8: incident 진행 중 — ALARM (peak fault sensor 값 노출)
         st.error(
             f"## 🚨 ALARM — INCIDENT #47 진행 중\n\n"
             f"**{last_row['machine_id']}** (fleet 중 1대)  ·  coolant_temp **{last_row['coolant_temp']:.1f}°C** "
@@ -1716,9 +1734,20 @@ def render_operator_view() -> None:
             f"⚡ TWF (Tool Wear Failure) 예지 + HDF (Heat Dissipation Failure) 진행 — **즉시 의사결정 필요**\n\n"
             f"🏭 다른 {n_healthy_now}대 ({', '.join(HEALTHY_MACHINE_IDS[:3])} 등) 는 정상 가동 중"
         )
-    elif last_row:
+    elif in_recovery_phase and last_row is not None:
+        # M9-M10: 회복 + 학습 자산화 완료
         st.success(
-            f"## ✅ 정상 가동 — DuckDB cnc_telemetry 라이브\n\n"
+            f"## ✅ INCIDENT #47 회복 완료 — 학습 자산화 진행\n\n"
+            f"**{last_row['machine_id']}**  ·  공구 교체 후 정상 가동 복귀  ·  "
+            f"coolant **{last_row['coolant_temp']:.1f}°C**  ·  vibration **{last_row['vibration_xyz']:.2f}**\n\n"
+            f"📚 incident #47 패턴 자동 학습 — 정확도 0.81 → 0.97 (+19.8%p). 다음 사이클부터 자동 활용.\n\n"
+            f"🏭 fleet {len(fleet_summary) or FLEET_SIZE}대 전체 정상"
+        )
+    elif last_row is not None:
+        # M0-M4: 정상 + 예지 risk 감지 (M1+) 노출
+        risk_suffix = (" · 예지 risk 감지 (TWF 1순위)" if marker_idx >= 1 else "")
+        st.success(
+            f"## ✅ 정상 가동 — DuckDB cnc_telemetry 라이브{risk_suffix}\n\n"
             f"**{last_row['machine_id']}**  ·  tool_age **{last_row['tool_age']:.1f}h**  ·  "
             f"coolant **{last_row['coolant_temp']:.1f}°C**  ·  vibration **{last_row['vibration_xyz']:.2f}**\n\n"
             f"🏭 fleet {len(fleet_summary) or FLEET_SIZE}대 전체 정상"
@@ -1726,11 +1755,12 @@ def render_operator_view() -> None:
     else:
         st.warning("⚠️ DuckDB 미가동 — 사이드바의 CNC stream Start 또는 demo 모드 실행 필요")
 
-    # 3 의사결정 버튼 (실 운영자 액션)
+    # 3 의사결정 버튼 — incident phase 일 때 'AI 추천 적용' primary 강조
     st.markdown("### 🎯 운영자 의사결정")
     col_apply, col_hold, col_halt = st.columns(3)
+    primary_button_type = "primary" if in_incident_phase else "secondary"
     with col_apply:
-        if st.button("✅ AI 추천 적용", use_container_width=True, type="primary"):
+        if st.button("✅ AI 추천 적용", use_container_width=True, type=primary_button_type):
             st.toast("✅ 공구 교체 명령 발송 (tool_age reset) — Slack 통보", icon="✅")
     with col_hold:
         if st.button("⏸ 보류 (모니터링 계속)", use_container_width=True):
@@ -1876,6 +1906,11 @@ def main() -> None:
     render_header()
     st.markdown("---")
 
+    # 마커 인덱스 세션 상태 — view_mode 와 무관하게 항상 먼저 로드 (operator view 도 marker phase 사용)
+    if "marker_idx" not in st.session_state:
+        st.session_state["marker_idx"] = 0
+    marker_idx: int = int(st.session_state["marker_idx"])
+
     # View 모드 toggle (mason 의 advisor 권고 — Operator View 분리)
     view_mode = st.radio(
         "🎛️ View 모드",
@@ -1885,16 +1920,11 @@ def main() -> None:
     )
 
     if view_mode == "🚨 운영자 대시보드 (Operator View)":
-        render_operator_view()
+        render_operator_view(marker_idx)
         return
     elif view_mode == "🚀 Enterprise Scale-out Vision (V3)":
         render_enterprise_vision()
         return
-
-    # 마커 인덱스 세션 상태
-    if "marker_idx" not in st.session_state:
-        st.session_state["marker_idx"] = 0
-    marker_idx: int = int(st.session_state["marker_idx"])
 
     render_marker_timeline(marker_idx)
 
