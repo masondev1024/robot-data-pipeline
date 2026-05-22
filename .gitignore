@@ -88,7 +88,10 @@ docs/
 # 발표 자료 (로컬 빌드 도구, git 추적 X)
 presentation/
 발표자료.md
-
+PRISM_숙지자료.md
+PRISM_briefing.md
+PRISM_DEMO_DAY.md
+PRISM_TALKING_POINTS.md
 # 런타임 로그 (시연 중 stdout/stderr 누적, 결정성 무관)
 logs/
 
