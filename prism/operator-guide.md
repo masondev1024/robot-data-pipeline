@@ -12,11 +12,25 @@ docker compose ps         # app 상태 healthy 확인
 docker compose logs app | tail -20
 ```
 
-브라우저 접속: <http://localhost:8501>
+브라우저 접속: <http://localhost:8501> (Demo) 또는 <http://localhost:8502> (Live)
 콘솔 상단 "PRISM — Predictive Real-time Intelligence for Smart Manufacturing"
 헤더 + **🏭 10대 CNC fleet** caption ("현재 incident CNC-01 · 정상 가동 9대") 이 보이면 정상.
 **KPI 카드 4장 (OEE/RCA/Defect/비용) 은 M10 도달 시 final reveal** — 시연 초반에는 숨김
 (mason 5/21: 결말 spoiler 차단 + fleet 컨텍스트 priority 확보 + 평가자 0초 검증 욕구 자극 차단).
+
+## Operator-first 별도 데모
+
+기존 Docker/8501(Demo) 및 8502(Live) 데모는 그대로 유지한다.
+ 운영자 플랫폼 느낌을 먼저 보여주는 새 데모는 루트에서
+별도 포트로 실행한다.
+
+```bash
+PYTHONHASHSEED=2026 PRISM_MODE=demo streamlit run apps/prism_operator_demo.py --server.port 8503
+```
+
+브라우저 접속: <http://localhost:8503>
+
+새 데모는 첫 화면이 **운영자 대시보드**이며, Timeline 과 V3 는 상단 View 모드에서 전환한다.
 
 ## 시연 timeline (apps/prism_demo.py MARKERS 와 일치)
 
@@ -86,7 +100,7 @@ BEDROCK_OFFLINE=true
 | 마커 4 fast-forward 무반응 (5초+) | DoWhy 학습 진행 중 | 정상. `@st.cache_resource` 라 시연 시작 1회만 ~3초 |
 | 마커 7-8 "Cache miss" 에러 | offline 모드인데 cache_replay 키 mismatch | `BEDROCK_OFFLINE=false` + Bedrock 키 채우거나 cache_replay 재녹화 (`scripts/build_cache_replay.py`) |
 | fallback_video "Recording pending D-1" | `presentation/prism_demo_master.mp4` 없음 | 시연 D-1 까지 영상 녹화 필요 (offline fallback 안전망) |
-| 8501 포트 충돌 | 다른 streamlit 인스턴스 | `.env` 의 `STREAMLIT_PORT=8502` 변경 후 재기동 |
+| 8501/8502/8503 포트 충돌 | 다른 streamlit 인스턴스 | `.env` 의 `DEMO_PORT` 등 변경 후 재기동 |
 | DuckDB 락 → sensor stream 멈춤 | 동시 write | `docker compose restart app` (`data/prism_demo.duckdb` 보존) |
 
 ## 시연 후 정리
@@ -103,5 +117,5 @@ git status               # 결정론적 시연이면 diff 0 (PYTHONHASHSEED=2026
 - [ ] `assets/xgb_6class.pkl`, `assets/cache_replay.jsonl`, `assets/causal_refute_v2.json` 동봉
 - [ ] `data/prism_demo.duckdb` 초기 상태 확인 (생산 라인별 seed 다를 수 있음)
 - [ ] `presentation/prism_demo_master.mp4` (D-1 녹화본) 동봉 — offline fallback 안전망
-- [ ] 사내망 접근 URL 공지 (`http://<host-ip>:8501`)
+- [ ] 사내망 접근 URL 공지 (`http://<host-ip>:8502`)
 - [ ] 운영자에게 11 마커 timeline + Prev/Next 조작 숙지시킴

@@ -14,7 +14,7 @@ gatherUsageStats = false
 
 [server]
 headless = false
-port = 8501
+port = 8502
 enableCORS = false
 enableXsrfProtection = false
 runOnSave = false  # 시연 중 hot-reload 차단 (안정성)

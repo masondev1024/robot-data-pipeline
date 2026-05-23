@@ -12,8 +12,18 @@ docker compose up --build
 ```
 
 부팅 후:
-- Streamlit 운영 콘솔: <http://localhost:8501>
+- Streamlit 운영 콘솔 (Demo): <http://localhost:8501>
+- Streamlit 운영 콘솔 (Live): <http://localhost:8502>
+- Streamlit 운영 콘솔 (Operator): <http://localhost:8503>
 - CNC generator: docker network 안에서 tick 발신 → Streamlit 이 DuckDB 로 직접 적재
+
+기존 8502 콘솔을 보존하고 Operator-first 새 화면을 별도로 확인할 때는 루트에서 직접 실행:
+
+```bash
+PYTHONHASHSEED=2026 PRISM_MODE=demo streamlit run apps/prism_operator_demo.py --server.port 8503
+```
+
+- Operator-first 콘솔: <http://localhost:8503>
 
 ## 왜 가벼운 스택인가
 
@@ -37,7 +47,7 @@ docker compose up --build
 prism/
 ├── README.md              ← 이 파일
 ├── docker-compose.yml     ← Streamlit + generator 컨테이너 정의
-├── Dockerfile.app         ← Streamlit 이미지 (apps/prism_demo.py 실행)
+├── Dockerfile.app         ← 기존 8502 Streamlit 이미지 (apps/prism_demo.py 실행)
 ├── Dockerfile.generator   ← CNC stream generator 이미지
 ├── requirements.txt       ← prism 컨테이너 공통 Python deps
 ├── .env.example           ← Bedrock·시연 옵션 템플릿
@@ -45,7 +55,8 @@ prism/
 ```
 
 런타임이 참조하는 외부 디렉토리(루트 기준):
-- `apps/prism_demo.py` — Streamlit entry point
+- `apps/prism_demo.py` — 기존 8501(Demo)/8502(Live) Streamlit entry point
+- `apps/prism_operator_demo.py` — 새 8503 Operator-first Streamlit entry point
 - `src/orchestration/` — 인과 DAG, 카드, supervisor, llm_cache
 - `src/generator/cnc_stream.py` — CNC stream tick
 - `src/ml/local_predictor.py` — 로컬 6-class XGBoost
@@ -61,7 +72,9 @@ prism/
 | `BEDROCK_REGION` | `us-west-2` | Bedrock Claude 호출 region |
 | `BEDROCK_OFFLINE` | `false` | `true` 면 cache_replay 만 사용 (네트워크 없이도 시연) |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | — | Bedrock 호출 시. offline 모드면 불필요 |
-| `STREAMLIT_PORT` | `8501` | 호스트 포트 |
+| `DEMO_PORT` | `8501` | 호스트 포트 (Demo) |
+| `LIVE_PORT` | `8502` | 호스트 포트 (Live) |
+| `OPERATOR_PORT` | `8503` | 호스트 포트 (Operator) |
 
 ## 시연 안정성 — offline 모드
 
@@ -79,7 +92,7 @@ BEDROCK_OFFLINE=true docker compose up
 1. 노트북 / 미니 서버에 Docker 설치.
 2. 이 저장소 clone 또는 `prism/` 디렉토리 + `apps/`, `src/`, `assets/`, `data/` rsync.
 3. `.env` 에 고객사 Bedrock 키 또는 `BEDROCK_OFFLINE=true` 설정.
-4. `docker compose up -d` 후 노트북 IP:8501 사내망 공유.
+4. `docker compose up -d` 후 노트북 IP:8502 사내망 공유.
 5. 운영자는 `operator-guide.md` 따라 마커별 의사결정 실행.
 
 ## 1000대 robot production 확장 경로

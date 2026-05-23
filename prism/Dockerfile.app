@@ -25,10 +25,10 @@ ENV PYTHONHASHSEED=2026 \
     PYTHONPATH=/app \
     PRISM_MODE=demo
 
-EXPOSE 8501
+EXPOSE 8502
 
 CMD ["streamlit", "run", "apps/prism_demo.py", \
-     "--server.port=8501", \
+     "--server.port=8502", \
      "--server.address=0.0.0.0", \
      "--server.headless=true", \
      "--browser.gatherUsageStats=false"]

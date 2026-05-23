@@ -2,26 +2,75 @@
 # 사용: cd prism/ && cp .env.example .env && docker compose up --build
 
 services:
-  app:
+  demo-app:
     build:
       context: ..
       dockerfile: prism/Dockerfile.app
     image: prism-app:local
-    container_name: prism-app
+    container_name: prism-demo-app
     env_file: .env
+    command: ["streamlit", "run", "apps/prism_demo.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true", "--browser.gatherUsageStats=false"]
     environment:
-      # .env 에서 BEDROCK_OFFLINE / PRISM_MODE 등 주입.
-      # 명시 override 가 필요한 항목만 여기에.
-      - STREAMLIT_SERVER_PORT=${STREAMLIT_PORT:-8501}
+      - STREAMLIT_SERVER_PORT=8501
+      - PRISM_MODE=demo
     ports:
-      - "${STREAMLIT_PORT:-8501}:8501"
+      - "${DEMO_PORT:-8501}:8501"
     volumes:
-      # DuckDB 적재 결과를 호스트로 보존 (재시작 시 시연 상태 유지).
       - ../data:/app/data
-      # 시연 중 cache_replay 업데이트 hot-reload 필요시.
       - ../assets:/app/assets:ro
+      - ../presentation:/app/presentation:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+  live-app:
+    build:
+      context: ..
+      dockerfile: prism/Dockerfile.app
+    image: prism-app:local
+    container_name: prism-live-app
+    env_file: .env
+    command: ["streamlit", "run", "apps/prism_demo.py", "--server.port=8502", "--server.address=0.0.0.0", "--server.headless=true", "--browser.gatherUsageStats=false"]
+    environment:
+      - STREAMLIT_SERVER_PORT=8502
+      - PRISM_MODE=live
+    ports:
+      - "${LIVE_PORT:-8502}:8502"
+    volumes:
+      - ../data:/app/data
+      - ../assets:/app/assets:ro
+      - ../presentation:/app/presentation:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8502/_stcore/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+  operator-app:
+    build:
+      context: ..
+      dockerfile: prism/Dockerfile.app
+    image: prism-app:local
+    container_name: prism-operator-app
+    env_file: .env
+    command: ["streamlit", "run", "apps/prism_operator_demo.py", "--server.port=8503", "--server.address=0.0.0.0", "--server.headless=true", "--browser.gatherUsageStats=false"]
+    environment:
+      - STREAMLIT_SERVER_PORT=8503
+      - PRISM_MODE=demo
+    ports:
+      - "${OPERATOR_PORT:-8503}:8503"
+    volumes:
+      - ../data:/app/data
+      - ../assets:/app/assets:ro
+      - ../presentation:/app/presentation:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8503/_stcore/health')"]
       interval: 30s
       timeout: 5s
       retries: 3

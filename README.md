@@ -17,7 +17,15 @@ cp .env.example .env       # offline 시연이면 그대로 두기
 docker compose up --build
 ```
 
-브라우저: <http://localhost:8501>
+브라우저: <http://localhost:8501> (Demo) / <http://localhost:8502> (Live) / <http://localhost:8503> (Operator)
+
+기존 8502 데모를 보존한 채 Operator-first 새 데모를 따로 볼 때:
+
+```bash
+PYTHONHASHSEED=2026 PRISM_MODE=demo streamlit run apps/prism_operator_demo.py --server.port 8503
+```
+
+브라우저: <http://localhost:8503>
 
 자세한 운영 가이드 → [`prism/operator-guide.md`](prism/operator-guide.md)
 배포 구성 상세  → [`prism/README.md`](prism/README.md)
@@ -73,7 +81,8 @@ Bedrock offline 모드 (`BEDROCK_OFFLINE=true`) 로 네트워크 없이도 재�
 │   └── .env.example
 │
 ├── apps/
-│   └── prism_demo.py    ← Streamlit entry (마커 11개 + Operator View + V3 Enterprise Vision)
+│   ├── prism_demo.py            ← 기존 8501(Demo)/8502(Live) Streamlit entry
+│   └── prism_operator_demo.py   ← 새 8503 Operator-first Streamlit entry
 │
 ├── src/
 │   ├── orchestration/   ← causal_dag, causal_card, supervisor, llm_cache, storage
@@ -133,6 +142,7 @@ scale-up 진입 시 → `legacy/README.md` + `legacy/CLAUDE.md` 가드레일 재
 # 로컬 개발 (Docker 없이 직접 streamlit)
 pip install -r prism/requirements.txt
 PYTHONHASHSEED=2026 streamlit run apps/prism_demo.py
+PYTHONHASHSEED=2026 PRISM_MODE=demo streamlit run apps/prism_operator_demo.py --server.port 8503
 
 # 회귀 테스트
 PYTHONHASHSEED=2026 python3 -m pytest -q
