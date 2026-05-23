@@ -1,165 +1,120 @@
-# PRISM — 스마트 공장 운영 시스템 MVP
+# Robot Data Pipeline + PRISM AI 인과추론
 
-**P**robabilistic **R**oot-cause **I**nference & **S**imulation **M**onitor.
-CNC 텔레메트리에서 이상을 감지하고, **인과 추론 카드**로 운영자에게 권고하고,
-"보류" 결정 시 **시뮬레이션 fast-forward** 로 결과를 미리 보여주는 운영 콘솔.
+**스마트 공장 1000대 로봇 텔레메트리 실시간 데이터 파이프라인** 위에 **PRISM AI 인과추론·운영자 의사결정 콘솔** 을 접목한 통합 저장소.
 
-> 해커톤 본선 2026-05-22. 노트북 1대 + Docker 만으로 동작하는 lightweight MVP.
-> CNC fleet **10대** 모니터링 (incident 1대 narrative · 9대 정상 가동 배경 fact).
+- **Production 파이프라인:** KDS → Firehose → S3 Parquet (Bronze/Silver/Gold) → Athena → SageMaker → Grafana → FastAPI portal
+- **AI 인과추론 레이어 (PRISM):** DoWhy 6-Node DAG + 4-Agent Supervisor + Bedrock LLM 자연어 권고
+- **Demo:** 노트북 1대 + docker-compose 로 오프라인 시연 가능 (`prism/`)
 
 ---
 
-## 한 줄 부팅 (시연·현장 공통)
+## 두 가지 부팅 모드
+
+### A. PRISM Demo (오프라인 · 노트북 1대)
+
+PRISM AI 인과추론 + 운영자 콘솔을 **AWS 인프라 없이** 결정론적으로 시연.
 
 ```bash
 cd prism/
-cp .env.example .env       # offline 시연이면 그대로 두기
+cp .env.example .env       # Bedrock offline 모드면 그대로
 docker compose up --build
 ```
 
-브라우저: <http://localhost:8501> (Demo) / <http://localhost:8502> (Live) / <http://localhost:8503> (Operator)
+- <http://localhost:8501> — Demo (cache replay, deterministic)
+- <http://localhost:8502> — Live (Bedrock 라이브)
+- <http://localhost:8503> — Operator-first 콘솔
 
-기존 8502 데모를 보존한 채 Operator-first 새 데모를 따로 볼 때:
+데이터 백엔드: DuckDB in-process. AI 추론: `assets/cache_replay.jsonl` 사전 녹화 응답.
+
+운영 가이드 → [`prism/operator-guide.md`](prism/operator-guide.md)
+배포 단위 상세 → [`prism/README.md`](prism/README.md)
+
+### B. Production (EKS · 1000대 스케일)
 
 ```bash
-PYTHONHASHSEED=2026 PRISM_MODE=demo streamlit run apps/prism_operator_demo.py --server.port 8503
+# Step 0: Secrets Manager 사전 작업 (사람이 직접)
+#   /robot-telemetry/slack-webhook-url
+#   /robot-telemetry/grafana-admin-password
+
+# Step 1: 인프라
+cd terraform/ && terraform apply
+
+# Step 2: K8s 워크로드
+kubectl apply -f k8s/
+
+# Step 3: ALB DNS polling + SSM 저장 (GitHub Actions post-deploy)
+
+# Step 4: Airflow Helm
+helm upgrade airflow apache-airflow/airflow -f helm/airflow-values.yaml --version 1.16.0 --wait
 ```
 
-브라우저: <http://localhost:8503>
-
-자세한 운영 가이드 → [`prism/operator-guide.md`](prism/operator-guide.md)
-배포 구성 상세  → [`prism/README.md`](prism/README.md)
+배포 4단계 + 사고 가드레일 → [`CLAUDE.md`](CLAUDE.md)
+비용 셧다운/복구 → [`비용절감플랜/`](비용절감플랜/)
 
 ---
 
-## 시연 timeline (11 마커, 0:00 ~ 3:45)
-
-| idx | 시각 | 라벨 | 라이브 | 핵심 |
-|---|---|---|---|---|
-| 0 | 0:00 | 정상 | — | sensor 11 stream watch |
-| 1 | 0:15 | 예지경보 risk62% | ✅ XGBoost | `predict_proba` ~1ms, TWF 1순위 (tool_age 18h 빠른 마모 추세) |
-| 2 | 0:30 | 인과 v1 | — | DoWhy 6-Node DAG, **공구 교체** (tool_age reset) 추천 — XGBoost 감지 변수와 통일 |
-| 3 | 0:45 | 운영자결정 | — | **운영자 "보류"** (공구 교체 4h 정지 부담) |
-| 4 | 1:00 | 시뮬가속 | ✅ DoWhy | `do(tool_age=−1σ)` ATE 라이브, 3h→1s 압축 |
-| 5 | 1:15 | 불량 #47 | — | motor_temp 105°C (TWF secondary symptom), 보류 결정의 결과 |
-| 6 | 1:30 | 인과 v2 | — | Causal Effect 재추정 CE 0.78 → 0.71 |
-| 7 | 2:15 | 4 Agent | ✅ Bedrock | 품질·안전·설비·생산 동시 분석 (cache_replay) |
-| 8 | 3:00 | Supervisor | ✅ Net Value | α/β/γ slider 라이브 → 최적 액션 권고 |
-| 9 | 3:30 | 재학습 0.81→0.97 | ✅ 라이브 fit() | 라이브 XGBoost 재학습 측정값 (+20%) |
-| 10 | 3:45 | OEE +32%p | — | Closed-Loop 요약 + 비용 임팩트 (0.34→0.67 Nakajima) |
-
-라이브 wiring 4개 (1·4·7·8) + 정적 narrative 7개 → 동작 검증 + 시연 결정론성 양립.
-Bedrock offline 모드 (`BEDROCK_OFFLINE=true`) 로 네트워크 없이도 재생 가능.
-
----
-
-## 핵심 기술 스택
-
-| 컴포넌트 | 선택 | 이유 |
-|---|---|---|
-| UI | Streamlit | 단일 호스트 콘솔, 실시간 차트 + 의사결정 위젯 |
-| 저장 | DuckDB (in-process) | KDS/S3/Athena 불요. 노트북 1대로 충분 (10대 fleet × 100s = 1000행) |
-| 인과 추론 | DoWhy | 6-Node DAG (tool_age → spindle_rpm → … → defect), backdoor + IV refute |
-| 분류 | XGBoost 로컬 | 6-class fault label (`src/ml/local_predictor.py`) |
-| LLM | Bedrock Claude (offline 가능) | cache_replay 로 네트워크 끊겨도 시연 결정론적 |
-| 패키징 | Docker Compose | `docker compose up` 한 줄 |
-
-월 운영비 추정: 노트북 + Bedrock on-demand **≈ \$10-20**.
-
----
-
-## 디렉토리 구조
+## 저장소 구조
 
 ```
-.
-├── prism/               ← 배포 단위 (현장·시연용)
-│   ├── docker-compose.yml
-│   ├── Dockerfile.app
-│   ├── README.md
-│   ├── operator-guide.md
-│   ├── requirements.txt
-│   └── .env.example
-│
-├── apps/
-│   ├── prism_demo.py            ← 기존 8501(Demo)/8502(Live) Streamlit entry
-│   └── prism_operator_demo.py   ← 새 8503 Operator-first Streamlit entry
-│
+robot-data-pipeline/
+├── apps/                    PRISM Streamlit 콘솔 (demo · operator)
+├── prism/                   PRISM 배포 단위 (docker-compose + 운영 자료)
 ├── src/
-│   ├── orchestration/   ← causal_dag, causal_card, supervisor, llm_cache, storage
-│   ├── generator/       ← cnc_stream (CNCStreamGenerator)
-│   ├── ml/              ← local_predictor (6-class XGBoost)
-│   └── common/          ← aws.py, bedrock.py
-│
-├── assets/              ← xgb_6class.pkl, cache_replay.jsonl, causal_refute_v2.json
-├── data/                ← prism_demo.duckdb, seed_data_sample.csv
-├── docs/                ← PRD, ARCHITECTURE, ADR, hackathon-prism/, UI_GUIDE
-├── evals/               ← golden_qa, prism_qa, judge_prompt
-├── metrics/             ← bedrock_tokens, cache_hit_rate, e2e_runtime
-├── tests/               ← PRISM 회귀 (194 tests)
-│
-├── presentation/        ← PPTX, 스크린샷
-├── 학습자료/, 프로젝트 정보/
-│
-├── PRISM_briefing.md, PRISM_DEMO_DAY.md, PRISM_TALKING_POINTS.md
-├── PRISM_마스터가이드.pdf, 스마트 공장 운영 시스템 mvp 개발 기획서.pdf
-│
-└── legacy/              ← Production scale-up reference (현재 미가동)
-    ├── README.md            ← 자산 매핑
-    ├── CLAUDE.md            ← 옛 운영 가드레일
-    ├── dags/                ← Airflow 3 DAG
-    ├── terraform/, helm/, k8s/, grafana/, sql/, docker/
-    ├── src/{api,lambda,ml,common,generator}/
-    ├── tests/{api,lambda,ml,etl,generator}/
-    ├── scripts/             ← EKS/Grafana/ADOT 운영 스크립트
-    ├── docs/plan/           ← 옛 작업 큐
-    └── 비용절감플랜/
+│   ├── orchestration/       PRISM AI 레이어 (supervisor, causal_dag, agents, llm_cache)
+│   ├── generator/           KDS producer (legacy) + cnc_stream (PRISM demo)
+│   ├── ml/                  SageMaker train/redeploy (legacy) + local_predictor (PRISM demo)
+│   ├── api/                 FastAPI portal (legacy)
+│   ├── lambda/              Slack alert handler (legacy)
+│   └── common/              athena · aws · bedrock helper
+├── terraform/               IaC (EKS, KDS, Firehose, Glue, Lambda, ALB, SageMaker)
+├── k8s/                     StatefulSet · HPA · Karpenter · ALB Ingress · Grafana
+├── helm/                    airflow-values.yaml (chart 1.16.0 pinned)
+├── dags/                    Airflow 3 DAG (daily ETL · weekly DQ · weekly ML retrain)
+├── sql/                     Athena DDL (Bronze/Silver/Gold + dim view)
+├── grafana/                 5 monitoring dashboards
+├── docker/airflow/          Airflow 커스텀 이미지
+├── scripts/                 운영 스크립트 (PRISM demo · 인프라 진단)
+├── 비용절감플랜/             EKS up.sh / down.sh
+├── tests/                   PRISM smoke (root) + legacy unit (api/etl/generator/lambda/ml)
+├── assets/                  XGBoost model · cache_replay · causal DAG
+├── data/                    DuckDB demo data
+├── docs/                    설계 문서 + INTERFACE 계약 (gitignored)
+└── legacy/                  학습 · 발표 자료 아카이브 (이주 완료)
 ```
 
 ---
 
-## 1000대 robot production 확장 경로
+## AI 인과추론 레이어 = production · demo 공통
 
-PRISM MVP 가 그대로 production 으로 가지 **않는다**. 1000대 규모로 가져갈 때는
-이미 한 번 구축해 본 `legacy/` 의 자산을 다시 살린다 (발표 슬라이드 1장 = "확장 경로").
+PRISM 의 `src/orchestration/` 코드는 두 모드에서 동일하게 동작한다. 데이터 소스만 `DataSource` Protocol 로 추상화:
 
-| 단계 | MVP (현재) | 1000대 production |
+| 모드 | `DataSource` 구현체 | 데이터 |
 |---|---|---|
-| Ingest | Streamlit 안 generator tick | KDS 2 shard (`legacy/terraform/modules/data_pipeline/kinesis.tf`) |
-| Lakehouse | DuckDB 단일 파일 | Firehose → S3 Iceberg (`legacy/sql/*_ddl.sql`) |
-| Batch | — (불요) | Airflow 3 DAG (`legacy/dags/`) |
-| ML | 로컬 XGBoost | SageMaker XGBoost (`legacy/src/ml/train.py`) |
-| 알림 | Streamlit 내 영역 | Lambda → Slack (`legacy/src/lambda/alert_handler.py`) |
-| 모니터링 | Streamlit 콘솔 | Grafana fleet/anomaly (`legacy/grafana/dashboards/`) |
-| 운영 | docker compose | EKS + Karpenter (`legacy/k8s/`, `legacy/helm/`) |
+| Demo (PRISM_MODE=demo/live) | `DuckDBDataSource` | DuckDB · cache_replay |
+| Production (PRISM_MODE=production) | `AthenaDataSource` | Athena Gold table |
 
-scale-up 진입 시 → `legacy/README.md` + `legacy/CLAUDE.md` 가드레일 재활성.
+자세한 연결 계약 → [`docs/INTERFACE.md`](docs/INTERFACE.md) (gitignored, 로컬 참조)
 
 ---
 
-## 개발 / 테스트
+## 핵심 기술 결정 (ADR)
 
-```bash
-# 로컬 개발 (Docker 없이 직접 streamlit)
-pip install -r prism/requirements.txt
-PYTHONHASHSEED=2026 streamlit run apps/prism_demo.py
-PYTHONHASHSEED=2026 PRISM_MODE=demo streamlit run apps/prism_operator_demo.py --server.port 8503
-
-# 회귀 테스트
-PYTHONHASHSEED=2026 python3 -m pytest -q
-# tests/ 루트만 실행 (legacy/tests/ 는 pytest.ini 가 norecursedirs 로 제외).
-```
-
-| 명령 | 용도 |
+| ADR | 결정 |
 |---|---|
-| `python3 -m pytest -q` | PRISM 회귀 (194 tests, ~100s) |
-| `python3 scripts/verify_demo_determinism.py` | 시연 결정론성 검증 (Bedrock 토큰 / cache hit / e2e 런타임) |
-| `python3 scripts/build_cache_replay.py` | cache_replay.jsonl 재녹화 |
-| `python3 scripts/precompute_causal_refute.py` | causal_refute_v2.json 재생성 |
+| Streaming | Kinesis Data Streams + Managed Flink (Studio Notebook = single source of truth) |
+| Lakehouse | Firehose → S3 Parquet + Partition Projection (`year/month/day/hour`) |
+| Batch | Airflow 3 (chart 1.16.0 pinned, `helm/airflow-values.yaml`) |
+| Causal | DoWhy 6-Node DAG (`src/orchestration/causal_dag.py`) |
+| AI | Bedrock Claude Haiku 3 + 4 도메인 에이전트 supervisor |
+| ML | SageMaker XGBoost (production) / 6-class XGBoost pickle (demo) |
+| Alerting | Lambda → Slack (단일 채널, SNS 우회 금지) |
+| Cost | EKS 비용 셧다운 자동화 (Karpenter · HPA · ALB · EIP 누수 0) |
+
+근거 사고 로그 → [`CLAUDE.md`](CLAUDE.md) §1
 
 ---
 
-## 라이선스 / 데이터셋
+## 라이선스 · 데이터
 
-- 시드 데이터: **AI4I 2020 Predictive Maintenance Dataset** (CC BY 4.0,
-  [Kaggle](https://www.kaggle.com/datasets/stephanmatzka/predictive-maintenance-dataset-ai4i-2020))
-- 코드: 본 저장소 (해커톤 제출용)
+- 시연 데이터: AI4I 2020 Predictive Maintenance Dataset (CC BY 4.0)
+- 외부 합성 데이터 추가 금지 (재현성 · 라이선스 무결성)

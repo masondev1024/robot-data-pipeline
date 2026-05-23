@@ -160,3 +160,90 @@ class StorageDB:
         rows = self.query(f"SELECT * FROM {table} ORDER BY {order_by}")
         blob = "\n".join(repr(sorted(r.items())) for r in rows).encode("utf-8")
         return hashlib.sha256(blob).hexdigest()
+
+    # ── DataSource Protocol 구현 (production 어댑터 인터페이스) ──────────
+    #
+    # PRISM AI 레이어가 demo↔production 양쪽에서 동일하게 동작하려면 production
+    # Athena Gold 스키마와 같은 컬럼 셰이프로 반환해야 한다. DuckDB demo 데이터는
+    # per-tick 이라 Gold 의 일별 집계 컬럼을 즉석에서 계산.
+
+    def query_robot_daily_stats(self, dt: str, limit: int = 1000):
+        """Athena `gold_robot_daily_stats` 와 동일 컬럼 셰이프 반환 (DuckDB 즉석 집계).
+
+        DataFrame 컬럼: robot_id, avg_motor_temp, max_motor_temp,
+            battery_start, battery_end, battery_drain, active_hours,
+            anomaly_record_count, max_temp_load_ratio, dominant_failure_type.
+        """
+        sql = """
+            WITH base AS (
+                SELECT robot_id, ts, motor_temp, current_load,
+                       battery_level, active_hours, fault_phase
+                FROM robot_telemetry
+                WHERE CAST(ts AS DATE) = CAST(? AS DATE)
+            )
+            SELECT
+                robot_id,
+                AVG(motor_temp) AS avg_motor_temp,
+                MAX(motor_temp) AS max_motor_temp,
+                CAST(FIRST(battery_level ORDER BY ts ASC) AS INTEGER) AS battery_start,
+                CAST(LAST(battery_level ORDER BY ts ASC) AS INTEGER) AS battery_end,
+                CAST(FIRST(battery_level ORDER BY ts ASC)
+                     - LAST(battery_level ORDER BY ts ASC) AS INTEGER) AS battery_drain,
+                CAST(MAX(active_hours) AS INTEGER) AS active_hours,
+                CAST(SUM(CASE WHEN motor_temp > 90 THEN 1 ELSE 0 END) AS INTEGER)
+                    AS anomaly_record_count,
+                MAX(CASE WHEN current_load > 0 THEN motor_temp / current_load END)
+                    AS max_temp_load_ratio,
+                MODE(fault_phase) AS dominant_failure_type
+            FROM base
+            GROUP BY robot_id
+            LIMIT ?
+        """
+        import pandas as pd
+        rows = self.query(sql, (dt, limit))
+        return pd.DataFrame(rows)
+
+    def query_robot_realtime(self, limit: int = 100):
+        """legacy `silver_robot_telemetry` 와 동일 컬럼 셰이프 반환.
+
+        DataFrame 컬럼: robot_id, pos_x, pos_y, battery_level, current_load,
+            motor_temp, timestamp, failure_type.
+        """
+        sql = """
+            SELECT robot_id, pos_x, pos_y,
+                   CAST(battery_level AS INTEGER) AS battery_level,
+                   CAST(current_load AS INTEGER) AS current_load,
+                   motor_temp,
+                   CAST(ts AS VARCHAR) AS timestamp,
+                   fault_phase AS failure_type
+            FROM robot_telemetry
+            ORDER BY ts DESC
+            LIMIT ?
+        """
+        import pandas as pd
+        rows = self.query(sql, (limit,))
+        return pd.DataFrame(rows)
+
+    def query_cnc_telemetry(self, limit: int = 100):
+        """CNC 텔레메트리 — PRISM demo 전용 (production 에는 스키마 없음).
+
+        DataFrame 컬럼: ts, machine_id, tool_age, spindle_rpm, coolant_temp,
+            vibration_xyz, thermal_drift, dimension_dev, defect.
+        """
+        import pandas as pd
+        rows = self.query(
+            "SELECT * FROM cnc_telemetry ORDER BY ts DESC LIMIT ?",
+            (limit,),
+        )
+        return pd.DataFrame(rows)
+
+    def insert_cnc_row(self, row: dict) -> None:
+        """CNC tick 1행 적재 (demo generator 전용)."""
+        self.write_cnc([row])
+
+
+# ── DataSource Protocol alias (PRISM_MODE=demo|live|dev 라우팅 목표) ─────
+# 12개 기존 호출처 (`apps/prism_demo.py`, `apps/prism_operator_demo.py`,
+# `medallion.py`, tests) 가 `from src.orchestration.storage import StorageDB`
+# 그대로 사용할 수 있도록 alias 유지. 신규 코드는 `DuckDBDataSource` 권장.
+DuckDBDataSource = StorageDB
