@@ -206,8 +206,12 @@ resource "aws_glue_schema" "telemetry" {
   })
 }
 
+# force_destroy: query history 가 남아있으면 DeleteWorkGroup 이 InvalidRequestException
+# (workgroup is not empty) 로 막힘. terraform destroy 가 dependent EKS·VPC 까지 못 지움.
+# 2026-05-23 사고 — 수동 `aws athena delete-work-group --recursive-delete-option` 으로 우회.
 resource "aws_athena_workgroup" "main" {
-  name = "robot-telemetry-workgroup"
+  name          = "robot-telemetry-workgroup"
+  force_destroy = true
 
   configuration {
     enforce_workgroup_configuration    = true

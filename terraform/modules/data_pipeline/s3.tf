@@ -1,6 +1,10 @@
 # S3 Data Lake Bucket
+# force_destroy: terraform destroy 가 BucketNotEmpty 로 막혀 EKS·VPC 까지 청산 못 하는
+# 사고 회피 (2026-05-23 — versioning 28개 object 잔여로 3차 시도 필요). 운영 데이터는
+# Bronze→Glacier IR 라이프사이클로 archived 되어 본 bucket 자체 삭제 risk 는 낮음.
 resource "aws_s3_bucket" "datalake" {
-  bucket = var.datalake_bucket_name
+  bucket        = var.datalake_bucket_name
+  force_destroy = true
 
   tags = {
     Name = "robot-telemetry-datalake"

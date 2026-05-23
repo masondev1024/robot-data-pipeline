@@ -66,6 +66,13 @@ resource "aws_eks_cluster" "main" {
     subnet_ids = concat(aws_subnet.public[*].id, aws_subnet.app_private[*].id)
   }
 
+  # import 시 drift 회피 — AWS 가 default 로 true 로 읽지만 EKS managed addons (vpc-cni 등)
+  # 와 충돌해 replace 강제. 2026-05-23 — 어제 partial apply 후 import 시 cluster replace
+  # 트리거됨. 본 cluster 는 EKS managed addons (addons.tf) 가 single source of truth.
+  lifecycle {
+    ignore_changes = [bootstrap_self_managed_addons]
+  }
+
   depends_on = [
     aws_iam_role_policy_attachment.eks_cluster_policy
   ]
