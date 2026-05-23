@@ -1,49 +1,39 @@
-# legacy/ — Production Scale-Up Reference
+# legacy/ — 학습·발표 자료 아카이브
 
-이 디렉토리는 **PRISM MVP에 직접 쓰이지 않는** 인프라·코드 자산을 모아둔 곳이다.
-PRISM 본선 시연(2026-05-22)은 가벼운 로컬 스택(`prism/`)만 사용한다.
+이 디렉토리는 **PRISM AI 인과추론 레이어를 legacy 대규모 데이터 파이프라인에 접목하는 통합 작업(2026-05-23)** 이후
+production 코드·인프라가 모두 루트로 이동되고, **학습·발표 참고자료만** 남은 상태다.
 
-## 왜 지우지 않고 두는가
+## 현재 보존되는 자산
 
-PRISM MVP는 단일 호스트에서 동작하지만, 실제 1000대 robot 규모 production 으로
-가져갈 때는 streaming + batch lakehouse 패턴이 필요하다. 이 디렉토리는
-**"이미 한 번 구축해 본 production scale-up 패턴"** 의 reference 구현체로 보존된다.
+| 파일/디렉토리 | 내용 |
+|---|---|
+| `학습자료/` | 데이터 엔지니어링 학습 노트 |
+| `프로젝트 정보/` | 프로젝트 메타데이터·기록 |
+| `발표자료.md` | 데이터 파이프라인 발표 원고 (PRISM 이전) |
+| `README_robot_data_pipeline.md` | 옛 robot-data-pipeline 단독 README (역사 참고) |
+| `CLAUDE.md` | 옛 운영 매뉴얼 (루트 `CLAUDE.md` 의 가드레일 출처. **삭제 금지** — 통합 시 keep/drop 판단 기준) |
 
-발표 슬라이드 1장 ("PRISM → Production 확장 경로") 의 근거 자료.
+## 이주 완료된 production 자산 (위치)
 
-## 구성
+| 옛 경로 | 새 경로 |
+|---|---|
+| `legacy/terraform/` | [`terraform/`](../terraform/) |
+| `legacy/dags/` | [`dags/`](../dags/) |
+| `legacy/helm/` | [`helm/`](../helm/) |
+| `legacy/k8s/` | [`k8s/`](../k8s/) |
+| `legacy/sql/` | [`sql/`](../sql/) |
+| `legacy/grafana/` | [`grafana/`](../grafana/) |
+| `legacy/docker/` | [`docker/`](../docker/) |
+| `legacy/scripts/*` | [`scripts/`](../scripts/) (PRISM scripts 와 공존) |
+| `legacy/비용절감플랜/` | [`비용절감플랜/`](../비용절감플랜/) |
+| `legacy/src/api/` | [`src/api/`](../src/api/) |
+| `legacy/src/lambda/` | [`src/lambda/`](../src/lambda/) |
+| `legacy/src/generator/*` | [`src/generator/`](../src/generator/) (PRISM `cnc_stream.py` 와 공존) |
+| `legacy/src/ml/*` | [`src/ml/`](../src/ml/) (PRISM `local_predictor.py` 와 공존) |
+| `legacy/src/common/athena.py` | [`src/common/athena.py`](../src/common/) |
+| `legacy/tests/{api,etl,generator,lambda,ml}/` | [`tests/`](../tests/) (PRISM tests 와 서브디렉토리 분리 공존) |
+| `legacy/docs/plan/` | [`docs/plan/`](../docs/plan/) |
 
-| 경로 | 역할 | PRISM MVP 대체재 |
-|---|---|---|
-| `dags/` | Airflow ETL/ML 재학습 (3개 DAG) | `prism/causal/` 가 Streamlit 안에서 직접 호출 |
-| `terraform/` | EKS, KDS, Firehose, Glue, Lambda, ALB | docker-compose 1줄 (`prism/docker-compose.yml`) |
-| `helm/` | airflow-values.yaml (chart 1.16.0) | — |
-| `k8s/` | StatefulSet/HPA/Karpenter/ALB Ingress | docker container 1개 |
-| `grafana/` | 실시간 fleet 모니터링 dashboard 5장 | Streamlit 콘솔이 batch 결과 표시 |
-| `sql/` | Bronze/Silver/Gold Athena DDL (Iceberg) | DuckDB + Parquet 로컬 |
-| `docker/airflow/` | Airflow 커스텀 이미지 | — |
-| `src/api/` | FastAPI portal (chat / work-orders) | Streamlit 이 직접 UI |
-| `src/lambda/` | Slack alert handler | Streamlit 내 알림 영역 |
-| `src/ml/` (train/redeploy/synthesize) | SageMaker XGBoost 학습·배포 | `src/ml/local_predictor.py` (PRISM, 로컬 추론) |
-| `src/common/athena.py` | Athena query helper | DuckDB SQL |
-| `tests/api,lambda,ml,etl/` | 위 컴포넌트 단위 테스트 | `tests/` 루트(=PRISM) 만 CI 회귀 |
-| `docs/plan/` | active.md 작업 큐 + ops-checklist | PRISM MVP 단계는 별도 추적 불요 |
-| `비용절감플랜/` | EKS up/down 셧다운 스크립트 | docker compose down |
-| `scripts/diagnose_grafana.sh` 외 | EKS·Grafana·Karpenter·ADOT 운영 스크립트 | — |
-| `발표자료.md` | 데이터 파이프라인 발표 원고 (PRISM 이전) | `PRISM_TALKING_POINTS.md` (root) |
+## 통합 설계 참조
 
-## 사용 금지 (현재 스코프 한정)
-
-- 본선(5/22) 시연·전시 부스에서 이 디렉토리의 어떤 것도 부팅하지 않는다.
-  - EKS 셧다운 상태 유지. ALB·EIP 누수 0.
-- `legacy/` 코드 변경 = production 확장 시 다시 살릴 때만.
-- CI 는 `legacy/tests/` 를 default 회귀에서 제외한다 (`tests/` 루트만 = PRISM).
-
-## 복구 (Production scale-up 시작할 때)
-
-1. `git mv legacy/terraform terraform` (또는 symlink) 후 plan 검토.
-2. `legacy/CLAUDE.md` (옛 robot-data-pipeline 운영 가드레일) 을 root `CLAUDE.md` 에 다시 병합.
-3. AWS Secrets Manager 에 `slack-webhook-url`, `grafana-admin-password` 수동 저장.
-4. `legacy/비용절감플랜/up.sh` 실행.
-
-자세한 옛 운영 가드레일은 `legacy/CLAUDE.md` 참조.
+`docs/superpowers/specs/2026-05-23-prism-production-integration-design.md`
