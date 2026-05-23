@@ -432,6 +432,93 @@ async def predict_failure(request: Request, body: PredictRequest):
     }
 
 
+class RecommendationRequest(BaseModel):
+    """PRISM 4-agent supervisor 권고 호출.
+
+    dt 는 명시 필수 (CLAUDE.md §1.E — D-1 hard-code 금지 룰).
+    candidate_actions 는 최소 2개 (SupervisorInput 제약).
+    α/β/γ 는 net_value 가중치 (default 1.0, prism_demo.py 슬라이더와 동일).
+    """
+
+    dt: str
+    robot_id: str | None = None
+    candidate_actions: list[str] = ["continue", "halt", "schedule_maintenance"]
+    alpha: float = 1.0
+    beta: float = 1.0
+    gamma: float = 1.0
+    horizon_h: int = 4
+
+
+@app.post("/api/recommendation")
+@limiter.limit("10/minute")
+async def recommendation(request: Request, body: RecommendationRequest):
+    """PRISM AI 인과추론 supervisor → 4 agent 협의 → net_value argmax 결정.
+
+    PRISM_MODE 자동 라우팅 (DataSource Protocol):
+        - production → AthenaDataSource (Athena Gold)
+        - demo/live/dev → DuckDBDataSource (in-process)
+
+    응답: SupervisorOutput Pydantic 모델 (decision + alternatives + tradeoff_breakdown).
+    """
+    if len(body.candidate_actions) < 2:
+        raise HTTPException(status_code=400, detail="candidate_actions 는 최소 2개 필요")
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", body.dt):
+        raise HTTPException(status_code=400, detail="dt 형식 오류 (YYYY-MM-DD 필요)")
+
+    from src.orchestration.datasource import get_data_source
+    from src.orchestration.predictor import get_predictor
+    from src.orchestration.supervisor import Supervisor, SupervisorConfig
+
+    ds = get_data_source()
+    try:
+        df = await asyncio.to_thread(ds.query_robot_daily_stats, body.dt, 1000)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"DataSource 조회 실패: {exc}")
+
+    if body.robot_id:
+        df = df[df["robot_id"] == body.robot_id]
+        if df.empty:
+            raise HTTPException(
+                status_code=404,
+                detail=f"{body.robot_id} 가 {body.dt} 파티션에 없습니다",
+            )
+    if df.empty:
+        raise HTTPException(
+            status_code=404,
+            detail=f"{body.dt} 파티션에 데이터가 없습니다",
+        )
+
+    row = df.iloc[0].to_dict()
+    scenario_context: dict = {"dt": body.dt, "robot_data": row}
+
+    # 5F 추출 — Predictor 가 robot 5F 만 받음. 누락 키는 supervisor 컨텍스트에서 생략.
+    feature_keys = (
+        "avg_motor_temp", "max_motor_temp", "battery_drain",
+        "active_hours", "max_temp_load_ratio",
+    )
+    features = {k: row[k] for k in feature_keys if k in row and row[k] is not None}
+    if "robot_id" in row:
+        features["robot_id"] = row["robot_id"]
+
+    if len(features) >= 5:  # robot_id 제외 5개 필요
+        predictor = get_predictor()
+        ml_pred = await asyncio.to_thread(predictor.predict_robot_failure, features)
+        scenario_context["ml_prediction"] = ml_pred
+
+    config = SupervisorConfig(
+        alpha=body.alpha, beta=body.beta, gamma=body.gamma, horizon_h=body.horizon_h,
+    )
+    supervisor = Supervisor(config=config)
+    try:
+        sup_out = await asyncio.to_thread(
+            supervisor.negotiate, scenario_context, body.candidate_actions,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Supervisor 협의 실패: {exc}")
+
+    return sup_out.model_dump()
+
+
 _ROBOT_ID_RE = re.compile(r"^ROBOT-\d{5}$")
 
 
