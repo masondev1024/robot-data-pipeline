@@ -1,3 +1,5 @@
+data "aws_caller_identity" "current" {}
+
 # ── Generator IRSA Role (EKS Pod → Kinesis) ─────────────────────
 
 data "aws_iam_policy_document" "generator_assume_role" {
@@ -222,7 +224,7 @@ data "aws_iam_policy_document" "api_permissions" {
       "secretsmanager:GetSecretValue",
     ]
     resources = [
-      "arn:aws:secretsmanager:${var.aws_region}:*:secret:/robot-telemetry/portal-basic-auth-*",
+      "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:/robot-telemetry/portal-basic-auth-*",
     ]
   }
 
@@ -422,7 +424,7 @@ data "aws_iam_policy_document" "airflow_permissions" {
     effect  = "Allow"
     actions = ["secretsmanager:GetSecretValue"]
     resources = [
-      "arn:aws:secretsmanager:${var.aws_region}:*:secret:/robot-telemetry/portal-basic-auth-*",
+      "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:/robot-telemetry/portal-basic-auth-*",
     ]
   }
 

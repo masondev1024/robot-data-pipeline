@@ -5,8 +5,10 @@ from __future__ import annotations
 import base64
 import json
 from unittest.mock import MagicMock
+import urllib.error
 import urllib.request
 
+from botocore.exceptions import ClientError
 import pytest
 
 
@@ -86,4 +88,56 @@ def test_secret_failure_is_warning_only_and_redacted(monkeypatch, capsys):
     urlopen.assert_not_called()
     output = capsys.readouterr().out
     assert "WARN" in output
+    assert secret_material not in output
+
+
+@pytest.mark.parametrize("status", [401, 503])
+def test_http_failure_logs_sanitized_status(monkeypatch, capsys, status):
+    monkeypatch.setattr(
+        etl.boto3,
+        "client",
+        lambda _service, **_kwargs: _SecretsClient("service:password"),
+    )
+    monkeypatch.setattr(
+        urllib.request,
+        "urlopen",
+        MagicMock(
+            side_effect=urllib.error.HTTPError(
+                url="http://portal/api/refresh",
+                code=status,
+                msg="server-provided-reason",
+                hdrs=None,
+                fp=None,
+            )
+        ),
+    )
+
+    etl._refresh_api_cache()
+
+    output = capsys.readouterr().out
+    assert f"category=http status={status}" in output
+    assert "server-provided-reason" not in output
+
+
+def test_access_denied_logs_sanitized_aws_error_code(monkeypatch, capsys):
+    secret_material = "never-log-access-denied-detail"
+    error = ClientError(
+        {
+            "Error": {
+                "Code": "AccessDeniedException",
+                "Message": secret_material,
+            }
+        },
+        "GetSecretValue",
+    )
+    monkeypatch.setattr(
+        etl.boto3,
+        "client",
+        MagicMock(side_effect=error),
+    )
+
+    etl._refresh_api_cache()
+
+    output = capsys.readouterr().out
+    assert "category=aws code=AccessDeniedException" in output
     assert secret_material not in output

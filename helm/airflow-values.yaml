@@ -69,13 +69,17 @@ createUserJob:
   args:
     - bash
     - -c
-    - >-
-      exec airflow users create
-      -r Admin
-      -u admin
-      -e admin@admin.com
-      -f admin
-      -l admin
+    - |-
+      set -euo pipefail
+      airflow users create \
+      -r Admin \
+      -u admin \
+      -e admin@admin.com \
+      -f admin \
+      -l admin \
+      -p "$AIRFLOW_ADMIN_PASSWORD"
+      exec airflow users reset-password \
+      -u admin \
       -p "$AIRFLOW_ADMIN_PASSWORD"
 
 # KubernetesExecutor가 만드는 worker pod에 IRSA 부여.

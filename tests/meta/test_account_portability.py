@@ -183,6 +183,7 @@ def test_airflow_cache_refresh_uses_scoped_portal_secret_permission():
     )[1].split('resource "aws_iam_role_policy" "airflow_permissions"', 1)[0]
     assert 'sid     = "SecretsGetPortalBasicAuth"' in airflow_policy
     assert "secret:/robot-telemetry/portal-basic-auth-*" in airflow_policy
+    assert "data.aws_caller_identity.current.account_id" in airflow_policy
 
 
 def test_airflow_admin_bootstrap_uses_kubernetes_secret_without_static_password():
@@ -201,7 +202,14 @@ def test_airflow_admin_bootstrap_uses_kubernetes_secret_without_static_password(
         "name": "airflow-admin-bootstrap",
         "key": "password",
     }
-    assert "$AIRFLOW_ADMIN_PASSWORD" in " ".join(create_user["args"])
+    create_user_command = " ".join(create_user["args"])
+    assert "$AIRFLOW_ADMIN_PASSWORD" in create_user_command
+    assert "set -euo pipefail" in create_user_command
+    assert "airflow users create" in create_user_command
+    assert "airflow users reset-password" in create_user_command
+    assert create_user_command.index("users create") < create_user_command.index(
+        "users reset-password"
+    )
 
 
 def test_airflow_admin_secret_sync_is_account_guarded_and_avoids_argv_secrets():

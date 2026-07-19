@@ -1,10 +1,12 @@
 import base64
 import json
 import os
+import urllib.error
 import urllib.request
 from datetime import datetime, timedelta
 
 import boto3
+from botocore.exceptions import ClientError
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
@@ -256,6 +258,23 @@ def _refresh_api_cache(**ctx):
             if payload.get("rows_after", 0) == 0:
                 # gold partition 이 비어있는 비정상 — 경고만, fail 시키진 않음 (DAG 자체는 성공).
                 print("[cache_refresh] WARN — rows_after=0, 적재 직후인데 캐시 비어있음")
+    except urllib.error.HTTPError as exc:
+        print(
+            "[cache_refresh] WARN — refresh 호출 실패 "
+            f"category=http status={exc.code}. 다음 cron 까지 stale 가능."
+        )
+    except ClientError as exc:
+        error_code = exc.response.get("Error", {}).get("Code", "Unknown")
+        print(
+            "[cache_refresh] WARN — refresh 호출 실패 "
+            f"category=aws code={error_code}. 다음 cron 까지 stale 가능."
+        )
+    except urllib.error.URLError as exc:
+        print(
+            "[cache_refresh] WARN — refresh 호출 실패 "
+            f"category=network reason={type(exc.reason).__name__}. "
+            "다음 cron 까지 stale 가능."
+        )
     except Exception as exc:
         # API 가 다운돼 있어도 ETL 자체는 끝났으므로 fail 시키지 않는다 — 다음 pod 재시작이나
         # KST 01:00 cron 이 자연 복구. 단 로그로 표시.

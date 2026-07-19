@@ -42,7 +42,7 @@ def test_quality_workflow_gates_python_and_infrastructure():
     assert "terraform fmt -check" in terraform_steps
     assert "terraform validate" in terraform_steps
     assert "apache-airflow==2.10.5" in airflow_steps
-    assert "tests/etl/test_bedrock_report.py" in airflow_steps
+    assert "pytest -q tests/etl" in airflow_steps
 
 
 def test_dev_dependencies_are_public_and_versioned():
