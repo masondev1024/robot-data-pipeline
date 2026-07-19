@@ -1,5 +1,7 @@
+import base64
 import json
 import os
+import urllib.request
 from datetime import datetime, timedelta
 
 import boto3
@@ -220,31 +222,47 @@ GROUP BY s.robot_id
     _run_athena_query(query)
 
 
+def _portal_basic_auth_header() -> str:
+    value = boto3.client("secretsmanager", region_name=AWS_REGION).get_secret_value(
+        SecretId="/robot-telemetry/portal-basic-auth"
+    )["SecretString"]
+    user, separator, password = value.partition(":")
+    if not separator or not user.strip() or not password:
+        raise ValueError("portal basic auth secret is malformed")
+    token = base64.b64encode(f"{user.strip()}:{password}".encode()).decode("ascii")
+    return f"Basic {token}"
+
+
 def _refresh_api_cache(**ctx):
     """robot-telemetry-api 의 Gold 캐시 즉시 재조회 트리거.
     Why: API pod 의 _gold_cache 는 startup + 매일 KST 01:00 cron 에만 갱신되어,
     pod 가 daily_etl 종료 전에 띄워졌을 경우 '(데이터 없음)' 으로 굳어 다음 cron 까지 stale.
     2026-05-07 사고 — 09:32 KST pod 시작 / 09:49 KST gold 적재 / 챗봇은 빈 응답.
-    cluster-internal DNS 로 POST. /api/refresh 는 BasicAuth 면제 + rate limit 5/min."""
-    import urllib.request
-    import urllib.error
+    cluster-internal DNS 로 POST. Portal BasicAuth secret 을 IRSA 로 읽어 인증한다."""
 
     api_url = os.environ.get(
         "ROBOT_API_REFRESH_URL",
         "http://robot-telemetry-api.robot-telemetry.svc.cluster.local/api/refresh",
     )
-    req = urllib.request.Request(api_url, method="POST")
     try:
+        req = urllib.request.Request(
+            api_url,
+            method="POST",
+            headers={"Authorization": _portal_basic_auth_header()},
+        )
         with urllib.request.urlopen(req, timeout=60) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
             print(f"[cache_refresh] {payload}")
             if payload.get("rows_after", 0) == 0:
                 # gold partition 이 비어있는 비정상 — 경고만, fail 시키진 않음 (DAG 자체는 성공).
                 print("[cache_refresh] WARN — rows_after=0, 적재 직후인데 캐시 비어있음")
-    except urllib.error.URLError as e:
+    except Exception as exc:
         # API 가 다운돼 있어도 ETL 자체는 끝났으므로 fail 시키지 않는다 — 다음 pod 재시작이나
         # KST 01:00 cron 이 자연 복구. 단 로그로 표시.
-        print(f"[cache_refresh] WARN — refresh 호출 실패: {e}. 다음 cron 까지 stale 가능.")
+        print(
+            "[cache_refresh] WARN — refresh 호출 실패 "
+            f"({type(exc).__name__}). 다음 cron 까지 stale 가능."
+        )
 
 
 def _bedrock_report(**ctx):

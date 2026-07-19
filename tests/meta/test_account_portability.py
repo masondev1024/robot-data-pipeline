@@ -147,6 +147,36 @@ def test_adot_setup_uses_rendered_manifests_without_mutating_sources():
     assert "TF_VAR_slack_webhook_url" not in script
 
 
+def test_portal_auth_policy_has_only_health_probe_as_public_path():
+    source = (ROOT / "src/api/main.py").read_text()
+    assert '_BASIC_AUTH_EXEMPT_PATHS = {"/healthz"}' in source
+    assert '"/api/refresh"' not in source.split(
+        "_BASIC_AUTH_EXEMPT_PATHS", 1
+    )[1].split("class AuthConfigurationError", 1)[0]
+
+
+def test_test_harness_never_replaces_auth_with_none_fallback():
+    source = (ROOT / "tests/conftest.py").read_text()
+    assert "_disable_portal_basic_auth" not in source
+    assert "_get_basic_auth_creds = lambda: None" not in source
+    assert "TEST_AUTH_HEADERS" in source
+
+
+def test_airflow_cache_refresh_uses_scoped_portal_secret_permission():
+    dag = (ROOT / "dags/robot_daily_etl.py").read_text()
+    assert 'SecretId="/robot-telemetry/portal-basic-auth"' in dag
+    assert 'headers={"Authorization": _portal_basic_auth_header()}' in dag
+
+    terraform = (
+        ROOT / "terraform/modules/data_pipeline/iam_eks_irsa_full.tf"
+    ).read_text()
+    airflow_policy = terraform.split(
+        'data "aws_iam_policy_document" "airflow_permissions"', 1
+    )[1].split('resource "aws_iam_role_policy" "airflow_permissions"', 1)[0]
+    assert 'sid     = "SecretsGetPortalBasicAuth"' in airflow_policy
+    assert "secret:/robot-telemetry/portal-basic-auth-*" in airflow_policy
+
+
 def test_terraform_requires_a_portable_bucket_input():
     variables = (ROOT / "terraform/variables.tf").read_text()
     assert RETIRED_BUCKET not in variables

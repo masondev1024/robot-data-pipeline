@@ -417,6 +417,15 @@ data "aws_iam_policy_document" "airflow_permissions" {
     resources = ["*"]
   }
 
+  statement {
+    sid     = "SecretsGetPortalBasicAuth"
+    effect  = "Allow"
+    actions = ["secretsmanager:GetSecretValue"]
+    resources = [
+      "arn:aws:secretsmanager:${var.aws_region}:*:secret:/robot-telemetry/portal-basic-auth-*",
+    ]
+  }
+
   # weekly_ml_retrain DAG: SageMaker XGBoost 학습 + endpoint 재배포.
   # CreateTrainingJob 호출 시 SageMaker 실행 role 을 SDK 가 자동으로 PassRole 함 →
   # Airflow IRSA 가 sagemaker role 을 넘길 수 있는 PassRole 권한 필요.
