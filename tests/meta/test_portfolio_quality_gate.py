@@ -24,7 +24,7 @@ def test_quality_workflow_gates_python_and_infrastructure():
     workflow = yaml.safe_load(workflow_path.read_text())
     jobs = workflow["jobs"]
 
-    assert {"python-quality", "terraform-quality"} <= jobs.keys()
+    assert {"python-quality", "airflow-contract", "terraform-quality"} <= jobs.keys()
 
     python_steps = "\n".join(
         str(step.get("run", "")) for step in jobs["python-quality"]["steps"]
@@ -32,12 +32,17 @@ def test_quality_workflow_gates_python_and_infrastructure():
     terraform_steps = "\n".join(
         str(step.get("run", "")) for step in jobs["terraform-quality"]["steps"]
     )
+    airflow_steps = "\n".join(
+        str(step.get("run", "")) for step in jobs["airflow-contract"]["steps"]
+    )
 
     assert "ruff check" in python_steps
     assert "pytest" in python_steps
     assert "pip install -r requirements-dev.lock" in python_steps
     assert "terraform fmt -check" in terraform_steps
     assert "terraform validate" in terraform_steps
+    assert "apache-airflow==2.10.5" in airflow_steps
+    assert "tests/etl/test_bedrock_report.py" in airflow_steps
 
 
 def test_dev_dependencies_are_public_and_versioned():

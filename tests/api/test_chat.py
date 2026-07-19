@@ -1,186 +1,166 @@
-"""ADR-013 (Bedrock Converse API + Tool Use) 마이그레이션으로 invoke_model
-mock 패턴이 더 이상 유효하지 않음. 본 모듈은 임시 skip — Converse API 응답 형식
-({"output": {"message": {"content": [...]}}, "usage": {...}, "stopReason": "..."})
-+ tool_use loop 검증으로 재작성 필요. 회귀 검증은 evals/ (LLM-as-judge) 가 우선
-담당하므로 본 transport-layer 테스트의 우선순위는 낮음."""
-import json
-from unittest.mock import patch, MagicMock
+"""Contract tests for POST /api/chat and the Bedrock Converse tool loop."""
+
+from copy import deepcopy
+
+from unittest.mock import MagicMock
+
 import pytest
 from fastapi.testclient import TestClient
 
-from src.api.main import app, limiter
+import src.api.main as api
 
-pytestmark = pytest.mark.skip(reason="ADR-013 — Converse API mock 으로 재작성 필요 (후속 PR)")
+
+MODEL_ID = "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
+
+
+def _final_response(text: str) -> dict:
+    return {
+        "output": {
+            "message": {
+                "role": "assistant",
+                "content": [{"text": text}],
+            },
+        },
+        "usage": {"inputTokens": 10, "outputTokens": 4},
+        "stopReason": "end_turn",
+    }
 
 
 @pytest.fixture(autouse=True)
-def reset_limiter():
-    """Reset limiter state before each test."""
-    # Clear all rate limit data
-    limiter._storage.storage.clear()
-    yield
+def reset_chat_state(monkeypatch):
+    api.limiter._storage.storage.clear()
+    monkeypatch.setenv("BEDROCK_MODEL_ID", MODEL_ID)
+    monkeypatch.setattr(
+        api,
+        "_gold_cache",
+        "robot_id,avg_motor_temp,max_motor_temp,battery_drain,active_hours\n"
+        "ROBOT-00001,92.5,98.0,30,8",
+    )
+    monkeypatch.setattr(api, "_cache_updated_at", "2026-04-27T10:00:00+00:00")
+    monkeypatch.setattr(api, "_data_date", "2026-04-26")
 
 
 @pytest.fixture
-def mock_bedrock_response():
-    """Mock Bedrock invoke_model response."""
-    response = MagicMock()
-    response.read.return_value = json.dumps({
-        "content": [{"text": "점검 시급: [ROBOT-00123], [ROBOT-00456]"}]
-    }).encode("utf-8")
-    return {"body": response}
+def bedrock(monkeypatch):
+    client = MagicMock()
+    client.converse.return_value = _final_response(
+        "점검 시급: [ROBOT-00123], [ROBOT-00456]"
+    )
+    monkeypatch.setattr(api, "_bedrock_runtime", client)
+    return client
 
 
-@pytest.fixture
-def setup_cache(monkeypatch):
-    """Setup cache state for tests."""
-    monkeypatch.setattr("src.api.main._cache_ready", True)
-    monkeypatch.setattr("src.api.main._cache_updated_at", "2026-04-27T10:00:00+00:00")
-    monkeypatch.setattr("src.api.main._data_date", "2026-04-26")
-    monkeypatch.setattr("src.api.main._gold_cache", "robot_id,avg_motor_temp\nROBOT-00001,92.5")
+def test_chat_returns_answer_metadata_and_robot_links(bedrock):
+    response = TestClient(api.app).post(
+        "/api/chat", json={"question": "최고 온도 로봇은?"}
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "answer": "점검 시급: [ROBOT-00123], [ROBOT-00456]",
+        "cached_at": "2026-04-27T10:00:00+00:00",
+        "data_date": "2026-04-26",
+        "links": [
+            {"label": "ROBOT-00123 차트", "url": "/?robot_id=ROBOT-00123"},
+            {"label": "ROBOT-00456 차트", "url": "/?robot_id=ROBOT-00456"},
+        ],
+    }
 
 
-class TestChatApi:
-    """POST /api/chat endpoint tests"""
+def test_chat_sends_converse_contract_with_cache_point_and_tools(bedrock):
+    response = TestClient(api.app).post(
+        "/api/chat", json={"question": "문제가 있는 로봇은?"}
+    )
 
-    @patch("src.common.aws.boto3.client")
-    def test_chat_normal_response(self, mock_boto, monkeypatch, mock_bedrock_response, setup_cache):
-        """POST /api/chat returns 200 with answer, cached_at, data_date, links."""
-        monkeypatch.setenv("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0")
-        client = TestClient(app)
+    assert response.status_code == 200
+    kwargs = bedrock.converse.call_args.kwargs
+    assert kwargs["modelId"] == MODEL_ID
+    assert kwargs["inferenceConfig"] == {"maxTokens": 512}
+    assert kwargs["system"][0] == {"text": api.ROBOT_ANALYST_SYSTEM_PROMPT}
+    assert kwargs["system"][1] == {"cachePoint": {"type": "default"}}
+    assert kwargs["toolConfig"] == api.CHAT_TOOL_CONFIG
+    assert kwargs["messages"][0]["role"] == "user"
+    prompt = kwargs["messages"][0]["content"][0]["text"]
+    assert "<gold_data>" in prompt
+    assert "문제가 있는 로봇은?" in prompt
 
-        mock_bedrock_client = MagicMock()
-        mock_bedrock_client.invoke_model.return_value = mock_bedrock_response
 
-        def client_factory(service, **kwargs):
-            if service == "bedrock-runtime":
-                return mock_bedrock_client
-            return MagicMock()
+def test_converse_executes_tool_and_returns_second_turn(monkeypatch):
+    client = MagicMock()
+    responses = iter([
+        {
+            "output": {
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "toolUse": {
+                                "toolUseId": "tool-1",
+                                "name": "predict_robot_failure",
+                                "input": {"robot_id": "ROBOT-00001"},
+                            },
+                        },
+                    ],
+                },
+            },
+            "stopReason": "tool_use",
+        },
+        _final_response("ROBOT-00001은 예방 정비가 필요합니다."),
+    ])
+    messages_at_call = []
 
-        mock_boto.side_effect = client_factory
+    def converse(**kwargs):
+        messages_at_call.append(deepcopy(kwargs["messages"]))
+        return next(responses)
 
-        response = client.post("/api/chat", json={"question": "최고 온도 로봇은?"})
-        assert response.status_code == 200
-        data = response.json()
-        assert "answer" in data
-        assert "cached_at" in data
-        assert "data_date" in data
-        assert "links" in data
+    client.converse.side_effect = converse
+    tool = MagicMock(return_value={"top_failure_type": "HDF"})
+    monkeypatch.setattr(api, "_bedrock_runtime", client)
+    monkeypatch.setattr(
+        api,
+        "_TOOL_IMPLEMENTATIONS",
+        {"predict_robot_failure": tool},
+    )
 
-    @patch("src.common.aws.boto3.client")
-    def test_chat_bedrock_invoke_params(self, mock_boto, monkeypatch, mock_bedrock_response, setup_cache):
-        """Verify Bedrock invoke_model call params: modelId, system field, max_tokens."""
-        monkeypatch.setenv("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0")
-        client = TestClient(app)
+    result = api._converse_with_tools("ROBOT-00001을 예측해줘")
 
-        mock_bedrock_client = MagicMock()
-        mock_bedrock_client.invoke_model.return_value = mock_bedrock_response
+    assert result == "ROBOT-00001은 예방 정비가 필요합니다."
+    tool.assert_called_once_with(robot_id="ROBOT-00001")
+    second_messages = messages_at_call[1]
+    assert second_messages[-1] == {
+        "role": "user",
+        "content": [
+            {
+                "toolResult": {
+                    "toolUseId": "tool-1",
+                    "content": [{"json": {"top_failure_type": "HDF"}}],
+                },
+            },
+        ],
+    }
 
-        def client_factory(service, **kwargs):
-            if service == "bedrock-runtime":
-                return mock_bedrock_client
-            return MagicMock()
 
-        mock_boto.side_effect = client_factory
+def test_chat_returns_503_when_gold_cache_is_empty(monkeypatch):
+    monkeypatch.setattr(api, "_gold_cache", "")
 
-        client.post("/api/chat", json={"question": "문제가 있는 로봇은?"})
+    response = TestClient(api.app).post("/api/chat", json={"question": "test"})
 
-        call_args = mock_bedrock_client.invoke_model.call_args
-        assert call_args.kwargs["modelId"] == "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
+    assert response.status_code == 503
+    assert response.json()["detail"] == "캐시가 아직 준비되지 않았습니다."
 
-        body_str = call_args.kwargs["body"]
-        body = json.loads(body_str)
-        assert "system" in body
-        assert body["max_tokens"] == 512
-        assert body["messages"][0]["role"] == "user"
 
-    @patch("src.common.aws.boto3.client")
-    def test_chat_links_extraction(self, mock_boto, monkeypatch, mock_bedrock_response, setup_cache):
-        """Extract links from response text matching [ROBOT-XXXXX] pattern."""
-        monkeypatch.setenv("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0")
-        client = TestClient(app)
+def test_chat_translates_bedrock_failure_to_502(bedrock):
+    bedrock.converse.side_effect = RuntimeError("service unavailable")
 
-        mock_bedrock_client = MagicMock()
-        response = MagicMock()
-        response.read.return_value = json.dumps({
-            "content": [{"text": "점검 시급: [ROBOT-00123], [ROBOT-00456]"}]
-        }).encode("utf-8")
-        mock_bedrock_client.invoke_model.return_value = {"body": response}
+    response = TestClient(api.app).post("/api/chat", json={"question": "test"})
 
-        def client_factory(service, **kwargs):
-            if service == "bedrock-runtime":
-                return mock_bedrock_client
-            return MagicMock()
+    assert response.status_code == 502
+    assert response.json()["detail"] == "Bedrock 호출 실패: service unavailable"
 
-        mock_boto.side_effect = client_factory
 
-        resp = client.post("/api/chat", json={"question": "??"})
-        data = resp.json()
-        assert len(data["links"]) == 2
-        assert data["links"][0]["url"] == "/?robot_id=ROBOT-00123"
-        assert data["links"][1]["url"] == "/?robot_id=ROBOT-00456"
+def test_chat_rate_limit_is_ten_requests_per_minute(bedrock):
+    client = TestClient(api.app)
+    for index in range(10):
+        assert client.post("/api/chat", json={"question": f"q{index}"}).status_code == 200
 
-    @patch("src.common.aws.boto3.client")
-    def test_chat_cache_not_ready_503(self, mock_boto, monkeypatch):
-        """Return 503 when cache is not ready."""
-        monkeypatch.setenv("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0")
-        monkeypatch.setattr("src.api.main._cache_ready", False)
-        client = TestClient(app)
-
-        response = client.post("/api/chat", json={"question": "test"})
-        assert response.status_code == 503
-
-    @patch("src.common.aws.boto3.client")
-    def test_chat_rate_limit(self, mock_boto, monkeypatch, setup_cache):
-        """Rate limit 10/minute: 11th request returns 429."""
-        monkeypatch.setenv("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0")
-        client = TestClient(app)
-
-        mock_bedrock_client = MagicMock()
-        mock_bedrock_client.invoke_model.return_value = {
-            "body": MagicMock(read=lambda: json.dumps({
-                "content": [{"text": "response"}]
-            }).encode())
-        }
-
-        def client_factory(service, **kwargs):
-            if service == "bedrock-runtime":
-                return mock_bedrock_client
-            return MagicMock()
-
-        mock_boto.side_effect = client_factory
-
-        for i in range(10):
-            resp = client.post("/api/chat", json={"question": f"q{i}"})
-            assert resp.status_code == 200
-
-        resp11 = client.post("/api/chat", json={"question": "q10"})
-        assert resp11.status_code == 429
-
-    @patch("src.common.aws.boto3.client")
-    def test_chat_system_field_in_body(self, mock_boto, monkeypatch, setup_cache):
-        """Verify 'system' field is in invoke_model body (bug 4B fix)."""
-        monkeypatch.setenv("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0")
-        client = TestClient(app)
-
-        mock_bedrock_client = MagicMock()
-        mock_bedrock_client.invoke_model.return_value = {
-            "body": MagicMock(read=lambda: json.dumps({
-                "content": [{"text": "test"}]
-            }).encode())
-        }
-
-        def client_factory(service, **kwargs):
-            if service == "bedrock-runtime":
-                return mock_bedrock_client
-            return MagicMock()
-
-        mock_boto.side_effect = client_factory
-
-        client.post("/api/chat", json={"question": "test"})
-
-        call_args = mock_bedrock_client.invoke_model.call_args
-        body_str = call_args.kwargs["body"]
-        body = json.loads(body_str)
-        assert "system" in body
-        assert len(body["system"]) > 0
+    assert client.post("/api/chat", json={"question": "q10"}).status_code == 429

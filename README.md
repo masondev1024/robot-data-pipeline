@@ -67,7 +67,7 @@ make infra-check
 
 지원 Python은 `.python-version`의 3.11로 고정합니다. PR과 `main` push에서는 같은 명령으로 critical Python lint, deterministic core tests, Terraform format/validate를 실행합니다.
 
-Airflow 및 AWS 의존 E2E는 별도 실행 계층입니다. 비용이 드는 production 검증을 로컬 core test와 동일한 증거로 표현하지 않습니다.
+Airflow 2.10.5 DAG contract는 별도 CI job에서 검증하고, AWS 의존 E2E는 수동 실행 계층으로 분리합니다. 비용이 드는 production 검증을 로컬 core test와 동일한 증거로 표현하지 않습니다.
 
 ## 플랫폼 엔지니어링에서 강조한 문제
 

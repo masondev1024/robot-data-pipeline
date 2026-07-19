@@ -33,6 +33,28 @@ jobs:
           PYTHONHASHSEED: "2026"
         run: pytest -q --ignore=tests/etl -m "not slow"
 
+  airflow-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+      - name: Install production-compatible Airflow test environment
+        run: >-
+          pip install
+          apache-airflow==2.10.5
+          boto3==1.36.3
+          pytest==8.3.4
+          --constraint
+          https://raw.githubusercontent.com/apache/airflow/constraints-2.10.5/constraints-3.11.txt
+      - name: Verify offline Bedrock report contract
+        env:
+          AIRFLOW_HOME: /tmp/robot-airflow-home
+          PYTHONHASHSEED: "2026"
+        run: pytest -q tests/etl/test_bedrock_report.py
+
   terraform-quality:
     runs-on: ubuntu-latest
     timeout-minutes: 10
