@@ -4,12 +4,13 @@ import pytest
 from fastapi.testclient import TestClient
 import inspect
 
+from conftest import TEST_AUTH_HEADERS
 from src.api.main import app
 
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    return TestClient(app, headers=TEST_AUTH_HEADERS)
 
 
 class TestStatusApi:

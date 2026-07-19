@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 from botocore.exceptions import ClientError
 from fastapi.testclient import TestClient
 
+from conftest import TEST_AUTH_HEADERS
 
 def _csv_response(probs: list[float]) -> MagicMock:
     """SageMaker text/csv 응답 mock — multi:softprob 6-class 확률."""
@@ -36,7 +37,7 @@ def test_predict_multiclass_high_risk_hdf(mock_sm):
 
     # NONE=0.10, TWF=0.05, HDF=0.70, PWF=0.05, OSF=0.05, RNF=0.05
     mock_sm.invoke_endpoint.return_value = _csv_response([0.10, 0.05, 0.70, 0.05, 0.05, 0.05])
-    client = TestClient(app)
+    client = TestClient(app, headers=TEST_AUTH_HEADERS)
 
     resp = client.post("/api/predict", json=_BASE_PAYLOAD)
     assert resp.status_code == 200, resp.text
@@ -54,7 +55,7 @@ def test_predict_multiclass_medium_risk_osf(mock_sm):
     """NONE=0.35, OSF=0.45 (argmax), 나머지 0.05 each → fault_prob=0.65 → medium."""
     mock_sm.invoke_endpoint.return_value = _csv_response([0.35, 0.05, 0.05, 0.05, 0.45, 0.05])
     from src.api.main import app
-    client = TestClient(app)
+    client = TestClient(app, headers=TEST_AUTH_HEADERS)
     resp = client.post("/api/predict", json={**_BASE_PAYLOAD, "robot_id": "ROBOT-00002"})
     assert resp.status_code == 200
     data = resp.json()
@@ -68,7 +69,7 @@ def test_predict_multiclass_low_risk_none(mock_sm):
     # NONE=0.85 우세 → low risk, predicted=NONE
     mock_sm.invoke_endpoint.return_value = _csv_response([0.85, 0.03, 0.03, 0.03, 0.03, 0.03])
     from src.api.main import app
-    client = TestClient(app)
+    client = TestClient(app, headers=TEST_AUTH_HEADERS)
     resp = client.post("/api/predict", json={**_BASE_PAYLOAD, "robot_id": "ROBOT-00003"})
     assert resp.status_code == 200
     data = resp.json()
@@ -82,7 +83,7 @@ def test_predict_handles_json_response(mock_sm):
     """JSON 응답(`[[...]]`)도 정상 파싱."""
     mock_sm.invoke_endpoint.return_value = _json_response([0.10, 0.05, 0.05, 0.70, 0.05, 0.05])
     from src.api.main import app
-    client = TestClient(app)
+    client = TestClient(app, headers=TEST_AUTH_HEADERS)
     resp = client.post("/api/predict", json=_BASE_PAYLOAD)
     assert resp.status_code == 200
     assert resp.json()["predicted_failure_type"] == "PWF"
@@ -93,7 +94,7 @@ def test_predict_dimension_mismatch_returns_502(mock_sm):
     """6 미만 차원 응답 시 502 (binary 모델 잔재 가드)."""
     mock_sm.invoke_endpoint.return_value = _csv_response([0.32])
     from src.api.main import app
-    client = TestClient(app)
+    client = TestClient(app, headers=TEST_AUTH_HEADERS)
     resp = client.post("/api/predict", json=_BASE_PAYLOAD)
     assert resp.status_code == 502
     assert "차원 불일치" in resp.json()["detail"]
@@ -103,7 +104,7 @@ def test_predict_dimension_mismatch_returns_502(mock_sm):
 def test_predict_returns_robot_id_unchanged(mock_sm):
     mock_sm.invoke_endpoint.return_value = _csv_response([0.10, 0.05, 0.05, 0.05, 0.70, 0.05])
     from src.api.main import app
-    client = TestClient(app)
+    client = TestClient(app, headers=TEST_AUTH_HEADERS)
     resp = client.post("/api/predict", json={**_BASE_PAYLOAD, "robot_id": "ROBOT-00042"})
     assert resp.status_code == 200
     assert resp.json()["robot_id"] == "ROBOT-00042"
@@ -113,7 +114,7 @@ def test_predict_returns_robot_id_unchanged(mock_sm):
 def test_predict_recommended_action_for_each_type(mock_sm):
     """6개 type 별 argmax 응답이 각각 올바른 recommended_action 매핑."""
     from src.api.main import app
-    client = TestClient(app)
+    client = TestClient(app, headers=TEST_AUTH_HEADERS)
 
     cases = [
         ([0.85, 0.03, 0.03, 0.03, 0.03, 0.03], "NONE", "정상"),
@@ -147,7 +148,7 @@ def test_predict_endpoint_offline_returns_503(mock_sm):
         operation_name="InvokeEndpoint",
     )
     from src.api.main import app
-    client = TestClient(app)
+    client = TestClient(app, headers=TEST_AUTH_HEADERS)
     resp = client.post("/api/predict", json=_BASE_PAYLOAD)
     assert resp.status_code == 503, resp.text
     detail = resp.json()["detail"]
@@ -164,7 +165,7 @@ def test_predict_other_client_error_preserves_502(mock_sm):
         operation_name="InvokeEndpoint",
     )
     from src.api.main import app
-    client = TestClient(app)
+    client = TestClient(app, headers=TEST_AUTH_HEADERS)
     resp = client.post("/api/predict", json=_BASE_PAYLOAD)
     assert resp.status_code == 502
     assert "SageMaker 호출 실패" in resp.json()["detail"]

@@ -7,10 +7,15 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
+from conftest import TEST_AUTH_HEADERS
 import src.api.main as api
 
 
 MODEL_ID = "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
+
+
+def _client() -> TestClient:
+    return TestClient(api.app, headers=TEST_AUTH_HEADERS)
 
 
 def _final_response(text: str) -> dict:
@@ -51,7 +56,7 @@ def bedrock(monkeypatch):
 
 
 def test_chat_returns_answer_metadata_and_robot_links(bedrock):
-    response = TestClient(api.app).post(
+    response = _client().post(
         "/api/chat", json={"question": "최고 온도 로봇은?"}
     )
 
@@ -68,7 +73,7 @@ def test_chat_returns_answer_metadata_and_robot_links(bedrock):
 
 
 def test_chat_sends_converse_contract_with_cache_point_and_tools(bedrock):
-    response = TestClient(api.app).post(
+    response = _client().post(
         "/api/chat", json={"question": "문제가 있는 로봇은?"}
     )
 
@@ -143,7 +148,7 @@ def test_converse_executes_tool_and_returns_second_turn(monkeypatch):
 def test_chat_returns_503_when_gold_cache_is_empty(monkeypatch):
     monkeypatch.setattr(api, "_gold_cache", "")
 
-    response = TestClient(api.app).post("/api/chat", json={"question": "test"})
+    response = _client().post("/api/chat", json={"question": "test"})
 
     assert response.status_code == 503
     assert response.json()["detail"] == "캐시가 아직 준비되지 않았습니다."
@@ -152,14 +157,14 @@ def test_chat_returns_503_when_gold_cache_is_empty(monkeypatch):
 def test_chat_translates_bedrock_failure_to_502(bedrock):
     bedrock.converse.side_effect = RuntimeError("service unavailable")
 
-    response = TestClient(api.app).post("/api/chat", json={"question": "test"})
+    response = _client().post("/api/chat", json={"question": "test"})
 
     assert response.status_code == 502
     assert response.json()["detail"] == "Bedrock 호출 실패: service unavailable"
 
 
 def test_chat_rate_limit_is_ten_requests_per_minute(bedrock):
-    client = TestClient(api.app)
+    client = _client()
     for index in range(10):
         assert client.post("/api/chat", json={"question": f"q{index}"}).status_code == 200
 

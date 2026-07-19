@@ -1,7 +1,7 @@
 """/api/recommendation 단위 테스트.
 
 AWS 부팅 0회 — DataSource·Predictor·Supervisor 모두 mock 으로 주입.
-`tests/conftest.py` 의 `_disable_portal_basic_auth` autouse fixture 가 BasicAuth 우회.
+모든 요청은 deterministic test credential 로 BasicAuth 경계를 통과한다.
 """
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
+from conftest import TEST_AUTH_HEADERS
 from src.api.main import app
 from src.orchestration.schema import (
     AlternativeAction,
@@ -20,7 +21,7 @@ from src.orchestration.schema import (
 )
 
 
-client = TestClient(app)
+client = TestClient(app, headers=TEST_AUTH_HEADERS)
 
 
 _GOLD_ROW = {

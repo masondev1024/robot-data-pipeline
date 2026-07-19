@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import json
+import logging
 import os
 import re
 import secrets as stdsecrets
@@ -20,6 +21,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from src.common.athena import run_query
 from src.common.aws import get_client
 
+logger = logging.getLogger(__name__)
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="Robot Telemetry AI Query API")
 app.state.limiter = limiter
@@ -104,31 +106,45 @@ SageMaker XGBoost multi:softprob 모델이 분류하는 6가지 실패 카테고
 
 
 _basic_auth_creds: tuple[str, str] | None = None
-# /api/refresh — Airflow daily_etl 의 cache_refresh task 가 cluster-internal 로 POST.
-# BasicAuth 면제 사유: cluster-internal traffic only (ALB 미경유), rate limit 으로 abuse 방어,
-# 트리거하는 액션이 "Athena 재쿼리" 1회 뿐이라 data exposure 없음. 외부 ALB 통한 호출은
-# rate limit 통과해도 캐시를 강제 빌드만 시킬 뿐 응답에 데이터가 안 들어감.
-_BASIC_AUTH_EXEMPT_PATHS = {"/healthz", "/api/refresh"}
+_BASIC_AUTH_EXEMPT_PATHS = {"/healthz"}
 
 
-def _get_basic_auth_creds() -> tuple[str, str] | None:
+class AuthConfigurationError(RuntimeError):
+    """Portal authentication cannot be enforced with the current configuration."""
+
+
+def _auth_mode() -> str:
+    mode = os.environ.get("PORTAL_AUTH_MODE", "required").strip().lower()
+    app_env = os.environ.get("APP_ENV", "production").strip().lower()
+    if mode not in {"required", "disabled"}:
+        raise AuthConfigurationError("invalid portal authentication mode")
+    if mode == "disabled" and app_env not in {"local", "test"}:
+        raise AuthConfigurationError("portal authentication cannot be disabled")
+    return mode
+
+
+def _get_basic_auth_creds() -> tuple[str, str]:
     """Secrets Manager `/robot-telemetry/portal-basic-auth` (형식: `user:pass`) 1회 read & 캐시.
-    값 미설정 / 조회 실패 시 None 반환 → 미들웨어가 인증 비활성 (개발/로컬 모드)."""
+    유효한 값만 캐시하며 조회 실패나 형식 오류는 fail-closed 처리한다."""
     global _basic_auth_creds
     if _basic_auth_creds is not None:
-        return _basic_auth_creds if _basic_auth_creds != ("", "") else None
+        return _basic_auth_creds
     try:
         value = get_client("secretsmanager").get_secret_value(
             SecretId="/robot-telemetry/portal-basic-auth"
         )["SecretString"]
-        if ":" in value:
-            user, _, pwd = value.partition(":")
+        user, separator, pwd = value.partition(":")
+        if separator and user.strip() and pwd:
             _basic_auth_creds = (user.strip(), pwd)
             return _basic_auth_creds
-    except Exception as e:
-        print(f"Secrets Manager /robot-telemetry/portal-basic-auth 조회 실패 — Basic Auth 비활성: {e}")
-    _basic_auth_creds = ("", "")
-    return None
+        raise AuthConfigurationError("portal basic auth secret is malformed")
+    except AuthConfigurationError:
+        raise
+    except Exception as exc:
+        logger.error(
+            "Portal Basic Auth secret lookup failed (%s)", type(exc).__name__
+        )
+        raise AuthConfigurationError("portal basic auth secret is unavailable") from exc
 
 
 class BasicAuthMiddleware(BaseHTTPMiddleware):
@@ -138,9 +154,16 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         if request.url.path in _BASIC_AUTH_EXEMPT_PATHS:
             return await call_next(request)
-        creds = _get_basic_auth_creds()
-        if creds is None:
-            return await call_next(request)
+        try:
+            mode = _auth_mode()
+            if mode == "disabled":
+                return await call_next(request)
+            creds = _get_basic_auth_creds()
+        except AuthConfigurationError:
+            return Response(
+                content="authentication configuration unavailable",
+                status_code=503,
+            )
         expected_user, expected_pwd = creds
         auth = request.headers.get("Authorization", "")
         unauthorized = Response(
@@ -150,9 +173,11 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
         if not auth.startswith("Basic "):
             return unauthorized
         try:
-            decoded = base64.b64decode(auth[6:]).decode("utf-8", errors="ignore")
-            user, _, pwd = decoded.partition(":")
-        except Exception:
+            decoded = base64.b64decode(auth[6:], validate=True).decode("utf-8")
+            user, separator, pwd = decoded.partition(":")
+            if not separator or not user or not pwd:
+                return unauthorized
+        except (ValueError, UnicodeDecodeError):
             return unauthorized
         if not (
             stdsecrets.compare_digest(user, expected_user)
