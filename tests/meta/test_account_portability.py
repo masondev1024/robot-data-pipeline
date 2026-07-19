@@ -139,6 +139,12 @@ def test_quality_workflow_runs_an_explicit_render_smoke_test():
     assert "scripts/render_deployment.py" in workflow
 
 
+def test_quality_workflow_runs_the_complete_airflow_contract_suite():
+    workflow = (ROOT / ".github/workflows/quality.yml").read_text()
+    assert "pytest -q tests/etl" in workflow
+    assert "pytest -q tests/etl/test_bedrock_report.py" not in workflow
+
+
 def test_adot_setup_uses_rendered_manifests_without_mutating_sources():
     script = (ROOT / "scripts/setup_adot.sh").read_text()
     assert "scripts/require_aws_account.sh" in script

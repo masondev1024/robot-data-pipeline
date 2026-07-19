@@ -57,11 +57,11 @@ jobs:
           pytest==8.3.4
           --constraint
           https://raw.githubusercontent.com/apache/airflow/constraints-2.10.5/constraints-3.11.txt
-      - name: Verify offline Bedrock report contract
+      - name: Verify Airflow DAG and boundary contracts
         env:
           AIRFLOW_HOME: /tmp/robot-airflow-home
           PYTHONHASHSEED: "2026"
-        run: pytest -q tests/etl/test_bedrock_report.py
+        run: pytest -q tests/etl
 
   terraform-quality:
     runs-on: ubuntu-latest
