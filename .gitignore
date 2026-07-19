@@ -88,6 +88,8 @@ CLAUDE.md
 docs/*
 !docs/public/
 !docs/public/**
+# 로컬 구현 설계 — 공개 포트폴리오 문서와 분리
+docs/public/ACCOUNT-PORTABILITY-DESIGN.md
 # 발표 자료 (로컬 빌드 도구, git 추적 X)
 presentation/
 발표자료.md
