@@ -59,10 +59,15 @@ docker compose up --build
 ## 검증
 
 ```bash
-AIRFLOW_HOME=/tmp/robot-data-pipeline-airflow PYTHONHASHSEED=2026 python3.11 -m pytest -q
+make setup
+make lint
+make test
+make infra-check
 ```
 
-CI는 Terraform validation, Kubernetes 배포, 배포 후 ALB/SSM 확인, LLM evaluation, production E2E 점검을 분리합니다. AWS 의존 E2E는 비용 절감을 위해 수동 실행하며, 오프라인 테스트와 동일한 검증으로 오해하지 않도록 구분합니다.
+지원 Python은 `.python-version`의 3.11로 고정합니다. PR과 `main` push에서는 같은 명령으로 critical Python lint, deterministic core tests, Terraform format/validate를 실행합니다.
+
+Airflow 및 AWS 의존 E2E는 별도 실행 계층입니다. 비용이 드는 production 검증을 로컬 core test와 동일한 증거로 표현하지 않습니다.
 
 ## 플랫폼 엔지니어링에서 강조한 문제
 
