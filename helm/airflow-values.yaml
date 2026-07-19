@@ -14,7 +14,7 @@
 # Why: _PIP_ADDITIONAL_REQUIREMENTS 매 콜드스타트 install 이 webserver 75분
 # CrashLoop (down/up 사이클) 의 root cause. baked-in 으로 옮겨 콜드스타트 단축.
 # 태그 전략: <airflow-version>-r<revision>. revision 갱신 시 helm upgrade 필요.
-defaultAirflowRepository: 827913617635.dkr.ecr.eu-west-1.amazonaws.com/robot-telemetry-airflow
+defaultAirflowRepository: __AWS_ACCOUNT_ID__.dkr.ecr.__AWS_REGION__.amazonaws.com/robot-telemetry-airflow
 defaultAirflowTag: 2.10.5-r1
 
 executor: KubernetesExecutor
@@ -40,7 +40,7 @@ webserver:
     create: true
     name: airflow-webserver
     annotations:
-      eks.amazonaws.com/role-arn: arn:aws:iam::827913617635:role/robot-telemetry-airflow-irsa
+      eks.amazonaws.com/role-arn: arn:aws:iam::__AWS_ACCOUNT_ID__:role/robot-telemetry-airflow-irsa
   # Probe 여유 — _PIP_ADDITIONAL_REQUIREMENTS=boto3 다운그레이드 install + Airflow
   # 2.10.5 providers preload 가 콜드스타트 시 ~60s 이상 소요 → chart default 60s
   # startupProbe 로는 부족해 connection refused 후 SIGTERM 무한 루프 회귀.
@@ -69,7 +69,7 @@ workers:
     create: true
     name: airflow-worker
     annotations:
-      eks.amazonaws.com/role-arn: arn:aws:iam::827913617635:role/robot-telemetry-airflow-irsa
+      eks.amazonaws.com/role-arn: arn:aws:iam::__AWS_ACCOUNT_ID__:role/robot-telemetry-airflow-irsa
 
 # Remote logging (S3) — KubernetesExecutor ephemeral pod 로그 수집 픽스.
 # Worker pod 가 task 실행 중 로그를 S3 에도 동시 업로드 → pod 삭제되어도 잔존 →
@@ -79,7 +79,7 @@ workers:
 config:
   logging:
     remote_logging: "True"
-    remote_base_log_folder: "s3://de-ai-06-smartfactory-bucket/airflow-logs/"
+    remote_base_log_folder: "s3://__S3_BUCKET_NAME__/airflow-logs/"
     remote_log_conn_id: ""
     encrypt_s3_logs: "False"
   webserver:
@@ -132,7 +132,7 @@ triggerer:
 # DAG의 `from src.common.athena import ...` 가 동작하려면 repo root 추가 필수.
 # Step 0(사람): airflow-slack-webhook secret 사전 생성 필요
 #   aws secretsmanager get-secret-value \
-#     --secret-id /robot-telemetry/slack-webhook-url --region eu-west-1 \
+#     --secret-id /robot-telemetry/slack-webhook-url --region __AWS_REGION__ \
 #     --query SecretString --output text \
 #   | kubectl create secret generic airflow-slack-webhook -n airflow \
 #     --from-file=url=/dev/stdin
@@ -143,21 +143,21 @@ env:
   # boto3 + sagemaker 는 custom image baked-in (defaultAirflowRepository/Tag 참조).
   # 이전엔 _PIP_ADDITIONAL_REQUIREMENTS 글로벌 boto3 + workers.env sagemaker 격리.
   - name: AWS_DEFAULT_REGION
-    value: "eu-west-1"
+    value: "__AWS_REGION__"
   - name: S3_BUCKET_NAME
-    value: "de-ai-06-smartfactory-bucket"
+    value: "__S3_BUCKET_NAME__"
   - name: ATHENA_DATABASE
     value: "robot_telemetry_db"
   - name: ATHENA_WORKGROUP
     value: "robot-telemetry-workgroup"
   - name: ATHENA_OUTPUT_LOCATION
-    value: "s3://de-ai-06-smartfactory-bucket/project-athena-results/"
+    value: "s3://__S3_BUCKET_NAME__/project-athena-results/"
   - name: BEDROCK_MODEL_ID
     value: "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
   - name: DQ_SNS_TOPIC_ARN
-    value: "arn:aws:sns:eu-west-1:827913617635:robot-anomaly-alerts"
+    value: "arn:aws:sns:__AWS_REGION__:__AWS_ACCOUNT_ID__:robot-anomaly-alerts"
   - name: SAGEMAKER_ROLE_ARN
-    value: "arn:aws:iam::827913617635:role/robot-telemetry-sagemaker-role"
+    value: "arn:aws:iam::__AWS_ACCOUNT_ID__:role/robot-telemetry-sagemaker-role"
 
 # K8s Secret 참조 env (chart 의 `env:` 블록은 value-only 스키마라 valueFrom 불가).
 # `extraEnv` 는 templated string 으로 모든 airflow 컨테이너(webserver/scheduler/worker)에 주입.

@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 DEFAULT_WORKGROUP = "robot-telemetry-workgroup"
 DEFAULT_DATABASE = "robot_telemetry_db"
-DEFAULT_OUTPUT_LOCATION = "s3://de-ai-06-smartfactory-bucket/project-athena-results/"
+DEFAULT_OUTPUT_LOCATION = "s3://robot-telemetry-data/project-athena-results/"
 
 
 # Gold/Silver column → Python type 변환표. Athena get_query_results 는 모든 값을

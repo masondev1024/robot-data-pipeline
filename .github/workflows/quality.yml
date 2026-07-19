@@ -27,6 +27,14 @@ jobs:
         run: pip install -r requirements-dev.lock
       - name: Reject critical Python errors
         run: ruff check src tests --select E9,F63,F7,F82
+      - name: Render account-neutral deployment templates
+        env:
+          AWS_ACCOUNT_ID: "123456789012"
+          AWS_REGION: eu-west-1
+          EKS_CLUSTER_NAME: robot-telemetry-cluster
+          S3_BUCKET_NAME: robot-platform-ci-example
+          IMAGE_TAG: 0123456789abcdef0123456789abcdef01234567
+        run: python3 scripts/render_deployment.py --output /tmp/robot-deploy
       - name: Run deterministic core tests
         env:
           AIRFLOW_HOME: /tmp/robot-data-pipeline-airflow

@@ -55,7 +55,7 @@ spec:
                 topologyKey: kubernetes.io/hostname
       containers:
         - name: generator
-          image: 827913617635.dkr.ecr.eu-west-1.amazonaws.com/robot-telemetry-generator:latest
+          image: __AWS_ACCOUNT_ID__.dkr.ecr.__AWS_REGION__.amazonaws.com/robot-telemetry-generator:__IMAGE_TAG__
           env:
             # SIGUSR1 핸들러 print() 즉시 flush — 옛 Deployment 시점 회귀 방지.
             - name: PYTHONUNBUFFERED
@@ -80,7 +80,7 @@ spec:
             - name: KINESIS_ALERT_STREAM_NAME
               value: "robot-anomaly-alert-stream"
             - name: AWS_DEFAULT_REGION
-              value: "eu-west-1"
+              value: "__AWS_REGION__"
             - name: SEED_CSV_PATH
               value: "/data/seed_data_sample.csv"
             # Fault episode entry probability — robot 수 무관 (개당 비율).
@@ -111,4 +111,4 @@ metadata:
   name: generator-sa
   namespace: robot-telemetry
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::827913617635:role/robot-telemetry-generator-irsa
+    eks.amazonaws.com/role-arn: arn:aws:iam::__AWS_ACCOUNT_ID__:role/robot-telemetry-generator-irsa

@@ -17,6 +17,7 @@ tsconfig.tsbuildinfo
 .env.local
 .env.*.local
 .env.example
+!.env.example
 # Terraform 상태 및 자격증명
 terraform/.terraform/
 terraform/*.tfstate
@@ -24,6 +25,7 @@ terraform/*.tfstate.backup
 terraform/*.tfstate.*.backup
 terraform/*.tfstate.*
 terraform/*.tfvars
+!terraform/example.tfvars
 terraform/.terraform.lock.hcl
 # tfvars 추가 패턴 (어느 위치든 보호)
 terraform.tfvars

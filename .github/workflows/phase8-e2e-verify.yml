@@ -19,13 +19,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      AWS_REGION: eu-west-1
+      AWS_REGION: ${{ vars.AWS_REGION || 'eu-west-1' }}
       ECR_REPO: robot-telemetry-generator
-      EKS_CLUSTER: robot-telemetry-cluster
+      EKS_CLUSTER: ${{ vars.EKS_CLUSTER_NAME || 'robot-telemetry-cluster' }}
       K8S_NS: robot-telemetry
       ATHENA_DB: robot_telemetry_db
       ATHENA_WG: robot-telemetry-workgroup
-      ATHENA_OUTPUT: s3://de-ai-06-smartfactory-bucket/project-athena-results/
+      ATHENA_OUTPUT: s3://${{ vars.S3_BUCKET_NAME }}/project-athena-results/
       # 임계 commit (Phase 8). 이 시각 이후 push 된 이미지면 fresh.
       # 2026-05-01 02:13 KST = 2026-04-30T17:13:00Z UTC.
       MIN_PUSH_AT: "2026-04-30T17:13:00Z"
@@ -38,6 +38,9 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Validate required deployment coordinates
+        run: test -n "${{ vars.S3_BUCKET_NAME }}" || { echo "S3_BUCKET_NAME repository variable is required"; exit 1; }
 
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --name "$EKS_CLUSTER" --region "$AWS_REGION"

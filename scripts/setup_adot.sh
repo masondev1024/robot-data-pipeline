@@ -14,17 +14,32 @@
 # 사전 조건: AWS 자격증명, kubectl + terraform + helm CLI.
 set -euo pipefail
 
-# .env 의 SLACK_WEBHOOK_URL → TF_VAR_ 자동 주입 (terraform plan/apply 가 webhook 변수 요구 시 fallback CHANGEME 회피)
-ENV_FILE="$(cd "$(dirname "$0")/.." && pwd)/.env"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ENV_FILE="$REPO_ROOT/.env"
 if [ -f "$ENV_FILE" ]; then
-  set -a; source "$ENV_FILE"; set +a
-  if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
-    export TF_VAR_slack_webhook_url="$SLACK_WEBHOOK_URL"
-  fi
+  set -a
+  source "$ENV_FILE"
+  set +a
 fi
 
 REGION="${AWS_REGION:-eu-west-1}"
-CLUSTER="${EKS_CLUSTER:-robot-telemetry-cluster}"
+CLUSTER="${EKS_CLUSTER_NAME:-${EKS_CLUSTER:-robot-telemetry-cluster}}"
+: "${AWS_ACCOUNT_ID:?AWS_ACCOUNT_ID must be set to the intended 12-digit account ID}"
+: "${S3_BUCKET_NAME:?S3_BUCKET_NAME must be set}"
+
+# External mutations require an explicit intended account, then an STS match.
+export EXPECTED_AWS_ACCOUNT_ID="$AWS_ACCOUNT_ID"
+bash "$REPO_ROOT/scripts/require_aws_account.sh"
+
+export AWS_REGION="$REGION"
+export EKS_CLUSTER_NAME="$CLUSTER"
+export IMAGE_TAG="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+export TF_VAR_aws_region="$REGION"
+export TF_VAR_eks_cluster_name="$CLUSTER"
+export TF_VAR_s3_bucket_name="$S3_BUCKET_NAME"
+RENDER_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/robot-adot-render.XXXXXX")"
+trap 'rm -rf "$RENDER_ROOT"' EXIT
+python3 "$REPO_ROOT/scripts/render_deployment.py" --output "$RENDER_ROOT"
 
 echo "[adot-setup] cluster=$CLUSTER region=$REGION"
 
@@ -44,7 +59,7 @@ kubectl -n cert-manager wait --for=condition=ready pod -l app.kubernetes.io/name
 
 # 2) ADOT EKS Add-on (terraform 으로 IRSA + add-on 동시 설치)
 echo "[adot-setup] step 2/5: terraform apply ADOT add-on"
-cd "$(dirname "$0")/../terraform"
+cd "$REPO_ROOT/terraform"
 terraform plan -target=aws_iam_role.adot_collector \
                -target=aws_iam_role_policy_attachment.adot_xray \
                -target=aws_iam_role_policy_attachment.adot_cloudwatch \
@@ -58,14 +73,15 @@ cd - >/dev/null
 # 3) Collector + Instrumentation CR apply
 echo "[adot-setup] step 3/5: ADOT Collector + Instrumentation CR apply"
 # Collector ServiceAccount IRSA annotation 의 role-arn 을 terraform output 으로 갱신
-ROLE_ARN=$(terraform -chdir=terraform output -raw adot_collector_irsa_role_arn)
+ROLE_ARN=$(terraform -chdir="$REPO_ROOT/terraform" output -raw adot_collector_irsa_role_arn)
 echo "[adot-setup]   IRSA role: $ROLE_ARN"
-sed -i.bak "s|arn:aws:iam::[0-9]*:role/robot-telemetry-adot-collector-irsa|$ROLE_ARN|" \
-  k8s/monitoring/adot/collector.yaml
-rm -f k8s/monitoring/adot/collector.yaml.bak
+grep -Fq "$ROLE_ARN" "$RENDER_ROOT/k8s/monitoring/adot/collector.yaml" || {
+  echo "[adot-setup] rendered collector IRSA role does not match Terraform output" >&2
+  exit 1
+}
 
-kubectl apply -f k8s/monitoring/adot/collector.yaml
-kubectl apply -f k8s/monitoring/adot/instrumentation.yaml
+kubectl apply -f "$RENDER_ROOT/k8s/monitoring/adot/collector.yaml"
+kubectl apply -f "$RENDER_ROOT/k8s/monitoring/adot/instrumentation.yaml"
 
 kubectl -n opentelemetry-operator-system wait --for=condition=ready \
   pod -l app.kubernetes.io/name=adot-collector --timeout=180s || true

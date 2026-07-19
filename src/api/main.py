@@ -197,7 +197,7 @@ async def refresh_cache():
     workgroup = os.environ.get("ATHENA_WORKGROUP", "robot-telemetry-workgroup")
     output_location = os.environ.get(
         "ATHENA_OUTPUT_LOCATION",
-        "s3://de-ai-06-smartfactory-bucket/project-athena-results/",
+        "s3://robot-telemetry-data/project-athena-results/",
     )
 
     window_start = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
@@ -533,7 +533,7 @@ async def _athena_lookup_robot(robot_id: str, lookback_days: int = 7) -> dict | 
     workgroup = os.environ.get("ATHENA_WORKGROUP", "robot-telemetry-workgroup")
     output_location = os.environ.get(
         "ATHENA_OUTPUT_LOCATION",
-        "s3://de-ai-06-smartfactory-bucket/project-athena-results/",
+        "s3://robot-telemetry-data/project-athena-results/",
     )
     cutoff = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
     query = f"""
@@ -814,7 +814,7 @@ async def list_recommendations():
             workgroup=os.environ.get("ATHENA_WORKGROUP", "robot-telemetry-workgroup"),
             output_location=os.environ.get(
                 "ATHENA_OUTPUT_LOCATION",
-                "s3://de-ai-06-smartfactory-bucket/project-athena-results/",
+                "s3://robot-telemetry-data/project-athena-results/",
             ),
         )
     except Exception as exc:
@@ -852,7 +852,7 @@ async def fleet_summary():
     workgroup = os.environ.get("ATHENA_WORKGROUP", "robot-telemetry-workgroup")
     output_location = os.environ.get(
         "ATHENA_OUTPUT_LOCATION",
-        "s3://de-ai-06-smartfactory-bucket/project-athena-results/",
+        "s3://robot-telemetry-data/project-athena-results/",
     )
 
     # 6분 윈도우 = Firehose buffer(5분) + 안전 마진 1분 (CLAUDE.md §1.A)

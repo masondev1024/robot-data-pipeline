@@ -8,7 +8,7 @@ metadata:
   name: adot-collector-sa
   namespace: opentelemetry-operator-system
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::827913617635:role/robot-telemetry-adot-collector-irsa
+    eks.amazonaws.com/role-arn: arn:aws:iam::__AWS_ACCOUNT_ID__:role/robot-telemetry-adot-collector-irsa
 ---
 # OpenTelemetryCollector CR — ADOT Operator 가 관찰하여 Collector Deployment 자동 생성.
 # OTLP receiver (gRPC 4317) → batch processor → AWS X-Ray exporter.
@@ -20,7 +20,7 @@ metadata:
 spec:
   mode: deployment
   serviceAccount: adot-collector-sa
-  image: public.ecr.aws/aws-observability/aws-otel-collector:latest
+  image: public.ecr.aws/aws-observability/aws-otel-collector:v0.48.0
   config: |
     receivers:
       otlp:
@@ -37,7 +37,7 @@ spec:
 
     exporters:
       awsxray:
-        region: eu-west-1
+        region: __AWS_REGION__
 
     service:
       pipelines:

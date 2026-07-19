@@ -14,14 +14,14 @@ data:
         isDefault: true
         jsonData:
           authType: default
-          defaultRegion: eu-west-1
+          defaultRegion: __AWS_REGION__
       - name: Athena
         uid: athena
         type: grafana-athena-datasource
         access: proxy
         jsonData:
           authType: default
-          defaultRegion: eu-west-1
+          defaultRegion: __AWS_REGION__
           catalog: AwsDataCatalog
           database: robot_telemetry_db
           workgroup: robot-telemetry-workgroup
@@ -34,4 +34,4 @@ data:
         access: proxy
         jsonData:
           authType: default
-          defaultRegion: eu-west-1
+          defaultRegion: __AWS_REGION__

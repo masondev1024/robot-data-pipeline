@@ -5,7 +5,7 @@ metadata:
   name: api-sa
   namespace: robot-telemetry
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::827913617635:role/robot-telemetry-api-irsa  # replace with actual ARN
+    eks.amazonaws.com/role-arn: arn:aws:iam::__AWS_ACCOUNT_ID__:role/robot-telemetry-api-irsa  # replace with actual ARN
 
 ---
 apiVersion: apps/v1
@@ -39,7 +39,7 @@ spec:
                 topologyKey: kubernetes.io/hostname
       containers:
         - name: api
-          image: 827913617635.dkr.ecr.eu-west-1.amazonaws.com/robot-telemetry-api:latest
+          image: __AWS_ACCOUNT_ID__.dkr.ecr.__AWS_REGION__.amazonaws.com/robot-telemetry-api:__IMAGE_TAG__
           ports:
             - containerPort: 8000
           env:
@@ -50,11 +50,11 @@ spec:
             - name: ATHENA_WORKGROUP
               value: "robot-telemetry-workgroup"
             - name: ATHENA_OUTPUT_LOCATION
-              value: "s3://de-ai-06-smartfactory-bucket/project-athena-results/"
+              value: "s3://__S3_BUCKET_NAME__/project-athena-results/"
             - name: CACHE_REFRESH_HOUR
               value: "1"
             - name: AWS_DEFAULT_REGION
-              value: "eu-west-1"
+              value: "__AWS_REGION__"
             # NOTE: GRAFANA_URL은 SSM /robot-telemetry/grafana-url 에서 런타임 조회 (Late-binding)
             # 환경변수 주입은 fallback 용도 — post-deploy job이 SSM 갱신 후 자동 사용
             # Postgres (work_orders DB) 접속 — postgres svc DNS, secret 으로 인증.

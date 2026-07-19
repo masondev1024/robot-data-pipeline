@@ -1,6 +1,31 @@
+output "aws_region" {
+  description = "AWS region containing the deployed resources"
+  value       = var.aws_region
+}
+
+output "eks_cluster_name" {
+  description = "EKS cluster name used by deployment tooling"
+  value       = aws_eks_cluster.main.name
+}
+
 output "datalake_bucket_name" {
   description = "Data Lake S3 Bucket name"
   value       = module.data_pipeline.datalake_bucket_name
+}
+
+output "generator_ecr_repository_url" {
+  description = "Generator container ECR repository URL"
+  value       = aws_ecr_repository.generator.repository_url
+}
+
+output "api_ecr_repository_url" {
+  description = "API container ECR repository URL"
+  value       = aws_ecr_repository.api.repository_url
+}
+
+output "airflow_ecr_repository_url" {
+  description = "Airflow container ECR repository URL"
+  value       = aws_ecr_repository.airflow.repository_url
 }
 
 # ── IRSA Role ARNs (EKS 부팅 후 K8s SA annotate에 사용) ──

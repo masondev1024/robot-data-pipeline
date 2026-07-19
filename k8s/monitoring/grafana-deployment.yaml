@@ -4,7 +4,7 @@ metadata:
   name: grafana
   namespace: monitoring
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::827913617635:role/robot-telemetry-grafana-irsa
+    eks.amazonaws.com/role-arn: arn:aws:iam::__AWS_ACCOUNT_ID__:role/robot-telemetry-grafana-irsa
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -61,9 +61,9 @@ spec:
             - name: GF_SERVER_SERVE_FROM_SUB_PATH
               value: "false"
             - name: AWS_REGION
-              value: eu-west-1
+              value: __AWS_REGION__
             - name: AWS_DEFAULT_REGION
-              value: eu-west-1
+              value: __AWS_REGION__
           resources:
             requests:
               cpu: 100m

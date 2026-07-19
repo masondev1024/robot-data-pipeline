@@ -31,7 +31,7 @@ from airflow.sensors.external_task import ExternalTaskSensor
 
 from src.common.athena import fetch_rows, start_query, wait_for_query
 
-S3_BUCKET = os.environ.get("S3_BUCKET_NAME", "de-ai-06-smartfactory-bucket")
+S3_BUCKET = os.environ.get("S3_BUCKET_NAME", "robot-telemetry-data")
 ATHENA_DATABASE = os.environ.get("ATHENA_DATABASE", "robot_telemetry_db")
 ATHENA_WORKGROUP = os.environ.get("ATHENA_WORKGROUP", "robot-telemetry-workgroup")
 ATHENA_OUTPUT = os.environ.get("ATHENA_OUTPUT_LOCATION", f"s3://{S3_BUCKET}/project-athena-results/")

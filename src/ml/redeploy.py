@@ -7,7 +7,7 @@ train.py 의 model.tar.gz 가 S3 에 보존돼 있으면(`MODEL_PREFIX/<job-name
 boto3 만 사용 (sagemaker SDK 313MB 회피) — 비용 셧다운 후 로컬 어디서든 즉시 실행 가능.
 
 실행:
-    SAGEMAKER_ROLE_ARN=arn:aws:iam::827913617635:role/robot-telemetry-sagemaker-role \
+    SAGEMAKER_ROLE_ARN=arn:aws:iam::<aws-account-id>:role/robot-telemetry-sagemaker-role \
     python3 -m src.ml.redeploy
 
 환경변수:
@@ -23,7 +23,7 @@ from pathlib import Path
 import boto3
 
 REGION = os.environ.get("AWS_REGION", "eu-west-1")
-S3_BUCKET = os.environ.get("S3_BUCKET_NAME", "de-ai-06-smartfactory-bucket")
+S3_BUCKET = os.environ.get("S3_BUCKET_NAME", "robot-telemetry-data")
 ENDPOINT_NAME = "robot-failure-predictor"
 
 # SageMaker XGBoost framework container (region-specific registry).

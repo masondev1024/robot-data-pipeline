@@ -10,6 +10,13 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'eu-west-1' }}
+  EXPECTED_AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+  EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME || 'robot-telemetry-cluster' }}
+  S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
+  IMAGE_TAG: ${{ github.sha }}
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -20,7 +27,17 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: eu-west-1
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Resolve and validate deployment coordinates
+        run: |
+          test -n "$EXPECTED_AWS_ACCOUNT_ID" || { echo "AWS_ACCOUNT_ID repository variable is required"; exit 1; }
+          test -n "$S3_BUCKET_NAME" || { echo "S3_BUCKET_NAME repository variable is required"; exit 1; }
+          bash scripts/require_aws_account.sh
+          echo "AWS_ACCOUNT_ID=$EXPECTED_AWS_ACCOUNT_ID" >> "$GITHUB_ENV"
+
+      - name: Render account-neutral deployment templates
+        run: python3 scripts/render_deployment.py --output /tmp/robot-deploy
 
       - name: Login to ECR
         id: ecr-login
@@ -29,25 +46,19 @@ jobs:
       - name: Build and push Generator image
         env:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
         run: |
           if [ -f src/generator/Dockerfile ]; then
             docker build -t $ECR_REGISTRY/robot-telemetry-generator:$IMAGE_TAG -f src/generator/Dockerfile .
             docker push $ECR_REGISTRY/robot-telemetry-generator:$IMAGE_TAG
-            docker tag $ECR_REGISTRY/robot-telemetry-generator:$IMAGE_TAG $ECR_REGISTRY/robot-telemetry-generator:latest
-            docker push $ECR_REGISTRY/robot-telemetry-generator:latest
           fi
 
       - name: Build and push API image
         env:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
         run: |
           if [ -f src/api/Dockerfile ]; then
             docker build -t $ECR_REGISTRY/robot-telemetry-api:$IMAGE_TAG -f src/api/Dockerfile .
             docker push $ECR_REGISTRY/robot-telemetry-api:$IMAGE_TAG
-            docker tag $ECR_REGISTRY/robot-telemetry-api:$IMAGE_TAG $ECR_REGISTRY/robot-telemetry-api:latest
-            docker push $ECR_REGISTRY/robot-telemetry-api:latest
           fi
 
       - name: Build Lambda ZIP
@@ -63,15 +74,15 @@ jobs:
           fi
 
       - name: Update kubeconfig
-        run: aws eks update-kubeconfig --name robot-telemetry-cluster --region eu-west-1
+        run: aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
 
       - name: Apply Kubernetes manifests
         run: |
-          if [ -d k8s/ ] && [ "$(ls -A k8s/)" ]; then
-            kubectl apply -f k8s/ --recursive
+          if [ -d /tmp/robot-deploy/k8s ] && [ "$(ls -A /tmp/robot-deploy/k8s)" ]; then
+            kubectl apply -f /tmp/robot-deploy/k8s --recursive
           fi
 
-      - name: Restart deployments
+      - name: Verify workload rollouts
         run: |
-          kubectl rollout restart deployment/robot-telemetry-generator -n robot-telemetry 2>/dev/null || true
-          kubectl rollout restart deployment/robot-telemetry-api -n robot-telemetry 2>/dev/null || true
+          kubectl rollout status statefulset/robot-telemetry-generator -n robot-telemetry --timeout=300s
+          kubectl rollout status deployment/robot-telemetry-api -n robot-telemetry --timeout=300s

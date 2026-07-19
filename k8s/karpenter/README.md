@@ -7,16 +7,23 @@
 
 ## 배포 순서
 
-1. **Terraform으로 Karpenter Helm 차트 설치** (terraform apply)
+1. **Terraform으로 Karpenter Helm 차트 설치**
+
+   Remote state와 locking, 배포용 OIDC trust를 먼저 bootstrap한 환경에서만 검토된 plan을 적용합니다. 저장소 CI는 bootstrap 전 `validate`까지만 수행합니다.
+
    ```bash
    cd terraform
-   terraform apply
+   terraform plan -out=reviewed.tfplan
+   terraform apply reviewed.tfplan
    # → karpenter namespace, controller, RBAC가 배포됨
    ```
 
-2. **K8s NodePool 매니페스트 적용** (kubectl apply)
+2. **계정 중립 템플릿을 렌더링한 뒤 NodePool 적용**
+
+   루트 README의 `계정 이식성과 배포 안전 게이트` 절차로 `RENDER_ROOT`를 만든 다음 적용합니다. placeholder가 남은 원본 매니페스트를 직접 적용하지 않습니다.
+
    ```bash
-   kubectl apply -f k8s/karpenter/nodepool.yaml
+   kubectl apply -f "$RENDER_ROOT/k8s/karpenter/nodepool.yaml"
    # → Karpenter가 NodePool을 인식하고 노드 프로비저닝 시작
    ```
 

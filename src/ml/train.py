@@ -6,7 +6,7 @@ from sagemaker.xgboost import XGBoost
 from src.common.athena import start_query, wait_for_query
 from src.common.aws import get_client
 
-S3_BUCKET = os.environ.get("S3_BUCKET_NAME", "de-ai-06-smartfactory-bucket")
+S3_BUCKET = os.environ.get("S3_BUCKET_NAME", "robot-telemetry-data")
 ATHENA_DATABASE = os.environ.get("ATHENA_DATABASE", "robot_telemetry_db")
 ATHENA_OUTPUT = os.environ.get("ATHENA_OUTPUT_LOCATION", f"s3://{S3_BUCKET}/project-athena-results/")
 MODEL_PREFIX = "ml-models/robot-failure-predictor"

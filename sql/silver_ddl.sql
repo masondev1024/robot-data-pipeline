@@ -10,7 +10,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS robot_telemetry_db.silver_robot_telemetry (
 )
 PARTITIONED BY (dt DATE)
 STORED AS PARQUET
-LOCATION 's3://de-ai-06-smartfactory-bucket/silver/'
+LOCATION 's3://__S3_BUCKET_NAME__/silver/'
 TBLPROPERTIES (
     'classification'              = 'parquet',
     'parquet.compression'         = 'SNAPPY',
@@ -21,5 +21,5 @@ TBLPROPERTIES (
     'projection.dt.interval'      = '1',
     'projection.dt.interval.unit' = 'DAYS',
     'storage.location.template'   =
-        's3://de-ai-06-smartfactory-bucket/silver/dt=${dt}/'
+        's3://__S3_BUCKET_NAME__/silver/dt=${dt}/'
 );

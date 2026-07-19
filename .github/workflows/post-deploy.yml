@@ -10,6 +10,13 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'eu-west-1' }}
+  EXPECTED_AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+  EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME || 'robot-telemetry-cluster' }}
+  S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
+  IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+
 jobs:
   store-dns:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
@@ -17,15 +24,27 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: eu-west-1
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Resolve and validate deployment coordinates
+        run: |
+          test -n "$EXPECTED_AWS_ACCOUNT_ID" || { echo "AWS_ACCOUNT_ID repository variable is required"; exit 1; }
+          test -n "$S3_BUCKET_NAME" || { echo "S3_BUCKET_NAME repository variable is required"; exit 1; }
+          bash scripts/require_aws_account.sh
+          echo "AWS_ACCOUNT_ID=$EXPECTED_AWS_ACCOUNT_ID" >> "$GITHUB_ENV"
+
+      - name: Render account-neutral deployment templates
+        run: python3 scripts/render_deployment.py --output /tmp/robot-deploy
 
       - name: Update kubeconfig
-        run: aws eks update-kubeconfig --name robot-telemetry-cluster --region eu-west-1
+        run: aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
 
       - name: Wait for API ALB DNS
         id: api-dns
@@ -143,7 +162,7 @@ jobs:
 
           # ConfigMap 의 dashboard JSON 에서 placeholder 치환 + apply + grafana 재시작
           sed "s|__API_ALB_ARN_SUFFIX__|${ARN_SUFFIX}|g" \
-            k8s/monitoring/grafana-dashboards.yaml > /tmp/grafana-dashboards.rendered.yaml
+            /tmp/robot-deploy/k8s/monitoring/grafana-dashboards.yaml > /tmp/grafana-dashboards.rendered.yaml
           kubectl apply -f /tmp/grafana-dashboards.rendered.yaml
           kubectl rollout restart deployment/grafana -n monitoring
           kubectl rollout status deployment/grafana -n monitoring --timeout=180s

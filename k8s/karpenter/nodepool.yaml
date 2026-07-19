@@ -73,10 +73,10 @@ spec:
         - key: karpenter.k8s.aws/instance-size
           operator: In
           values: ["medium", "large", "xlarge"]
-        # AZ a/b only (cluster has no private subnet in eu-west-1c)
+        # AZ a/b only (cluster has no private subnet in __AWS_REGION__c)
         - key: topology.kubernetes.io/zone
           operator: In
-          values: ["eu-west-1a", "eu-west-1b"]
+          values: ["__AWS_REGION__a", "__AWS_REGION__b"]
         - key: kubernetes.io/arch
           operator: In
           values: ["amd64"]

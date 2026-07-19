@@ -9,7 +9,25 @@ variable "project_name" {
 variable "s3_bucket_name" {
   description = "Data Lake S3 bucket name (Bronze/Silver/Gold layers)"
   type        = string
-  default     = "de-ai-06-smartfactory-bucket"
+
+  validation {
+    condition = (
+      length(var.s3_bucket_name) >= 3 &&
+      length(var.s3_bucket_name) <= 63 &&
+      can(regex("^[a-z0-9][a-z0-9.-]*[a-z0-9]$", var.s3_bucket_name)) &&
+      !strcontains(var.s3_bucket_name, "..") &&
+      !can(regex("^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", var.s3_bucket_name)) &&
+      !startswith(var.s3_bucket_name, "xn--") &&
+      !startswith(var.s3_bucket_name, "sthree-") &&
+      !startswith(var.s3_bucket_name, "amzn-s3-demo-") &&
+      !endswith(var.s3_bucket_name, "-s3alias") &&
+      !endswith(var.s3_bucket_name, "--ol-s3") &&
+      !endswith(var.s3_bucket_name, ".mrap") &&
+      !endswith(var.s3_bucket_name, "--x-s3") &&
+      !endswith(var.s3_bucket_name, "--table-s3")
+    )
+    error_message = "s3_bucket_name must be a globally unique, AWS-compatible S3 bucket name: 3-63 lowercase letters, numbers, periods, or hyphens; begin and end with a letter or number; and not be an IP address or use an AWS-reserved prefix/suffix."
+  }
 }
 
 variable "eks_cluster_name" {

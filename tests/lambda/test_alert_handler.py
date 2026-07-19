@@ -174,7 +174,7 @@ class TestAlertHandler:
             "OldStateValue": "OK",
             "NewStateReason": "Threshold Crossed: 2 datapoints were less than the threshold (95.0).",
             "Region": "EU (Ireland)",
-            "AlarmArn": "arn:aws:cloudwatch:eu-west-1:827913617635:alarm:robot-telemetry-firehose-delivery-errors",
+            "AlarmArn": "arn:aws:cloudwatch:eu-west-1:123456789012:alarm:robot-telemetry-firehose-delivery-errors",
         }
 
         result = module.handler(alarm_event, None)
@@ -206,8 +206,8 @@ class TestAlertHandler:
         # Lambda direct invoke schema (실 운영에서 받는 실제 payload 형식)
         alarm_event = {
             "source": "aws.cloudwatch",
-            "alarmArn": "arn:aws:cloudwatch:eu-west-1:827913617635:alarm:robot-telemetry-firehose-delivery-errors",
-            "accountId": "827913617635",
+            "alarmArn": "arn:aws:cloudwatch:eu-west-1:123456789012:alarm:robot-telemetry-firehose-delivery-errors",
+            "accountId": "123456789012",
             "time": "2026-05-01T10:30:39Z",
             "region": "eu-west-1",
             "alarmData": {

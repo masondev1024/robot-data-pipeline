@@ -11,7 +11,7 @@
 | Streaming | Kinesis Data Streams → Firehose → S3 Parquet, 동적 파티셔닝 |
 | Lakehouse | Bronze/Silver/Gold, Glue/Athena Partition Projection |
 | Platform | EKS, Karpenter, HPA/PDB, IRSA, ALB, Helm pinning |
-| Batch/ML | Airflow 3 DAG, SageMaker XGBoost 학습·재배포 |
+| Batch/ML | Airflow 2.10.5 DAG, SageMaker XGBoost 학습·재배포 |
 | Observability | CloudWatch, ADOT/X-Ray, Grafana 5종 대시보드, Slack alert |
 | IaC/GitOps | Terraform 모듈, GitHub Actions OIDC, 배포 후 검증 |
 | AI decision layer | DoWhy 6-node causal DAG, 4-agent supervisor, Bedrock cache replay |
@@ -68,6 +68,25 @@ make infra-check
 지원 Python은 `.python-version`의 3.11로 고정합니다. PR과 `main` push에서는 같은 명령으로 critical Python lint, deterministic core tests, Terraform format/validate를 실행합니다.
 
 Airflow 2.10.5 DAG contract는 별도 CI job에서 검증하고, AWS 의존 E2E는 수동 실행 계층으로 분리합니다. 비용이 드는 production 검증을 로컬 core test와 동일한 증거로 표현하지 않습니다.
+
+## 계정 이식성과 배포 안전 게이트
+
+- K8s·Helm·Athena 배포 원본에는 AWS 계정 ID, 리전, 버킷, 이미지 태그를 고정하지 않습니다. `scripts/render_deployment.py`가 검증된 비밀 아닌 좌표만 별도 디렉터리에 렌더링하며 원본은 수정하지 않습니다.
+- GitHub Actions는 OIDC 세션의 STS identity로 계정을 확인하고, 컨테이너 이미지를 Git commit SHA로만 배포합니다. `latest` 태그는 workload 계약에서 금지합니다.
+- 배포 전 GitHub Repository Variables에 `AWS_ACCOUNT_ID`, `AWS_REGION`, `EKS_CLUSTER_NAME`, `S3_BUCKET_NAME`을 등록합니다. 실제 STS account가 `AWS_ACCOUNT_ID`와 다르면 배포는 렌더링 전에 종료됩니다.
+- 로컬에서 AWS를 변경하는 셋업 스크립트는 명시한 계정과 실제 STS account가 일치해야 진행합니다. 장기 access key는 입력 계약에 포함하지 않습니다.
+- Terraform CI는 현재 `fmt/init -backend=false/validate`까지만 허용합니다. 새 계정의 remote state, state locking, OIDC trust를 bootstrap하기 전에는 plan/apply를 배포 증거로 주장하지 않습니다.
+
+```bash
+cp .env.example .env
+RENDER_ROOT="$(mktemp -d /tmp/robot-deploy.XXXXXX)"
+AWS_ACCOUNT_ID=123456789012 \
+AWS_REGION=eu-west-1 \
+EKS_CLUSTER_NAME=robot-telemetry-cluster \
+S3_BUCKET_NAME=globally-unique-bucket \
+IMAGE_TAG="$(git rev-parse HEAD)" \
+python3 scripts/render_deployment.py --output "$RENDER_ROOT"
+```
 
 ## 플랫폼 엔지니어링에서 강조한 문제
 

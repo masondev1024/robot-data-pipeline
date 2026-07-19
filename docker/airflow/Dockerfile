@@ -13,9 +13,9 @@
 #
 # 빌드:
 #   aws ecr get-login-password --region eu-west-1 \
-#     | docker login --username AWS --password-stdin 827913617635.dkr.ecr.eu-west-1.amazonaws.com
+#     | docker login --username AWS --password-stdin <aws-account-id>.dkr.ecr.<aws-region>.amazonaws.com
 #   docker buildx build --platform linux/amd64 \
-#     -t 827913617635.dkr.ecr.eu-west-1.amazonaws.com/robot-telemetry-airflow:<tag> \
+#     -t <aws-account-id>.dkr.ecr.<aws-region>.amazonaws.com/robot-telemetry-airflow:<tag> \
 #     --push docker/airflow/
 #
 # 태그 전략: <airflow-version>-r<revision> (예: 2.10.5-r1, 2.10.5-r2 …)

@@ -141,7 +141,7 @@ def test_predict_endpoint_offline_returns_503(mock_sm):
         error_response={
             "Error": {
                 "Code": "ValidationError",
-                "Message": "Endpoint robot-failure-predictor of account 827913617635 not found.",
+                "Message": "Endpoint robot-failure-predictor of account 123456789012 not found.",
             }
         },
         operation_name="InvokeEndpoint",

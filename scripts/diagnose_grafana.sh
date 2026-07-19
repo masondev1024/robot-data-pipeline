@@ -12,7 +12,7 @@
 set -uo pipefail
 
 REGION="${AWS_DEFAULT_REGION:-eu-west-1}"
-BUCKET="${S3_BUCKET_NAME:-de-ai-06-smartfactory-bucket}"
+BUCKET="${S3_BUCKET_NAME:-robot-telemetry-data}"
 WORKGROUP="${ATHENA_WORKGROUP:-robot-telemetry-workgroup}"
 DATABASE="${ATHENA_DATABASE:-robot_telemetry_db}"
 RESULT_LOC="s3://${BUCKET}/project-athena-results/"
