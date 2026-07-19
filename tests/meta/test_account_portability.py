@@ -1,6 +1,8 @@
 from pathlib import Path
 import re
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[2]
 RETIRED_ACCOUNT_ID = "827913617635"
@@ -175,6 +177,35 @@ def test_airflow_cache_refresh_uses_scoped_portal_secret_permission():
     )[1].split('resource "aws_iam_role_policy" "airflow_permissions"', 1)[0]
     assert 'sid     = "SecretsGetPortalBasicAuth"' in airflow_policy
     assert "secret:/robot-telemetry/portal-basic-auth-*" in airflow_policy
+
+
+def test_airflow_admin_bootstrap_uses_kubernetes_secret_without_static_password():
+    values_path = ROOT / "helm/airflow-values.yaml"
+    source = values_path.read_text()
+    values = yaml.safe_load(source)
+
+    assert "changeme" not in source.lower()
+    assert "password" not in values["webserver"]["defaultUser"]
+
+    create_user = values["createUserJob"]
+    password_env = next(
+        item for item in create_user["env"] if item["name"] == "AIRFLOW_ADMIN_PASSWORD"
+    )
+    assert password_env["valueFrom"]["secretKeyRef"] == {
+        "name": "airflow-admin-bootstrap",
+        "key": "password",
+    }
+    assert "$AIRFLOW_ADMIN_PASSWORD" in " ".join(create_user["args"])
+
+
+def test_airflow_admin_secret_sync_is_account_guarded_and_avoids_argv_secrets():
+    script = (ROOT / "scripts/sync_airflow_admin_secret.sh").read_text()
+
+    assert "scripts/require_aws_account.sh" in script
+    assert "secretsmanager get-secret-value" in script
+    assert "--from-file=password=/dev/stdin" in script
+    assert "--from-literal" not in script
+    assert "set -x" not in script
 
 
 def test_terraform_requires_a_portable_bucket_input():

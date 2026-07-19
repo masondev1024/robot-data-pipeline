@@ -75,6 +75,7 @@ Airflow 2.10.5 DAG contract는 별도 CI job에서 검증하고, AWS 의존 E2E�
 - GitHub Actions는 OIDC 세션의 STS identity로 계정을 확인하고, 컨테이너 이미지를 Git commit SHA로만 배포합니다. `latest` 태그는 workload 계약에서 금지합니다.
 - 배포 전 GitHub Repository Variables에 `AWS_ACCOUNT_ID`, `AWS_REGION`, `EKS_CLUSTER_NAME`, `S3_BUCKET_NAME`을 등록합니다. 실제 STS account가 `AWS_ACCOUNT_ID`와 다르면 배포는 렌더링 전에 종료됩니다.
 - 로컬에서 AWS를 변경하는 셋업 스크립트는 명시한 계정과 실제 STS account가 일치해야 진행합니다. 장기 access key는 입력 계약에 포함하지 않습니다.
+- Airflow 관리자 비밀번호는 Helm values에 두지 않습니다. `/robot-telemetry/airflow-admin-password`를 Secrets Manager에 만든 뒤 `scripts/sync_airflow_admin_secret.sh`로 Kubernetes Secret을 먼저 동기화해야 하며, 스크립트는 STS account 일치 여부를 Secret 조회 전에 검사합니다.
 - Terraform CI는 현재 `fmt/init -backend=false/validate`까지만 허용합니다. 새 계정의 remote state, state locking, OIDC trust를 bootstrap하기 전에는 plan/apply를 배포 증거로 주장하지 않습니다.
 
 ```bash
@@ -86,6 +87,9 @@ EKS_CLUSTER_NAME=robot-telemetry-cluster \
 S3_BUCKET_NAME=globally-unique-bucket \
 IMAGE_TAG="$(git rev-parse HEAD)" \
 python3 scripts/render_deployment.py --output "$RENDER_ROOT"
+
+# Airflow를 처음 설치하기 전에 namespace와 bootstrap Secret을 준비
+bash scripts/sync_airflow_admin_secret.sh
 ```
 
 ## 플랫폼 엔지니어링에서 강조한 문제

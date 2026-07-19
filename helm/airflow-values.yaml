@@ -19,7 +19,8 @@ defaultAirflowTag: 2.10.5-r1
 
 executor: KubernetesExecutor
 
-# 시연용 — 콘솔에서 패스워드 모르면 진입 불가하므로 명시 설정
+# 관리자 계정 bootstrap 비밀번호는 배포 전에 AWS Secrets Manager에서
+# airflow-admin-bootstrap Kubernetes Secret으로 동기화한다.
 # webserver SA 에도 동일 IRSA 부여 — UI 에서 S3 fallback 으로 task 로그 GetObject 시 필요.
 # (KubernetesExecutor 환경에서 worker pod 가 task 종료 후 즉시 사라지면 in-cluster log
 #  HTTP 페치가 NameResolutionError 로 실패하므로, S3 remote logging 으로 fallback 하려면
@@ -29,10 +30,6 @@ webserver:
     enabled: true
     role: Admin
     username: admin
-    # 초기 chart install 시 1회만 사용. 설치 후 Airflow UI 의 Security → List Users
-    # 에서 즉시 변경할 것. (chart 가 password rotation 미지원 → defaultUser 는
-    # bootstrap 용도만, 운영 비번은 UI/CLI 로 관리.)
-    password: changeme123
     email: admin@admin.com
     firstName: admin
     lastName: admin
@@ -61,6 +58,25 @@ webserver:
     failureThreshold: 10
     periodSeconds: 30
     timeoutSeconds: 10
+
+createUserJob:
+  env:
+    - name: AIRFLOW_ADMIN_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: airflow-admin-bootstrap
+          key: password
+  args:
+    - bash
+    - -c
+    - >-
+      exec airflow users create
+      -r Admin
+      -u admin
+      -e admin@admin.com
+      -f admin
+      -l admin
+      -p "$AIRFLOW_ADMIN_PASSWORD"
 
 # KubernetesExecutor가 만드는 worker pod에 IRSA 부여.
 # (boto3 + sagemaker 는 custom image baked-in 됐으므로 _PIP_ADDITIONAL_REQUIREMENTS 불요.)
