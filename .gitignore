@@ -83,8 +83,10 @@ terraform/tfplan
 # 로컬 AI 도구 / 세션 산출물 (공개 X)
 .claude/
 CLAUDE.md
-# 설계/운영 문서 — 로컬 보존, GitHub 미노출
-docs/
+# 설계/운영 문서 — 로컬 보존, GitHub에는 검토된 public 문서만 노출
+docs/*
+!docs/public/
+!docs/public/**
 # 발표 자료 (로컬 빌드 도구, git 추적 X)
 presentation/
 발표자료.md
@@ -94,4 +96,3 @@ PRISM_DEMO_DAY.md
 PRISM_TALKING_POINTS.md
 # 런타임 로그 (시연 중 stdout/stderr 누적, 결정성 무관)
 logs/
-

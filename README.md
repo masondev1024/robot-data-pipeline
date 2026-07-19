@@ -1,120 +1,99 @@
-# Robot Data Pipeline + PRISM AI 인과추론
+# Robot Data Platform + PRISM
 
-**스마트 공장 1000대 로봇 텔레메트리 실시간 데이터 파이프라인** 위에 **PRISM AI 인과추론·운영자 의사결정 콘솔** 을 접목한 통합 저장소.
+> 스마트 팩토리 로봇 텔레메트리를 수집·처리·운영하고, 예측 결과를 인과 기반 의사결정으로 연결하는 AWS 플랫폼 엔지니어링 프로젝트
 
-- **Production 파이프라인:** KDS → Firehose → S3 Parquet (Bronze/Silver/Gold) → Athena → SageMaker → Grafana → FastAPI portal
-- **AI 인과추론 레이어 (PRISM):** DoWhy 6-Node DAG + 4-Agent Supervisor + Bedrock LLM 자연어 권고
-- **Demo:** 노트북 1대 + docker-compose 로 오프라인 시연 가능 (`prism/`)
+이 저장소는 단순 데이터 분석 데모가 아니라 **1,000대 로봇을 가정한 스트리밍·레이크하우스·배치·ML·관측성 플랫폼**과, 같은 데이터 계약을 사용하는 **오프라인 결정론적 PRISM 데모**를 함께 담고 있습니다.
 
----
+## 한눈에 보는 결과
 
-## 두 가지 부팅 모드
+| 영역 | 구현 |
+|---|---|
+| Streaming | Kinesis Data Streams → Firehose → S3 Parquet, 동적 파티셔닝 |
+| Lakehouse | Bronze/Silver/Gold, Glue/Athena Partition Projection |
+| Platform | EKS, Karpenter, HPA/PDB, IRSA, ALB, Helm pinning |
+| Batch/ML | Airflow 3 DAG, SageMaker XGBoost 학습·재배포 |
+| Observability | CloudWatch, ADOT/X-Ray, Grafana 5종 대시보드, Slack alert |
+| IaC/GitOps | Terraform 모듈, GitHub Actions OIDC, 배포 후 검증 |
+| AI decision layer | DoWhy 6-node causal DAG, 4-agent supervisor, Bedrock cache replay |
+| Reproducibility | DuckDB 기반 오프라인 데모, 고정 seed/hash, 회귀 테스트 |
 
-### A. PRISM Demo (오프라인 · 노트북 1대)
+## 아키텍처
 
-PRISM AI 인과추론 + 운영자 콘솔을 **AWS 인프라 없이** 결정론적으로 시연.
+```mermaid
+flowchart LR
+  R["Robot telemetry"] --> KDS["Kinesis Data Streams"]
+  KDS --> FH["Firehose"] --> S3["S3 Parquet\nBronze / Silver / Gold"]
+  KDS --> FL["Managed Flink"] --> AL["Alert KDS"] --> LA["Lambda → Slack"]
+  S3 --> AT["Glue + Athena"]
+  AT --> AF["Airflow ETL"]
+  AT --> SM["SageMaker XGBoost"]
+  AT --> API["FastAPI portal"]
+  AT --> PR["PRISM causal supervisor"]
+  API --> GF["Grafana / operator UI"]
+  SM --> PR
+```
+
+- 설계와 트레이드오프: [`docs/public/ARCHITECTURE.md`](docs/public/ARCHITECTURE.md)
+- 운영 신뢰성 사례: [`docs/public/RELIABILITY.md`](docs/public/RELIABILITY.md)
+- PRISM ↔ production 계약: [`docs/public/INTERFACE.md`](docs/public/INTERFACE.md)
+
+## 5분 오프라인 데모
+
+AWS 비용이나 계정 없이 PRISM 의사결정 흐름을 재현할 수 있습니다.
 
 ```bash
-cd prism/
-cp .env.example .env       # Bedrock offline 모드면 그대로
+cd prism
+cp .env.example .env
 docker compose up --build
 ```
 
-- <http://localhost:8501> — Demo (cache replay, deterministic)
-- <http://localhost:8502> — Live (Bedrock 라이브)
-- <http://localhost:8503> — Operator-first 콘솔
+| URL | 화면 |
+|---|---|
+| <http://localhost:8501> | 결정론적 cache-replay 데모 |
+| <http://localhost:8502> | Bedrock live 모드 |
+| <http://localhost:8503> | operator-first 콘솔 |
 
-데이터 백엔드: DuckDB in-process. AI 추론: `assets/cache_replay.jsonl` 사전 녹화 응답.
+- 실행 상세: [`prism/README.md`](prism/README.md)
+- 운영자 시나리오: [`prism/operator-guide.md`](prism/operator-guide.md)
 
-운영 가이드 → [`prism/operator-guide.md`](prism/operator-guide.md)
-배포 단위 상세 → [`prism/README.md`](prism/README.md)
-
-### B. Production (EKS · 1000대 스케일)
+## 검증
 
 ```bash
-# Step 0: Secrets Manager 사전 작업 (사람이 직접)
-#   /robot-telemetry/slack-webhook-url
-#   /robot-telemetry/grafana-admin-password
-
-# Step 1: 인프라
-cd terraform/ && terraform apply
-
-# Step 2: K8s 워크로드
-kubectl apply -f k8s/
-
-# Step 3: ALB DNS polling + SSM 저장 (GitHub Actions post-deploy)
-
-# Step 4: Airflow Helm
-helm upgrade airflow apache-airflow/airflow -f helm/airflow-values.yaml --version 1.16.0 --wait
+AIRFLOW_HOME=/tmp/robot-data-pipeline-airflow PYTHONHASHSEED=2026 python3.11 -m pytest -q
 ```
 
-배포 4단계 + 사고 가드레일 → [`CLAUDE.md`](CLAUDE.md)
-비용 셧다운/복구 → [`비용절감플랜/`](비용절감플랜/)
+CI는 Terraform validation, Kubernetes 배포, 배포 후 ALB/SSM 확인, LLM evaluation, production E2E 점검을 분리합니다. AWS 의존 E2E는 비용 절감을 위해 수동 실행하며, 오프라인 테스트와 동일한 검증으로 오해하지 않도록 구분합니다.
 
----
+## 플랫폼 엔지니어링에서 강조한 문제
+
+- **장애를 코드와 가드레일로 환원:** KDS 재생성 후 Firehose/Lambda 연결 고착, ratio alarm 단위 오류, stale VolumeAttachment 같은 실제 운영 실패를 runbook과 자동화 조건으로 반영했습니다.
+- **비용도 플랫폼 품질로 취급:** HPA·Ingress·ALB·Grafana 잔존으로 생기는 유휴 비용까지 종료 순서에 포함했습니다.
+- **보안 경계:** GitHub Actions OIDC, IRSA, Secrets Manager/SSM을 사용하고 webhook·자격증명 하드코딩을 금지합니다.
+- **데이터 계약과 재현성:** production Athena와 demo DuckDB가 `DataSource`/`Predictor` 계약을 공유하고, demo는 고정 seed와 cache replay로 재현됩니다.
+- **정직한 검증 범위:** 로컬 결정론 테스트와 실제 AWS E2E 상태를 문서에서 분리합니다.
 
 ## 저장소 구조
 
-```
-robot-data-pipeline/
-├── apps/                    PRISM Streamlit 콘솔 (demo · operator)
-├── prism/                   PRISM 배포 단위 (docker-compose + 운영 자료)
-├── src/
-│   ├── orchestration/       PRISM AI 레이어 (supervisor, causal_dag, agents, llm_cache)
-│   ├── generator/           KDS producer (legacy) + cnc_stream (PRISM demo)
-│   ├── ml/                  SageMaker train/redeploy (legacy) + local_predictor (PRISM demo)
-│   ├── api/                 FastAPI portal (legacy)
-│   ├── lambda/              Slack alert handler (legacy)
-│   └── common/              athena · aws · bedrock helper
-├── terraform/               IaC (EKS, KDS, Firehose, Glue, Lambda, ALB, SageMaker)
-├── k8s/                     StatefulSet · HPA · Karpenter · ALB Ingress · Grafana
-├── helm/                    airflow-values.yaml (chart 1.16.0 pinned)
-├── dags/                    Airflow 3 DAG (daily ETL · weekly DQ · weekly ML retrain)
-├── sql/                     Athena DDL (Bronze/Silver/Gold + dim view)
-├── grafana/                 5 monitoring dashboards
-├── docker/airflow/          Airflow 커스텀 이미지
-├── scripts/                 운영 스크립트 (PRISM demo · 인프라 진단)
-├── 비용절감플랜/             EKS up.sh / down.sh
-├── tests/                   PRISM smoke (root) + legacy unit (api/etl/generator/lambda/ml)
-├── assets/                  XGBoost model · cache_replay · causal DAG
-├── data/                    DuckDB demo data
-├── docs/                    설계 문서 + INTERFACE 계약 (gitignored)
-└── legacy/                  학습 · 발표 자료 아카이브 (이주 완료)
+```text
+apps/             Streamlit PRISM/operator 콘솔
+src/orchestration PRISM causal DAG, agents, data/predictor contracts
+src/generator     KDS telemetry producer와 demo CNC stream
+src/api           FastAPI portal
+src/ml            local/SageMaker predictors와 training
+terraform/        AWS 인프라 및 data_pipeline 모듈
+k8s/, helm/       EKS workloads, autoscaling, observability, Airflow
+dags/, sql/       idempotent batch DAGs와 Athena DDL
+grafana/          운영 대시보드 5종
+tests/, evals/    unit/smoke/e2e 및 LLM 품질 평가
 ```
 
----
+## 현재 범위와 한계
 
-## AI 인과추론 레이어 = production · demo 공통
+- Managed Flink 코드는 AWS Studio Notebook을 운영 원본으로 사용하므로 이 저장소에는 배포 가능한 Flink 소스가 없습니다.
+- production AWS E2E는 인프라가 켜진 주기에만 수행합니다.
+- CNC telemetry는 demo 전용이며 production `AthenaDataSource`에서 의도적으로 지원하지 않습니다.
+- 이 저장소는 포트폴리오 환경을 위한 단일 계정/리전 설계입니다. 다중 계정 landing zone과 조직 단위 정책은 다음 확장 범위입니다.
 
-PRISM 의 `src/orchestration/` 코드는 두 모드에서 동일하게 동작한다. 데이터 소스만 `DataSource` Protocol 로 추상화:
+## 데이터와 라이선스
 
-| 모드 | `DataSource` 구현체 | 데이터 |
-|---|---|---|
-| Demo (PRISM_MODE=demo/live) | `DuckDBDataSource` | DuckDB · cache_replay |
-| Production (PRISM_MODE=production) | `AthenaDataSource` | Athena Gold table |
-
-자세한 연결 계약 → [`docs/INTERFACE.md`](docs/INTERFACE.md) (gitignored, 로컬 참조)
-
----
-
-## 핵심 기술 결정 (ADR)
-
-| ADR | 결정 |
-|---|---|
-| Streaming | Kinesis Data Streams + Managed Flink (Studio Notebook = single source of truth) |
-| Lakehouse | Firehose → S3 Parquet + Partition Projection (`year/month/day/hour`) |
-| Batch | Airflow 3 (chart 1.16.0 pinned, `helm/airflow-values.yaml`) |
-| Causal | DoWhy 6-Node DAG (`src/orchestration/causal_dag.py`) |
-| AI | Bedrock Claude Haiku 3 + 4 도메인 에이전트 supervisor |
-| ML | SageMaker XGBoost (production) / 6-class XGBoost pickle (demo) |
-| Alerting | Lambda → Slack (단일 채널, SNS 우회 금지) |
-| Cost | EKS 비용 셧다운 자동화 (Karpenter · HPA · ALB · EIP 누수 0) |
-
-근거 사고 로그 → [`CLAUDE.md`](CLAUDE.md) §1
-
----
-
-## 라이선스 · 데이터
-
-- 시연 데이터: AI4I 2020 Predictive Maintenance Dataset (CC BY 4.0)
-- 외부 합성 데이터 추가 금지 (재현성 · 라이선스 무결성)
+시연 데이터는 [AI4I 2020 Predictive Maintenance Dataset](https://archive.ics.uci.edu/dataset/601/ai4i+2020+predictive+maintenance+dataset) (CC BY 4.0)을 사용합니다. 원본 전체 데이터와 런타임 DuckDB 파일, 자격증명은 커밋하지 않습니다.
