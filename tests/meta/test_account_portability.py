@@ -76,7 +76,7 @@ def test_public_environment_example_contains_no_static_aws_credentials():
 
 def test_prism_environment_example_defaults_to_offline_without_static_keys():
     example = (ROOT / "prism/.env.example").read_text()
-    assert "BEDROCK_OFFLINE=true" in example
+    assert "PRISM_OFFLINE=1" in example
     assert "AWS_ACCESS_KEY_ID" not in example
     assert "AWS_SECRET_ACCESS_KEY" not in example
 

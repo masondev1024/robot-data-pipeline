@@ -75,8 +75,10 @@ ms 단위로 표기되어 청중이 "live" 임을 확인 가능. 정적 7개는 
 
 ```bash
 # prism/.env
-BEDROCK_OFFLINE=true
+PRISM_OFFLINE=1
 ```
+
+기존 로컬 `.env`의 `BEDROCK_OFFLINE=true`는 호환을 위해 계속 허용하지만, 신규 배포는 반드시 `PRISM_OFFLINE=1`을 사용한다.
 
 `assets/cache_replay.jsonl` 의 사전 녹화 응답을 `src/orchestration/llm_cache.py` 가 hash
 키로 lookup. cache miss → `CacheReplayError` raise → `fallback_video()` 가
@@ -98,7 +100,7 @@ BEDROCK_OFFLINE=true
 |---|---|---|
 | 마커 1 risk% 가 0 으로 표시 | xgb_6class.pkl 누락 | `python3 src/generator/generate_xgb_pkl.py` 로 재생성 |
 | 마커 4 fast-forward 무반응 (5초+) | DoWhy 학습 진행 중 | 정상. `@st.cache_resource` 라 시연 시작 1회만 ~3초 |
-| 마커 7-8 "Cache miss" 에러 | offline 모드인데 cache_replay 키 mismatch | `BEDROCK_OFFLINE=false` + Bedrock 키 채우거나 cache_replay 재녹화 (`scripts/build_cache_replay.py`) |
+| 마커 7-8 "Cache miss" 에러 | offline 모드인데 cache_replay 키 mismatch | `PRISM_OFFLINE=0` + Bedrock 키 채우거나 cache_replay 재녹화 (`scripts/build_cache_replay.py`) |
 | fallback_video "Recording pending D-1" | `presentation/prism_demo_master.mp4` 없음 | 시연 D-1 까지 영상 녹화 필요 (offline fallback 안전망) |
 | 8501/8502/8503 포트 충돌 | 다른 streamlit 인스턴스 | `.env` 의 `DEMO_PORT` 등 변경 후 재기동 |
 | DuckDB 락 → sensor stream 멈춤 | 동시 write | `docker compose restart app` (`data/prism_demo.duckdb` 보존) |
@@ -113,7 +115,7 @@ git status               # 결정론적 시연이면 diff 0 (PYTHONHASHSEED=2026
 ## 현장 PoC 인수인계 체크리스트
 
 - [ ] 노트북 / 미니 서버에 Docker Desktop 24+ 설치 확인
-- [ ] `.env` 의 `BEDROCK_OFFLINE` 정책 결정 (인터넷 가능 → false, 없으면 true)
+- [ ] `.env` 의 `PRISM_OFFLINE` 정책 결정 (인터넷 가능 → 0, 없으면 1)
 - [ ] `assets/xgb_6class.pkl`, `assets/cache_replay.jsonl`, `assets/causal_refute_v2.json` 동봉
 - [ ] `data/prism_demo.duckdb` 초기 상태 확인 (생산 라인별 seed 다를 수 있음)
 - [ ] `presentation/prism_demo_master.mp4` (D-1 녹화본) 동봉 — offline fallback 안전망

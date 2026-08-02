@@ -77,3 +77,42 @@ jobs:
         run: terraform -chdir=terraform init -backend=false -input=false
       - name: Validate Terraform configuration
         run: terraform -chdir=terraform validate
+
+  prism-public-container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build public PRISM application image
+        run: >-
+          docker build
+          --build-arg PUBLIC_STREAMLIT_CONFIG=true
+          --file prism/Dockerfile.app
+          --tag prism-public-operator:ci
+          .
+      - name: Build public PRISM reverse-proxy image
+        run: docker build --file prism/Dockerfile.caddy --tag prism-public-caddy:ci .
+      - name: Validate public PRISM Compose configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          dotenv_file="$(mktemp)"
+          chmod 600 "$dotenv_file"
+          trap 'rm -f "$dotenv_file"' EXIT
+          dummy_bcrypt_hash="$(
+            docker run --rm --entrypoint caddy prism-public-caddy:ci \
+              hash-password --plaintext ci-placeholder-password
+          )"
+          {
+            printf '%s\n' 'PRISM_PUBLIC_OPERATOR_IMAGE=prism-public-operator:ci'
+            printf '%s\n' 'PRISM_PUBLIC_CADDY_IMAGE=prism-public-caddy:ci'
+            printf '%s\n' 'PUBLIC_DOMAIN=ci.example.invalid'
+            printf '%s\n' 'CADDY_ACME_EMAIL=ci@example.invalid'
+            printf '%s\n' 'CADDY_BASIC_AUTH_USER=ci'
+            printf "CADDY_BASIC_AUTH_HASH='%s'\n" "$dummy_bcrypt_hash"
+          } > "$dotenv_file"
+          docker compose --env-file "$dotenv_file" -f prism/docker-compose.public.yml config --quiet
+          docker compose --env-file "$dotenv_file" -f prism/docker-compose.public.yml run --rm --no-deps --entrypoint caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile

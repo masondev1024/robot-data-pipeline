@@ -1,0 +1,8 @@
+.git
+.venv
+.env
+data/*.duckdb
+prism/recordings/
+__pycache__/
+*.py[cod]
+.pytest_cache/

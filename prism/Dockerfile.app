@@ -13,12 +13,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY prism/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
+RUN groupadd --gid 10001 prism \
+    && useradd --uid 10001 --gid 10001 --create-home --home-dir /home/prism prism \
+    && mkdir -p /app/data /app/.streamlit \
+    && chown -R 10001:10001 /app
+
 # PRISM core: apps + src + assets + data
-COPY apps /app/apps
-COPY src /app/src
-COPY assets /app/assets
-COPY data /app/data
-COPY .streamlit /app/.streamlit
+COPY --chown=10001:10001 apps /app/apps
+COPY --chown=10001:10001 src /app/src
+COPY --chown=10001:10001 assets /app/assets
+COPY --chown=10001:10001 data /app/data
+COPY --chown=10001:10001 .streamlit /app/.streamlit
+COPY --chown=10001:10001 prism/streamlit-public-config.toml /tmp/streamlit-public-config.toml
+
+ARG PUBLIC_STREAMLIT_CONFIG=false
+RUN if [ "$PUBLIC_STREAMLIT_CONFIG" = true ]; then \
+        cp /tmp/streamlit-public-config.toml /app/.streamlit/config.toml; \
+    fi
 
 ENV PYTHONHASHSEED=2026 \
     PYTHONUNBUFFERED=1 \
