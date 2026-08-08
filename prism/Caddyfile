@@ -1,0 +1,11 @@
+{
+	admin off
+	email {$CADDY_ACME_EMAIL}
+}
+
+{$PUBLIC_DOMAIN} {
+	basic_auth bcrypt "PRISM portfolio demo" {
+		{$CADDY_BASIC_AUTH_USER} {$CADDY_BASIC_AUTH_HASH}
+	}
+	reverse_proxy operator-app:8503
+}

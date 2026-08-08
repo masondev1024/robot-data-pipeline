@@ -143,8 +143,11 @@ def is_demo_mode() -> bool:
 
 
 def is_offline_mode() -> bool:
-    """venue WiFi 단절 (Section 5-D) 또는 명시적 offline."""
-    return os.environ.get("PRISM_OFFLINE", "0") == "1"
+    """Return the deterministic replay policy with legacy env compatibility."""
+    explicit = os.environ.get("PRISM_OFFLINE")
+    if explicit is not None:
+        return explicit == "1"
+    return os.environ.get("BEDROCK_OFFLINE", "false").lower() == "true"
 
 
 def replay(cache: LLMCache) -> Callable:

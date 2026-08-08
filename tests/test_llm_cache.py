@@ -208,3 +208,15 @@ def test_is_offline_mode(monkeypatch):
     assert not is_offline_mode()
     monkeypatch.delenv("PRISM_OFFLINE", raising=False)
     assert not is_offline_mode()
+
+
+def test_is_offline_mode_accepts_documented_legacy_flag(monkeypatch):
+    monkeypatch.delenv("PRISM_OFFLINE", raising=False)
+    monkeypatch.setenv("BEDROCK_OFFLINE", "true")
+    assert is_offline_mode()
+
+
+def test_is_offline_mode_prefers_explicit_public_flag(monkeypatch):
+    monkeypatch.setenv("BEDROCK_OFFLINE", "true")
+    monkeypatch.setenv("PRISM_OFFLINE", "0")
+    assert not is_offline_mode()

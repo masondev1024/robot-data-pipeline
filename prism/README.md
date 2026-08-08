@@ -70,7 +70,7 @@ prism/
 |---|---|---|
 | `PRISM_MODE` | `demo` | `demo` = 결정론적 시연 (`PYTHONHASHSEED=2026` 강제) |
 | `BEDROCK_REGION` | `us-west-2` | Bedrock Claude 호출 region |
-| `BEDROCK_OFFLINE` | `false` | `true` 면 cache_replay 만 사용 (네트워크 없이도 시연) |
+| `PRISM_OFFLINE` | `1` | `1` 이면 cache_replay 만 사용 (네트워크 없이도 시연) |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | — | Bedrock 호출 시. offline 모드면 불필요 |
 | `DEMO_PORT` | `8501` | 호스트 포트 (Demo) |
 | `LIVE_PORT` | `8502` | 호스트 포트 (Live) |
@@ -81,7 +81,7 @@ prism/
 본선·전시 부스에서 네트워크가 불안정해도 결정론적 결과 보장:
 
 ```bash
-BEDROCK_OFFLINE=true docker compose up
+PRISM_OFFLINE=1 docker compose up
 ```
 
 `assets/cache_replay.jsonl` 의 사전 녹화된 Bedrock 응답을 그대로 재생한다.
@@ -91,9 +91,105 @@ BEDROCK_OFFLINE=true docker compose up
 
 1. 노트북 / 미니 서버에 Docker 설치.
 2. 이 저장소 clone 또는 `prism/` 디렉토리 + `apps/`, `src/`, `assets/`, `data/` rsync.
-3. `.env` 에 고객사 Bedrock 키 또는 `BEDROCK_OFFLINE=true` 설정.
+3. `.env` 에 고객사 Bedrock 키 또는 `PRISM_OFFLINE=1` 설정.
 4. `docker compose up -d` 후 노트북 IP:8502 사내망 공유.
 5. 운영자는 `operator-guide.md` 따라 마커별 의사결정 실행.
+
+기존 로컬 `.env`의 `BEDROCK_OFFLINE=true`는 호환을 위해 계속 허용하지만, 신규 배포는 반드시 `PRISM_OFFLINE=1`을 사용한다.
+
+## Hosted portfolio deployment
+
+This is a small, single-host **public portfolio** deployment: Caddy terminates
+HTTPS and applies Basic Auth, while `operator-app` remains on the internal
+Compose network. It has no AWS credentials, cloud deployment step, or
+production control-plane access. Completing the steps below makes a host
+**ready**; it does not claim the demo is actually deployed until that host's
+DNS, TLS, authentication, and health checks have passed.
+
+Host prerequisites: a Linux host with Docker Engine plus the Docker Compose
+plugin, a bare public FQDN whose DNS A/AAAA records already point to the host,
+and inbound TCP 80/443 (plus UDP 443 when HTTP/3 is wanted). Set
+`PUBLIC_DOMAIN` to the FQDN only—never a scheme, port, path, or value containing
+whitespace. Keep the environment file host-only, outside this repository, and
+never commit it or place it in a shell profile.
+
+Create `/etc/prism-public.env` interactively with only the public domain,
+ACME email, Basic Auth user, and a bcrypt hash. Generate the hash locally (for
+example, `docker run --rm caddy:2.10.2 caddy hash-password --algorithm bcrypt`)
+and paste it into the file; do not put an actual password or hash in a command
+history. Restrict it before adding values:
+
+```bash
+sudo install -o root -g root -m 600 /dev/null /etc/prism-public.env
+sudoedit /etc/prism-public.env
+# PUBLIC_DOMAIN=prism.example.com
+# CADDY_ACME_EMAIL=ops@example.com
+# CADDY_BASIC_AUTH_USER=reviewer
+# CADDY_BASIC_AUTH_HASH='$2b$...'
+```
+
+From the repository root, validate the file before creating or changing any
+containers. The validator parses values without sourcing the file and never
+prints the hash.
+
+```bash
+sudo bash prism/scripts/prepare-public-demo.sh --env-file /etc/prism-public.env
+sudo docker compose --env-file /etc/prism-public.env -f prism/docker-compose.public.yml config --quiet
+sudo docker compose --env-file /etc/prism-public.env -f prism/docker-compose.public.yml up -d --build --wait
+```
+
+After DNS and certificate issuance complete, first confirm that anonymous
+access is rejected, then authenticate without placing a password in the
+command line (curl will prompt for it):
+
+```bash
+curl -I https://prism.example.com
+# Expect: HTTP/2 401
+curl -u reviewer https://prism.example.com/_stcore/health
+# Expect a successful health response after entering the password interactively.
+```
+
+Before an image or Compose upgrade, take a recoverable copy of the deterministic
+demo data volume. The local build identity is not a registry digest. Record
+release registry digest references separately in the change record. Do not reset
+a volume as an upgrade shortcut.
+
+```bash
+sudo mkdir -p backups
+sudo docker volume inspect prism-public-data
+sudo docker run --rm -v prism-public-data:/data:ro -v "$PWD/backups":/backup busybox \
+  tar czf /backup/prism-public-data-$(date +%F).tgz -C /data .
+sudo docker image inspect --format '{{.Id}}' prism-public-operator:local
+```
+
+To reset the deterministic demo dataset, review the backup and run this exact,
+explicitly destructive command. It stops and removes only `operator-app`, then
+removes only the literal `prism-public-data` volume before restarting the
+already selected image release with `--no-build` and waiting for the public
+Compose project.
+
+```bash
+sudo bash prism/scripts/reset-public-demo-data.sh --env-file /etc/prism-public.env \
+  --confirm-reset RESET_PRISM_PUBLIC_DEMO_DATA
+```
+
+For a release or rollback, put both previously approved immutable image
+references in the protected host file, then pull them before starting. `--no-build`
+is deliberate: it prevents a rollback from silently rebuilding the current
+source tree instead of using the selected release artifacts.
+
+```bash
+sudoedit /etc/prism-public.env
+# PRISM_PUBLIC_OPERATOR_IMAGE=registry.example/prism-operator@sha256:<previous-approved-digest>
+# PRISM_PUBLIC_CADDY_IMAGE=registry.example/prism-caddy@sha256:<previous-approved-digest>
+sudo docker compose --env-file /etc/prism-public.env -f prism/docker-compose.public.yml pull
+sudo docker compose --env-file /etc/prism-public.env -f prism/docker-compose.public.yml up -d --no-build --wait
+```
+
+Verify the same anonymous-401 and authenticated-health checks after a release
+or rollback. Teardown is an operator decision: run
+`sudo docker compose --env-file /etc/prism-public.env -f prism/docker-compose.public.yml down`
+only after preserving the data-volume backup and removing the host DNS record.
 
 ## 1000대 robot production 확장 경로
 
