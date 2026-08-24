@@ -103,6 +103,18 @@ variable "firehose_data_freshness_threshold_seconds" {
   }
 }
 
+variable "lambda_reserved_concurrency" {
+  description = "Optional alert Lambda reserved concurrency. Null preserves the account unreserved pool during short-lived validation."
+  type        = number
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.lambda_reserved_concurrency == null || var.lambda_reserved_concurrency >= 0
+    error_message = "lambda_reserved_concurrency must be null or a non-negative number."
+  }
+}
+
 variable "generator_replicas" {
   description = "Generator StatefulSet replicas. 1단계 HPA 잠금이라 10 고정. POD_TOTAL_REPLICAS env 와 동기화 필요 — Downward API reconciler 구현 후 동적 변경."
   type        = number
@@ -119,4 +131,10 @@ variable "eks_cluster_version" {
   description = "EKS K8s version. 1.34 remains on standard support through 2026-12; keep this explicit to avoid the $0.50/h extended-support surcharge on 1.33."
   type        = string
   default     = "1.34"
+}
+
+variable "allow_full_stack_apply" {
+  description = "Explicit cost approval gate for the complete EKS/EC2/NAT/ALB/RDS/SageMaker stack."
+  type        = bool
+  default     = false
 }

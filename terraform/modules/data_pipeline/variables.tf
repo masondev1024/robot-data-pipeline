@@ -63,3 +63,15 @@ variable "firehose_data_freshness_threshold_seconds" {
     error_message = "firehose_data_freshness_threshold_seconds must be greater than zero."
   }
 }
+
+variable "lambda_reserved_concurrency" {
+  description = "Optional Lambda reserved concurrency. Keep null for short-lived validation accounts with a small account concurrency quota."
+  type        = number
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.lambda_reserved_concurrency == null || var.lambda_reserved_concurrency >= 0
+    error_message = "lambda_reserved_concurrency must be null or a non-negative number."
+  }
+}

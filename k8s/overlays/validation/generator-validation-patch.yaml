@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: robot-telemetry-generator
+  namespace: robot-telemetry
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: generator
+          image: __AWS_ACCOUNT_ID__.dkr.ecr.__AWS_REGION__.amazonaws.com/robot-telemetry-full-20260824-generator:__IMAGE_TAG__
+          env:
+            - name: TOTAL_ROBOTS
+              value: "100"
+            - name: POD_TOTAL_REPLICAS
+              value: "1"
+            - name: TICK_INTERVAL_SECONDS
+              value: "1.0"
+            - name: KINESIS_STREAM_NAME
+              value: "__PROJECT_NAME__-stream"
+            - name: KINESIS_ALERT_STREAM_NAME
+              value: "robot-anomaly-alert-stream"
+            - name: GLUE_SCHEMA_REGISTRY_NAME
+              value: "__PROJECT_NAME__-registry"

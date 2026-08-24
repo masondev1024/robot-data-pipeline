@@ -21,5 +21,7 @@ infra-check:
 	terraform fmt -check -recursive terraform
 	terraform -chdir=terraform init -backend=false -input=false
 	terraform -chdir=terraform validate
+	terraform -chdir=terraform/validation init -backend=false -input=false
+	terraform -chdir=terraform/validation validate
 
 verify: lint test infra-check

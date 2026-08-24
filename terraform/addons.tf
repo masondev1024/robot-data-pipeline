@@ -3,10 +3,8 @@
 # auto-instrumentation 활성화. EKS Add-on 으로 AWS 가 lifecycle 관리.
 #
 # 사전 의존: cert-manager (ADOT Operator webhook TLS). EKS Add-on 자체는
-# cert-manager 를 자동 설치하지 않음. terraform apply 전 1회 helm install:
-#   helm repo add jetstack https://charts.jetstack.io
-#   helm install cert-manager jetstack/cert-manager \
-#     -n cert-manager --create-namespace --set crds.enabled=true
+# cert-manager를 자동 설치하지 않으므로 EKS Community Add-on으로 먼저 설치한다.
+# 수동 Helm 설치를 없애 apply 순서와 teardown 순서를 Terraform state 안에 둔다.
 #
 # Add-on apply 후 Collector + Instrumentation CR 은 별도 yaml apply 필요:
 #   kubectl apply -f k8s/monitoring/adot/
@@ -62,13 +60,38 @@ resource "aws_iam_role_policy_attachment" "adot_cloudwatch" {
 }
 
 # ADOT EKS Add-on 자체. cert-manager 가 사전 설치되어 있어야 install success.
+resource "aws_eks_addon" "cert_manager" {
+  cluster_name  = aws_eks_cluster.main.name
+  addon_name    = "cert-manager"
+  addon_version = "v1.21.1-eksbuild.1"
+
+  # 단일 노드 단기 검증 프로파일: 기본 2/2/2 replica를 1/1/1로 낮춰
+  # 애플리케이션 파드가 추가 노드 없이 스케줄되도록 한다. 운영 HA 프로파일에서는
+  # 이 값을 별도 변수로 올려야 하며, 본 설정은 상시 운영용이 아니다.
+  configuration_values = jsonencode({
+    replicaCount = 1
+    cainjector   = { replicaCount = 1 }
+    webhook      = { replicaCount = 1 }
+  })
+
+  # ADOT operator webhook이 생성되기 전에 cert-manager CRD/webhook이 준비되어야 한다.
+  depends_on = [aws_eks_node_group.main]
+
+  tags = {
+    Name = "${var.project_name}-cert-manager-addon"
+  }
+}
+
 resource "aws_eks_addon" "adot" {
   cluster_name             = aws_eks_cluster.main.name
   addon_name               = "adot"
   service_account_role_arn = aws_iam_role.adot_collector.arn
 
   # 노드그룹 떠있어야 operator pod 스케줄됨
-  depends_on = [aws_eks_node_group.main]
+  depends_on = [
+    aws_eks_node_group.main,
+    aws_eks_addon.cert_manager,
+  ]
 
   tags = {
     Name = "${var.project_name}-adot-addon"

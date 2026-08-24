@@ -21,11 +21,10 @@ resource "aws_lambda_function" "alert" {
   role             = aws_iam_role.lambda_alert_role.arn
   timeout          = 10
 
-  # 1000 robots 환경: alert KDS 1 shard 라 동시 invoker 1개. reserved=10 = shard 수
-  # +safety margin. 향후 alert KDS 2 shard 시 15 권장. unreserved (-1) 였으면
-  # account 단위 concurrent limit (1000) 안에서 자유 fork 였지만, 명시 reserved 로
-  # KDS reshard 후 (예: 4 → 8) 자동 scale 보장 + 다른 Lambda 와 격리.
-  reserved_concurrent_executions = 10
+  # 검증 계정은 Lambda account concurrency가 10으로 제한될 수 있으므로
+  # 예약 동시성을 기본으로 잡지 않는다. null은 unreserved pool을 보존하며,
+  # 운영 계정에서 downstream 보호가 필요할 때만 명시적인 값을 전달한다.
+  reserved_concurrent_executions = var.lambda_reserved_concurrency
 
   environment {
     variables = {

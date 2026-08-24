@@ -10,6 +10,7 @@ module "data_pipeline" {
 
   kds_iterator_age_threshold_milliseconds   = var.kds_iterator_age_threshold_milliseconds
   firehose_data_freshness_threshold_seconds = var.firehose_data_freshness_threshold_seconds
+  lambda_reserved_concurrency               = var.lambda_reserved_concurrency
 
   # EKS OIDC — 루트 eks_and_iam.tf 의 OIDC provider 참조
   eks_oidc_provider_arn = aws_iam_openid_connect_provider.eks.arn
