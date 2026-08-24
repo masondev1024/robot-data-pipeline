@@ -79,6 +79,24 @@ def test_renders_supported_placeholders_without_mutating_source(tmp_path: Path):
     assert template.read_text() == before
 
 
+def test_renders_project_scoped_streaming_resource_names(tmp_path: Path):
+    source = tmp_path / "templates"
+    source.mkdir()
+    (source / "dashboard.yaml").write_text(
+        "project: __PROJECT_NAME__\n"
+        "stream: __KDS_STREAM_NAME__\n"
+        "firehose: __FIREHOSE_NAME__\n"
+    )
+
+    render_tree(source, tmp_path / "rendered", _config(PROJECT_NAME="robot-stage"))
+
+    assert (tmp_path / "rendered/dashboard.yaml").read_text() == (
+        "project: robot-stage\n"
+        "stream: robot-stage-stream\n"
+        "firehose: robot-stage-firehose\n"
+    )
+
+
 def test_rejects_unknown_placeholder(tmp_path: Path):
     source = tmp_path / "templates"
     source.mkdir()

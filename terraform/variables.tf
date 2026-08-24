@@ -81,6 +81,40 @@ variable "kds_alert_shard_count" {
   default     = 1
 }
 
+variable "kds_iterator_age_threshold_milliseconds" {
+  description = "Kinesis consumer lag SLO threshold. 120 seconds is the default streaming freshness budget."
+  type        = number
+  default     = 120000
+
+  validation {
+    condition     = var.kds_iterator_age_threshold_milliseconds > 0
+    error_message = "kds_iterator_age_threshold_milliseconds must be greater than zero."
+  }
+}
+
+variable "firehose_data_freshness_threshold_seconds" {
+  description = "Firehose S3 delivery freshness SLO threshold."
+  type        = number
+  default     = 600
+
+  validation {
+    condition     = var.firehose_data_freshness_threshold_seconds > 0
+    error_message = "firehose_data_freshness_threshold_seconds must be greater than zero."
+  }
+}
+
+variable "lambda_reserved_concurrency" {
+  description = "Optional alert Lambda reserved concurrency. Null preserves the account unreserved pool during short-lived validation."
+  type        = number
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.lambda_reserved_concurrency == null || var.lambda_reserved_concurrency >= 0
+    error_message = "lambda_reserved_concurrency must be null or a non-negative number."
+  }
+}
+
 variable "generator_replicas" {
   description = "Generator StatefulSet replicas. 1단계 HPA 잠금이라 10 고정. POD_TOTAL_REPLICAS env 와 동기화 필요 — Downward API reconciler 구현 후 동적 변경."
   type        = number
@@ -94,7 +128,13 @@ variable "generator_total_robots" {
 }
 
 variable "eks_cluster_version" {
-  description = "EKS K8s version. 1.33 standard support 만료 ~2026-07. 만료 임박 시 1.34/1.35 등 새 standard 로 끌어올려서 Extended Support fee ($0.50/h, 월 $360) 회귀 차단."
+  description = "EKS K8s version. 1.34 remains on standard support through 2026-12; keep this explicit to avoid the $0.50/h extended-support surcharge on 1.33."
   type        = string
-  default     = "1.33"
+  default     = "1.34"
+}
+
+variable "allow_full_stack_apply" {
+  description = "Explicit cost approval gate for the complete EKS/EC2/NAT/ALB/RDS/SageMaker stack."
+  type        = bool
+  default     = false
 }

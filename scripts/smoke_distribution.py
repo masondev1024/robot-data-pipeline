@@ -27,11 +27,12 @@ from src.generator._record import (
     hour_load_multiplier,
     load_temp_delta,
 )
+from src.streaming.anomaly_contract import DEFAULT_THRESHOLDS, is_multivariate_anomaly
 
 
-# Flink 룰 (production 임계값 — flink notebook 04-29 PM 튜닝 후)
-FLINK_MIN_TEMP = 92.0
-FLINK_LOAD_RATIO = 2.5
+# Flink Notebook parity (운영 원본은 AWS Studio Notebook)
+FLINK_MIN_TEMP = DEFAULT_THRESHOLDS.min_motor_temp
+FLINK_LOAD_RATIO = DEFAULT_THRESHOLDS.load_ratio_threshold
 
 
 def simulate_one_robot(profile: dict, ticks: int, params: dict, rng: random.Random) -> list[float]:
@@ -102,12 +103,8 @@ def histogram(values: list[float], bins: list[tuple[float, float]]) -> list[tupl
 
 
 def flink_anomaly_rate(temps: list[float], loads: list[float]) -> tuple[int, float]:
-    """Flink 다변량 룰 (motor_temp >= 92 AND temp/load > 2.5) 발화 건수·비율."""
-    hits = 0
-    for t, l in zip(temps, loads):
-        ratio = t / max(l, 1.0)
-        if t >= FLINK_MIN_TEMP and ratio > FLINK_LOAD_RATIO:
-            hits += 1
+    """Flink 다변량 branch 발화 건수·비율을 계산한다."""
+    hits = sum(is_multivariate_anomaly(t, l) for t, l in zip(temps, loads))
     return hits, 100.0 * hits / max(len(temps), 1)
 
 
@@ -124,7 +121,8 @@ def main() -> int:
     random.seed(args.seed)  # gauss 등 module-level 시드 고정
 
     params = _load_realism_params()
-    profiles = load_profiles(args.seed_csv, args.robots)
+    # load_profiles는 StatefulSet shard와 동일한 전역 id 범위를 받는다.
+    profiles = load_profiles(args.seed_csv, (0, args.robots))
     faulty_count = sum(1 for p in profiles if p.get("is_faulty"))
 
     print(f"[smoke] robots={args.robots} ticks={args.ticks} faulty_profiles={faulty_count}")

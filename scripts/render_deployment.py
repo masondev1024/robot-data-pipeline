@@ -18,6 +18,7 @@ from collections.abc import Mapping
 _ACCOUNT_ID = re.compile(r"^[0-9]{12}$")
 _REGION = re.compile(r"^[a-z]{2}(?:-gov)?-[a-z]+-[0-9]$")
 _CLUSTER_NAME = re.compile(r"^[a-z0-9][a-z0-9.-]{0,99}$")
+_PROJECT_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
 _BUCKET_NAME = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
 _IP_ADDRESS_SHAPED = re.compile(r"^[0-9]{1,3}(?:\.[0-9]{1,3}){3}$")
 _IMAGE_TAG = re.compile(r"^[0-9a-f]{40}$")
@@ -40,6 +41,7 @@ class DeploymentConfig:
     eks_cluster_name: str
     s3_bucket_name: str
     image_tag: str
+    project_name: str
 
     @classmethod
     def from_mapping(cls, values: Mapping[str, str]) -> "DeploymentConfig":
@@ -66,12 +68,17 @@ class DeploymentConfig:
         ):
             raise ValueError("invalid or missing S3_BUCKET_NAME")
 
+        project_name = values.get("PROJECT_NAME", "robot-telemetry").strip()
+        if _PROJECT_NAME.fullmatch(project_name) is None:
+            raise ValueError("invalid PROJECT_NAME")
+
         return cls(
             aws_account_id=normalized["AWS_ACCOUNT_ID"],
             aws_region=normalized["AWS_REGION"],
             eks_cluster_name=normalized["EKS_CLUSTER_NAME"],
             s3_bucket_name=normalized["S3_BUCKET_NAME"],
             image_tag=normalized["IMAGE_TAG"],
+            project_name=project_name,
         )
 
     def replacements(self) -> dict[str, str]:
@@ -81,6 +88,9 @@ class DeploymentConfig:
             "__EKS_CLUSTER_NAME__": self.eks_cluster_name,
             "__S3_BUCKET_NAME__": self.s3_bucket_name,
             "__IMAGE_TAG__": self.image_tag,
+            "__PROJECT_NAME__": self.project_name,
+            "__KDS_STREAM_NAME__": f"{self.project_name}-stream",
+            "__FIREHOSE_NAME__": f"{self.project_name}-firehose",
         }
 
 

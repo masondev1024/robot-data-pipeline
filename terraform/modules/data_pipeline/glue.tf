@@ -172,6 +172,88 @@ resource "aws_glue_catalog_table" "silver_alerts" {
   }
 }
 
+# API startup/readiness와 Gold 쿼리가 의존하는 최종 테이블도 인프라와 함께
+# 카탈로그에 등록한다. 기존에는 bronze/silver_alerts만 Terraform으로 만들고
+# gold_ddl.sql을 별도 수동 실행해야 해서, 새 검증 클러스터에서 API가 503으로
+# 남는 배포 순서 결함이 있었다.
+resource "aws_glue_catalog_table" "gold_robot_daily_stats" {
+  name          = "gold_robot_daily_stats"
+  database_name = aws_glue_catalog_database.main.name
+  table_type    = "EXTERNAL_TABLE"
+
+  parameters = {
+    classification                = "parquet"
+    "parquet.compression"         = "SNAPPY"
+    "projection.enabled"          = "true"
+    "projection.dt.type"          = "date"
+    "projection.dt.range"         = "2024-01-01,NOW"
+    "projection.dt.format"        = "yyyy-MM-dd"
+    "projection.dt.interval"      = "1"
+    "projection.dt.interval.unit" = "DAYS"
+    "storage.location.template"   = "s3://${aws_s3_bucket.datalake.bucket}/gold/dt=$${dt}/"
+  }
+
+  storage_descriptor {
+    location      = "s3://${aws_s3_bucket.datalake.bucket}/gold/"
+    input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
+    output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
+
+    ser_de_info {
+      name                  = "gold-robot-daily-stats"
+      serialization_library = "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
+      parameters = {
+        "serialization.format" = "1"
+      }
+    }
+
+    columns {
+      name = "robot_id"
+      type = "string"
+    }
+    columns {
+      name = "avg_motor_temp"
+      type = "double"
+    }
+    columns {
+      name = "max_motor_temp"
+      type = "double"
+    }
+    columns {
+      name = "battery_start"
+      type = "int"
+    }
+    columns {
+      name = "battery_end"
+      type = "int"
+    }
+    columns {
+      name = "battery_drain"
+      type = "int"
+    }
+    columns {
+      name = "active_hours"
+      type = "int"
+    }
+    columns {
+      name = "anomaly_record_count"
+      type = "int"
+    }
+    columns {
+      name = "max_temp_load_ratio"
+      type = "double"
+    }
+    columns {
+      name = "dominant_failure_type"
+      type = "string"
+    }
+  }
+
+  partition_keys {
+    name = "dt"
+    type = "date"
+  }
+}
+
 resource "aws_glue_registry" "main" {
   registry_name = "${var.project_name}-registry"
 }

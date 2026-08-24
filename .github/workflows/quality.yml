@@ -77,6 +77,10 @@ jobs:
         run: terraform -chdir=terraform init -backend=false -input=false
       - name: Validate Terraform configuration
         run: terraform -chdir=terraform validate
+      - name: Initialize validation profile without remote state
+        run: terraform -chdir=terraform/validation init -backend=false -input=false
+      - name: Validate validation profile
+        run: terraform -chdir=terraform/validation validate
 
   prism-public-container:
     runs-on: ubuntu-latest

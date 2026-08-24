@@ -47,6 +47,12 @@ resource "aws_eks_addon" "ebs_csi" {
   addon_name               = "aws-ebs-csi-driver"
   service_account_role_arn = aws_iam_role.ebs_csi.arn
 
+  # 단일 노드 단기 검증에서는 controller 1개로도 PVC 생성/마운트 검증이 가능하다.
+  # 운영 환경에서는 controller HA(기본 2개)를 복원한다.
+  configuration_values = jsonencode({
+    controller = { replicaCount = 1 }
+  })
+
   # 노드그룹 떠있어야 driver pod 스케줄됨
   depends_on = [aws_eks_node_group.main]
 }
