@@ -15,7 +15,7 @@
 
 ## 실시간 경로
 
-Managed Flink는 event-time watermark를 적용해 이상 이벤트를 alert KDS로 분리합니다. Lambda가 alert stream을 소비해 Slack으로 직접 전송합니다. Flink 애플리케이션은 AWS Studio Notebook을 운영 원본으로 사용하므로 저장소의 코드가 실제 배포 원본인 것처럼 표현하지 않습니다.
+Managed Flink는 event-time watermark를 적용해 이상 이벤트를 alert KDS로 분리합니다. 현재 탐지 계약은 Z-Score `σ>3` OR `motor_temp>=92°C` 및 `motor_temp/current_load>2.5`이며, 5분 이동 통계와 1분 tumbling 집계를 사용합니다. Lambda가 alert stream을 소비해 Slack으로 직접 전송합니다. Flink 애플리케이션은 AWS Studio Notebook을 운영 원본으로 사용하므로 저장소의 코드가 실제 배포 원본인 것처럼 표현하지 않습니다. 계약과 live 검증 방법은 [FLINK-ANOMALY-CONTRACT.md](FLINK-ANOMALY-CONTRACT.md)에 기록합니다.
 
 ## 플랫폼 경계
 
@@ -41,6 +41,17 @@ Managed Flink는 event-time watermark를 적용해 이상 이벤트를 alert KDS
 ## 확장 시 우선순위
 
 - dev/stage/prod 다중 계정과 별도 Terraform state
-- SLO/error-budget 기반 alerting 및 synthetic probe
+- SLO/error-budget 기반 alerting 및 synthetic probe (KDS iterator age와 Firehose freshness guardrail은 구현; batch freshness 측정은 후속)
 - policy-as-code와 image/SBOM 공급망 검증
 - disaster recovery 목표(RTO/RPO)와 복구 훈련 자동화
+
+## 비용 프로필과 검증 경계
+
+전체 플랫폼과 단기 데이터 경로 검증은 같은 Terraform root에서 무조건 함께 실행하지 않는다.
+
+| 프로필 | 목적 | 포함 | 제외 |
+|---|---|---|---|
+| `terraform/validation` | Kinesis → Firehose → S3 Parquet 및 SLO 확인 | Kinesis 2 shards, Firehose, S3, Glue, CloudWatch | EKS, EC2, NAT, ALB, RDS, ECR, SageMaker, Slack/Lambda |
+| 전체 플랫폼 | Kubernetes workload, API, HPA, RDS, Canary, ML 통합 검증 | 기존 Terraform 전체 구성 | 비용 승인 없는 자동 실행 |
+
+단기 프로필은 기존 전체 plan 104개에서 14개 리소스로 축소했다. EKS와 NAT를 제거해 생성·삭제 대기시간을 줄이고, Firehose buffer를 128MB/300초에서 Parquet 변환이 허용하는 최소값인 64MB/60초로 조정해 데이터 신선도 피드백을 빠르게 한다. 이 선택은 비용과 피드백 속도를 최적화하지만 Kubernetes와 API 용량을 검증하지 않으므로, 프로필 간 결과를 혼용하지 않는다.

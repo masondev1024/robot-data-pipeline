@@ -2,6 +2,8 @@
 resource "aws_ecr_repository" "generator" {
   name                 = "${var.project_name}-generator"
   image_tag_mutability = "MUTABLE"
+  # 단기 검증 스택은 destroy 시 테스트 이미지를 함께 제거해 잔여 과금을 막는다.
+  force_delete = true
 
   image_scanning_configuration {
     scan_on_push = true
@@ -11,6 +13,8 @@ resource "aws_ecr_repository" "generator" {
 resource "aws_ecr_repository" "api" {
   name                 = "${var.project_name}-api"
   image_tag_mutability = "MUTABLE"
+  # 단기 검증 스택은 destroy 시 테스트 이미지를 함께 제거해 잔여 과금을 막는다.
+  force_delete = true
 
   image_scanning_configuration {
     scan_on_push = true
@@ -22,6 +26,8 @@ resource "aws_ecr_repository" "api" {
 resource "aws_ecr_repository" "airflow" {
   name                 = "${var.project_name}-airflow"
   image_tag_mutability = "MUTABLE"
+  # 단기 검증 스택은 destroy 시 테스트 이미지를 함께 제거해 잔여 과금을 막는다.
+  force_delete = true
 
   image_scanning_configuration {
     scan_on_push = true
@@ -29,10 +35,13 @@ resource "aws_ecr_repository" "airflow" {
 }
 
 # GitHub Actions OIDC Role
-resource "aws_iam_openid_connect_provider" "github" {
-  url             = "https://token.actions.githubusercontent.com"
-  client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"] # Default GitHub OIDC thumbprint
+#
+# GitHub's OIDC provider is account-scoped and is shared by repositories. It is
+# bootstrapped once outside this workload stack; treating it as a data source
+# prevents a second short-lived validation stack from trying to create the same
+# provider and failing with EntityAlreadyExists.
+data "aws_iam_openid_connect_provider" "github" {
+  url = "https://token.actions.githubusercontent.com"
 }
 
 resource "aws_iam_role" "github_actions" {
@@ -44,7 +53,7 @@ resource "aws_iam_role" "github_actions" {
       Action = "sts:AssumeRoleWithWebIdentity"
       Effect = "Allow"
       Principal = {
-        Federated = aws_iam_openid_connect_provider.github.arn
+        Federated = data.aws_iam_openid_connect_provider.github.arn
       }
       Condition = {
         StringLike = {

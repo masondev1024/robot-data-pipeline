@@ -361,6 +361,64 @@ data:
       "version": 1,
       "weekStart": ""
     }
+  pipeline_slo.json: |
+    {
+      "annotations": { "list": [] },
+      "editable": true,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 60000 }, { "color": "red", "value": 120000 }] }, "unit": "ms" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "id": 1,
+          "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single", "sort": "none" } },
+          "targets": [{ "alias": "Iterator age", "datasource": { "type": "cloudwatch", "uid": "cloudwatch" }, "dimensions": { "StreamName": "__KDS_STREAM_NAME__" }, "expression": "", "id": "", "matchExact": true, "metricEditorMode": 0, "metricName": "GetRecords.IteratorAgeMilliseconds", "metricQueryType": 0, "namespace": "AWS/Kinesis", "period": "60", "queryMode": "Metrics", "refId": "A", "region": "__AWS_REGION__", "sqlExpression": "", "statistic": "Maximum" }],
+          "title": "Streaming lag — Kinesis iterator age",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 300 }, { "color": "red", "value": 600 }] }, "unit": "s" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "id": 2,
+          "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single", "sort": "none" } },
+          "targets": [{ "alias": "S3 delivery freshness", "datasource": { "type": "cloudwatch", "uid": "cloudwatch" }, "dimensions": { "DeliveryStreamName": "__FIREHOSE_NAME__" }, "expression": "", "id": "", "matchExact": true, "metricEditorMode": 0, "metricName": "DeliveryToS3.DataFreshness", "metricQueryType": 0, "namespace": "AWS/Firehose", "period": "300", "queryMode": "Metrics", "refId": "A", "region": "__AWS_REGION__", "sqlExpression": "", "statistic": "Maximum" }],
+          "title": "Data freshness — Firehose to S3",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }, "unit": "short" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "id": 3,
+          "options": { "legend": { "calcs": ["min", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single", "sort": "none" } },
+          "targets": [{ "alias": "Successful S3 put commands", "datasource": { "type": "cloudwatch", "uid": "cloudwatch" }, "dimensions": { "DeliveryStreamName": "__FIREHOSE_NAME__" }, "expression": "", "id": "", "matchExact": true, "metricEditorMode": 0, "metricName": "DeliveryToS3.Success", "metricQueryType": 0, "namespace": "AWS/Firehose", "period": "300", "queryMode": "Metrics", "refId": "A", "region": "__AWS_REGION__", "sqlExpression": "", "statistic": "Minimum" }],
+          "title": "Firehose delivery success (count, not ratio)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+          "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }, "unit": "short" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+          "id": 4,
+          "options": { "legend": { "calcs": ["sum", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single", "sort": "none" } },
+          "targets": [{ "alias": "Write throttle events", "datasource": { "type": "cloudwatch", "uid": "cloudwatch" }, "dimensions": { "StreamName": "__KDS_STREAM_NAME__" }, "expression": "", "id": "", "matchExact": true, "metricEditorMode": 0, "metricName": "WriteProvisionedThroughputExceeded", "metricQueryType": 0, "namespace": "AWS/Kinesis", "period": "60", "queryMode": "Metrics", "refId": "A", "region": "__AWS_REGION__", "sqlExpression": "", "statistic": "Sum" }],
+          "title": "Producer pressure — Kinesis write throttles",
+          "type": "timeseries"
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 39,
+      "tags": ["robot-telemetry", "slo", "streaming"],
+      "templating": { "list": [] },
+      "time": { "from": "now-1h", "to": "now" },
+      "timezone": "UTC",
+      "title": "Robot Telemetry — Pipeline SLO",
+      "uid": "robot-pipeline-slo",
+      "version": 1
+    }
   pipeline_health.json: |
     {
       "annotations": {

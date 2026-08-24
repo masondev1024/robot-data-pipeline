@@ -1,0 +1,12 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: robot-telemetry-api
+  namespace: robot-telemetry
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: api
+          image: __AWS_ACCOUNT_ID__.dkr.ecr.__AWS_REGION__.amazonaws.com/robot-telemetry-full-20260824-api:__IMAGE_TAG__
