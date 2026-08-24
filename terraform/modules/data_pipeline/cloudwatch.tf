@@ -1,4 +1,4 @@
-# CloudWatch Alarm: Firehose 적재 실패율
+# CloudWatch Alarm: Firehose S3 전달 상태
 #
 # alarm action 경로 변경 (2026-04-30): SNS robot-anomaly-alerts → Lambda 직접 invoke.
 # 이유: SNS HTTPS subscription 이 04-28 PendingConfirmation 영구 고착 후 04-30 IaC 에서
@@ -15,10 +15,34 @@ resource "aws_cloudwatch_metric_alarm" "firehose_delivery_errors" {
   metric_name         = "DeliveryToS3.Success"
   namespace           = "AWS/Firehose"
   period              = "300"
-  statistic           = "Average"
-  threshold           = "0.95"
+  statistic           = "Minimum"
+  threshold           = "1"
   treat_missing_data  = "notBreaching"
-  alarm_description   = "Firehose DeliveryToS3.Success ratio < 0.95 (즉 < 95%) — Lambda 직접 invoke 로 Slack 알림. 메트릭은 0~1 ratio 라 threshold 도 ratio 단위."
+  alarm_description   = "Firehose DeliveryToS3.Success is the count of successful S3 put commands. Alert when an active 5-minute period has no successful put command. Freshness is monitored separately."
+  actions_enabled     = true
+  alarm_actions       = [aws_lambda_function.alert.arn]
+  ok_actions          = [aws_lambda_function.alert.arn]
+
+  dimensions = {
+    DeliveryStreamName = aws_kinesis_firehose_delivery_stream.main.name
+  }
+}
+
+# DeliveryToS3.DataFreshness is an age in seconds, not a success ratio.
+# This catches a buffered or retrying delivery path even when the last delivery
+# period happened to contain one successful object.
+resource "aws_cloudwatch_metric_alarm" "firehose_data_freshness" {
+  alarm_name          = "${var.project_name}-firehose-data-freshness"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  datapoints_to_alarm = "2"
+  metric_name         = "DeliveryToS3.DataFreshness"
+  namespace           = "AWS/Firehose"
+  period              = "300"
+  statistic           = "Maximum"
+  threshold           = var.firehose_data_freshness_threshold_seconds
+  treat_missing_data  = "notBreaching"
+  alarm_description   = "Firehose S3 delivery data age exceeded the freshness SLO (seconds)."
   actions_enabled     = true
   alarm_actions       = [aws_lambda_function.alert.arn]
   ok_actions          = [aws_lambda_function.alert.arn]
@@ -36,6 +60,14 @@ resource "aws_lambda_permission" "alarm_invoke_alert" {
   function_name = aws_lambda_function.alert.function_name
   principal     = "lambda.alarms.cloudwatch.amazonaws.com"
   source_arn    = aws_cloudwatch_metric_alarm.firehose_delivery_errors.arn
+}
+
+resource "aws_lambda_permission" "alarm_invoke_alert_firehose_freshness" {
+  statement_id  = "AllowCloudWatchAlarmInvokeFirehoseFreshness"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.alert.function_name
+  principal     = "lambda.alarms.cloudwatch.amazonaws.com"
+  source_arn    = aws_cloudwatch_metric_alarm.firehose_data_freshness.arn
 }
 
 # CloudWatch Alarm: KDS main write throttle
@@ -71,6 +103,40 @@ resource "aws_lambda_permission" "alarm_invoke_alert_kds_throttle" {
   function_name = aws_lambda_function.alert.function_name
   principal     = "lambda.alarms.cloudwatch.amazonaws.com"
   source_arn    = aws_cloudwatch_metric_alarm.kds_main_write_throttle.arn
+}
+
+# CloudWatch Alarm: KDS consumer lag
+#
+# IteratorAgeMilliseconds is the age of the last record returned to a consumer.
+# A rising value is a direct signal that Flink/Firehose is not keeping up with
+# the producer, while write throttles alone only describe the producer side.
+resource "aws_cloudwatch_metric_alarm" "kds_main_iterator_age" {
+  alarm_name          = "${var.project_name}-kds-iterator-age"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "3"
+  datapoints_to_alarm = "2"
+  metric_name         = "GetRecords.IteratorAgeMilliseconds"
+  namespace           = "AWS/Kinesis"
+  period              = "60"
+  statistic           = "Maximum"
+  threshold           = var.kds_iterator_age_threshold_milliseconds
+  treat_missing_data  = "notBreaching"
+  alarm_description   = "KDS consumer iterator age exceeded the streaming freshness SLO (milliseconds)."
+  actions_enabled     = true
+  alarm_actions       = [aws_lambda_function.alert.arn]
+  ok_actions          = [aws_lambda_function.alert.arn]
+
+  dimensions = {
+    StreamName = aws_kinesis_stream.main.name
+  }
+}
+
+resource "aws_lambda_permission" "alarm_invoke_alert_kds_iterator_age" {
+  statement_id  = "AllowCloudWatchAlarmInvokeKDSIteratorAge"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.alert.function_name
+  principal     = "lambda.alarms.cloudwatch.amazonaws.com"
+  source_arn    = aws_cloudwatch_metric_alarm.kds_main_iterator_age.arn
 }
 
 # Carry-over: Generator put_records_giving_up log filter alarm.

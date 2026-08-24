@@ -41,6 +41,6 @@ Managed Flink는 event-time watermark를 적용해 이상 이벤트를 alert KDS
 ## 확장 시 우선순위
 
 - dev/stage/prod 다중 계정과 별도 Terraform state
-- SLO/error-budget 기반 alerting 및 synthetic probe
+- SLO/error-budget 기반 alerting 및 synthetic probe (KDS iterator age와 Firehose freshness guardrail은 구현; batch freshness 측정은 후속)
 - policy-as-code와 image/SBOM 공급망 검증
 - disaster recovery 목표(RTO/RPO)와 복구 훈련 자동화
