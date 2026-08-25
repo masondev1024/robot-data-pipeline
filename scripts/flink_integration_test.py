@@ -9,7 +9,7 @@
 사전 조건:
   - Flink Studio Notebook (de-ai-06-flink-studio-nb) RUNNING.
   - Anomaly detection paragraph (S3 sink + KDS-alert sink) 양쪽 실행 중.
-  - AWS 자격증명 (eu-west-1) Kinesis read/write 권한.
+  - AWS 자격증명 (ap-northeast-2) Kinesis read/write 권한.
 
 사용:
   python3 scripts/flink_integration_test.py
@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 import boto3
 
 
-REGION = os.environ.get("AWS_REGION", "eu-west-1")
+REGION = os.environ.get("AWS_REGION", "ap-northeast-2")
 MAIN_STREAM = os.environ.get("KINESIS_STREAM_NAME", "robot-telemetry-stream")
 ALERT_STREAM = os.environ.get("KINESIS_ALERT_STREAM_NAME", "robot-anomaly-alert-stream")
 

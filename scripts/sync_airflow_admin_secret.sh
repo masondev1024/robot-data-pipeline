@@ -13,7 +13,7 @@ fi
 
 : "${AWS_ACCOUNT_ID:?AWS_ACCOUNT_ID must be set to the intended 12-digit account ID}"
 
-REGION="${AWS_REGION:-eu-west-1}"
+REGION="${AWS_REGION:-ap-northeast-2}"
 SECRET_ID="${AIRFLOW_ADMIN_SECRET_ID:-/robot-telemetry/airflow-admin-password}"
 NAMESPACE="${AIRFLOW_NAMESPACE:-airflow}"
 

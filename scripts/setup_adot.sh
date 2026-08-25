@@ -22,7 +22,7 @@ if [ -f "$ENV_FILE" ]; then
   set +a
 fi
 
-REGION="${AWS_REGION:-eu-west-1}"
+REGION="${AWS_REGION:-ap-northeast-2}"
 CLUSTER="${EKS_CLUSTER_NAME:-${EKS_CLUSTER:-robot-telemetry-cluster}}"
 : "${AWS_ACCOUNT_ID:?AWS_ACCOUNT_ID must be set to the intended 12-digit account ID}"
 : "${S3_BUCKET_NAME:?S3_BUCKET_NAME must be set}"

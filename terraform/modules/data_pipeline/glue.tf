@@ -172,6 +172,164 @@ resource "aws_glue_catalog_table" "silver_alerts" {
   }
 }
 
+# Canonical batch Silver table. The schema matches sql/silver_ddl.sql and the
+# robot_daily_etl Bronze -> Silver INSERT. Terraform owns the catalog contract;
+# the SQL file remains a review/reference artifact and must not drift from this
+# definition.
+resource "aws_glue_catalog_table" "silver_robot_telemetry" {
+  name          = "silver_robot_telemetry"
+  database_name = aws_glue_catalog_database.main.name
+
+  table_type = "EXTERNAL_TABLE"
+
+  parameters = {
+    "classification"              = "parquet"
+    "parquet.compression"         = "SNAPPY"
+    "projection.enabled"          = "true"
+    "projection.dt.type"          = "date"
+    "projection.dt.range"         = "2024-01-01,NOW"
+    "projection.dt.format"        = "yyyy-MM-dd"
+    "projection.dt.interval"      = "1"
+    "projection.dt.interval.unit" = "DAYS"
+    "storage.location.template"   = "s3://${aws_s3_bucket.datalake.bucket}/silver/dt=$${dt}/"
+  }
+
+  storage_descriptor {
+    location      = "s3://${aws_s3_bucket.datalake.bucket}/silver/"
+    input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
+    output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
+
+    ser_de_info {
+      name                  = "silver-robot-telemetry"
+      serialization_library = "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
+
+      parameters = {
+        "serialization.format" = "1"
+      }
+    }
+
+    columns {
+      name = "robot_id"
+      type = "string"
+    }
+    columns {
+      name = "pos_x"
+      type = "double"
+    }
+    columns {
+      name = "pos_y"
+      type = "double"
+    }
+    columns {
+      name = "battery_level"
+      type = "int"
+    }
+    columns {
+      name = "current_load"
+      type = "int"
+    }
+    columns {
+      name = "motor_temp"
+      type = "double"
+    }
+    columns {
+      name = "timestamp"
+      type = "string"
+    }
+    columns {
+      name = "failure_type"
+      type = "string"
+    }
+  }
+
+  partition_keys {
+    name = "dt"
+    type = "date"
+  }
+}
+
+# Canonical batch Gold table. One row per robot/day is produced by the
+# robot_daily_etl Silver -> Gold query and consumed by the API/PRISM layer.
+resource "aws_glue_catalog_table" "gold_robot_daily_stats" {
+  name          = "gold_robot_daily_stats"
+  database_name = aws_glue_catalog_database.main.name
+
+  table_type = "EXTERNAL_TABLE"
+
+  parameters = {
+    "classification"              = "parquet"
+    "parquet.compression"         = "SNAPPY"
+    "projection.enabled"          = "true"
+    "projection.dt.type"          = "date"
+    "projection.dt.range"         = "2024-01-01,NOW"
+    "projection.dt.format"        = "yyyy-MM-dd"
+    "projection.dt.interval"      = "1"
+    "projection.dt.interval.unit" = "DAYS"
+    "storage.location.template"   = "s3://${aws_s3_bucket.datalake.bucket}/gold/dt=$${dt}/"
+  }
+
+  storage_descriptor {
+    location      = "s3://${aws_s3_bucket.datalake.bucket}/gold/"
+    input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
+    output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
+
+    ser_de_info {
+      name                  = "gold-robot-daily-stats"
+      serialization_library = "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
+
+      parameters = {
+        "serialization.format" = "1"
+      }
+    }
+
+    columns {
+      name = "robot_id"
+      type = "string"
+    }
+    columns {
+      name = "avg_motor_temp"
+      type = "double"
+    }
+    columns {
+      name = "max_motor_temp"
+      type = "double"
+    }
+    columns {
+      name = "battery_start"
+      type = "int"
+    }
+    columns {
+      name = "battery_end"
+      type = "int"
+    }
+    columns {
+      name = "battery_drain"
+      type = "int"
+    }
+    columns {
+      name = "active_hours"
+      type = "int"
+    }
+    columns {
+      name = "anomaly_record_count"
+      type = "int"
+    }
+    columns {
+      name = "max_temp_load_ratio"
+      type = "double"
+    }
+    columns {
+      name = "dominant_failure_type"
+      type = "string"
+    }
+  }
+
+  partition_keys {
+    name = "dt"
+    type = "date"
+  }
+}
+
 resource "aws_glue_registry" "main" {
   registry_name = "${var.project_name}-registry"
 }
@@ -216,6 +374,7 @@ resource "aws_athena_workgroup" "main" {
   configuration {
     enforce_workgroup_configuration    = true
     publish_cloudwatch_metrics_enabled = true
+    bytes_scanned_cutoff_per_query     = var.athena_bytes_scanned_cutoff_per_query
 
     result_configuration {
       output_location = "s3://${aws_s3_bucket.datalake.bucket}/project-athena-results/"

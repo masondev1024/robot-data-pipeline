@@ -119,7 +119,7 @@ class Supervisor:
         self.config = config or SupervisorConfig()
         self.model_id = os.environ.get(
             "PRISM_SUPERVISOR_MODEL",
-            "anthropic.claude-sonnet-4-6-20250513-v1:0",
+            "apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
         )
 
     def _fan_out(self, action_id: str, scenario_context: dict) -> CandidateAction:

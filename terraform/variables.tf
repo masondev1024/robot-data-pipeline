@@ -1,5 +1,7 @@
 variable "aws_region" {
-  default = "eu-west-1"
+  description = "AWS region for the complete data platform. SSO directory region and service region are configured independently."
+  type        = string
+  default     = "ap-northeast-2"
 }
 
 variable "project_name" {
@@ -39,7 +41,42 @@ variable "vpc_cidr" {
 }
 
 variable "node_instance_type" {
-  default = "t3.large"
+  description = "Managed node group instance type. Keep t3.large as the baseline until CPU/memory p95 supports a smaller class."
+  type        = string
+  default     = "t3.large"
+}
+
+variable "node_group_min_size" {
+  description = "Minimum managed node group capacity. One Spot node keeps the dev data plane schedulable."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.node_group_min_size >= 0
+    error_message = "node_group_min_size must be non-negative."
+  }
+}
+
+variable "node_group_desired_size" {
+  description = "Initial managed node group capacity. Keep this low for the cost-controlled baseline; Karpenter adds burst capacity."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.node_group_desired_size >= 0
+    error_message = "node_group_desired_size must be non-negative."
+  }
+}
+
+variable "node_group_max_size" {
+  description = "Maximum managed node group capacity before Karpenter burst capacity is used."
+  type        = number
+  default     = 10
+
+  validation {
+    condition     = var.node_group_max_size >= 0
+    error_message = "node_group_max_size must be non-negative."
+  }
 }
 
 variable "environment" {
@@ -56,6 +93,12 @@ variable "github_repo" {
 
 variable "github_branch" {
   default = "main"
+}
+
+variable "manage_github_oidc_provider" {
+  description = "Create and own the GitHub Actions OIDC provider only when the AWS account does not already have the shared provider. Keep false for accounts with an existing provider so teardown cannot remove it."
+  type        = bool
+  default     = false
 }
 
 # NOTE: slack_webhook_url 변수는 제거됨.
@@ -94,7 +137,62 @@ variable "generator_total_robots" {
 }
 
 variable "eks_cluster_version" {
-  description = "EKS K8s version. 1.33 standard support 만료 ~2026-07. 만료 임박 시 1.34/1.35 등 새 standard 로 끌어올려서 Extended Support fee ($0.50/h, 월 $360) 회귀 차단."
+  description = "Pinned EKS Kubernetes version. 1.35 is a currently standard-supported, region-verified baseline; upgrade deliberately after addon/chart compatibility checks."
   type        = string
-  default     = "1.33"
+  default     = "1.35"
+}
+
+variable "firehose_buffering_size_mb" {
+  description = "Main telemetry Firehose buffer size in MB. Larger buffers reduce S3 PUT frequency but increase delivery latency."
+  type        = number
+  default     = 128
+
+  validation {
+    condition     = var.firehose_buffering_size_mb >= 1 && var.firehose_buffering_size_mb <= 128
+    error_message = "firehose_buffering_size_mb must be between 1 and 128 MB."
+  }
+}
+
+variable "firehose_buffering_interval_seconds" {
+  description = "Main telemetry Firehose buffering interval. 300 seconds is the cost/freshness baseline."
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = var.firehose_buffering_interval_seconds >= 60 && var.firehose_buffering_interval_seconds <= 900
+    error_message = "firehose_buffering_interval_seconds must be between 60 and 900 seconds."
+  }
+}
+
+variable "alert_firehose_buffering_size_mb" {
+  description = "Alert archive Firehose buffer size in MB. Keep at or below the main stream unless alert volume is measured."
+  type        = number
+  default     = 128
+
+  validation {
+    condition     = var.alert_firehose_buffering_size_mb >= 1 && var.alert_firehose_buffering_size_mb <= 128
+    error_message = "alert_firehose_buffering_size_mb must be between 1 and 128 MB."
+  }
+}
+
+variable "alert_firehose_buffering_interval_seconds" {
+  description = "Alert archive Firehose buffering interval."
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = var.alert_firehose_buffering_interval_seconds >= 60 && var.alert_firehose_buffering_interval_seconds <= 900
+    error_message = "alert_firehose_buffering_interval_seconds must be between 60 and 900 seconds."
+  }
+}
+
+variable "athena_bytes_scanned_cutoff_per_query" {
+  description = "Athena per-query bytes scanned cutoff in bytes. 10 GiB preserves the current daily ETL baseline while preventing unbounded scans; lower for dev after measuring workload."
+  type        = number
+  default     = 10737418240
+
+  validation {
+    condition     = var.athena_bytes_scanned_cutoff_per_query >= 1048576
+    error_message = "athena_bytes_scanned_cutoff_per_query must be at least 1 MiB."
+  }
 }

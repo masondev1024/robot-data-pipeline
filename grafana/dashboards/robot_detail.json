@@ -50,7 +50,7 @@
       "pluginVersion": "11.3.0",
       "targets": [
         {
-          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
+          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "ap-northeast-2", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
           "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
           "format": 1,
           "rawSQL": "SELECT max_motor_temp AS \"최고 온도\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE robot_id = '${robot_id}' AND dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
@@ -92,7 +92,7 @@
       "pluginVersion": "11.3.0",
       "targets": [
         {
-          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
+          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "ap-northeast-2", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
           "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
           "format": 1,
           "rawSQL": "SELECT avg_motor_temp AS \"평균 온도\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE robot_id = '${robot_id}' AND dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
@@ -134,7 +134,7 @@
       "pluginVersion": "11.3.0",
       "targets": [
         {
-          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
+          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "ap-northeast-2", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
           "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
           "format": 1,
           "rawSQL": "SELECT battery_drain AS \"배터리 소모\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE robot_id = '${robot_id}' AND dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
@@ -176,7 +176,7 @@
       "pluginVersion": "11.3.0",
       "targets": [
         {
-          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
+          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "ap-northeast-2", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
           "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
           "format": 1,
           "rawSQL": "SELECT anomaly_record_count AS \"이상치 발생\" FROM robot_telemetry_db.gold_robot_daily_stats WHERE robot_id = '${robot_id}' AND dt = CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '1' DAY AS DATE)",
@@ -227,7 +227,7 @@
       },
       "targets": [
         {
-          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
+          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "ap-northeast-2", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
           "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
           "format": 0,
           "rawSQL": "SELECT DATE_TRUNC('minute', from_iso8601_timestamp(\"timestamp\")) AS time, AVG(motor_temp) AS \"평균 온도\", MAX(motor_temp) AS \"피크 온도\" FROM robot_telemetry_db.bronze_robot_telemetry WHERE robot_id = '${robot_id}' AND ((year = date_format(current_date - interval '1' day, '%Y') AND month = date_format(current_date - interval '1' day, '%m') AND day = date_format(current_date - interval '1' day, '%d')) OR (year = date_format(current_date, '%Y') AND month = date_format(current_date, '%m') AND day = date_format(current_date, '%d'))) AND from_iso8601_timestamp(\"timestamp\") > current_timestamp - INTERVAL '24' HOUR GROUP BY DATE_TRUNC('minute', from_iso8601_timestamp(\"timestamp\")) ORDER BY time ASC",
@@ -280,7 +280,7 @@
       },
       "targets": [
         {
-          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
+          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "ap-northeast-2", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
           "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
           "format": 0,
           "rawSQL": "SELECT DATE_TRUNC('minute', from_iso8601_timestamp(\"timestamp\")) AS time, AVG(CAST(battery_level AS DOUBLE)) AS \"배터리\" FROM robot_telemetry_db.bronze_robot_telemetry WHERE robot_id = '${robot_id}' AND ((year = date_format(current_date - interval '1' day, '%Y') AND month = date_format(current_date - interval '1' day, '%m') AND day = date_format(current_date - interval '1' day, '%d')) OR (year = date_format(current_date, '%Y') AND month = date_format(current_date, '%m') AND day = date_format(current_date, '%d'))) AND from_iso8601_timestamp(\"timestamp\") > current_timestamp - INTERVAL '24' HOUR GROUP BY DATE_TRUNC('minute', from_iso8601_timestamp(\"timestamp\")) ORDER BY time ASC",
@@ -330,7 +330,7 @@
       },
       "targets": [
         {
-          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
+          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "ap-northeast-2", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
           "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
           "format": 0,
           "rawSQL": "SELECT DATE_TRUNC('minute', from_iso8601_timestamp(\"timestamp\")) AS time, MAX(motor_temp / GREATEST(CAST(current_load AS DOUBLE), 1.0)) AS \"온도/부하 비율 (Flink 임계 2.5)\" FROM robot_telemetry_db.bronze_robot_telemetry WHERE robot_id = '${robot_id}' AND ((year = date_format(current_date - interval '1' day, '%Y') AND month = date_format(current_date - interval '1' day, '%m') AND day = date_format(current_date - interval '1' day, '%d')) OR (year = date_format(current_date, '%Y') AND month = date_format(current_date, '%m') AND day = date_format(current_date, '%d'))) AND from_iso8601_timestamp(\"timestamp\") > current_timestamp - INTERVAL '24' HOUR GROUP BY DATE_TRUNC('minute', from_iso8601_timestamp(\"timestamp\")) ORDER BY time ASC",

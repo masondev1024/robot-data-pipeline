@@ -1026,7 +1026,7 @@ def _tool_predict_robot_failure(robot_id: str) -> dict:
         )
         raw = response["Body"].read().decode()
         probs = _parse_softprob_response(raw)
-    except Exception as exc:
+    except Exception:
         # 2026-04-30 시점 endpoint 미배포 — graceful degradation.
         return {
             "error": "predictor not deployed",
@@ -1067,8 +1067,10 @@ def _converse_with_tools(user_prompt: str, max_turns: int = 3) -> str:
     그 사이에 cachePoint 를 두면 system 부분이 캐시 대상.
     """
     model_id = os.environ.get(
-        "BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
+        "BEDROCK_MODEL_ID", "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
     )
+    fallback_model_id = os.environ.get("BEDROCK_FALLBACK_MODEL_ID", "").strip()
+    active_model_id = model_id
     system = [
         {"text": ROBOT_ANALYST_SYSTEM_PROMPT},
         {"cachePoint": {"type": "default"}},
@@ -1076,17 +1078,44 @@ def _converse_with_tools(user_prompt: str, max_turns: int = 3) -> str:
     messages = [{"role": "user", "content": [{"text": user_prompt}]}]
 
     for _ in range(max_turns):
-        response = _bedrock_runtime.converse(
-            modelId=model_id,
-            system=system,
-            messages=messages,
-            inferenceConfig={"maxTokens": 512},
-            toolConfig=CHAT_TOOL_CONFIG,
-        )
+        try:
+            response = _bedrock_runtime.converse(
+                modelId=active_model_id,
+                system=system,
+                messages=messages,
+                inferenceConfig={"maxTokens": 512},
+                toolConfig=CHAT_TOOL_CONFIG,
+            )
+        except ClientError as exc:
+            error_code = exc.response.get("Error", {}).get("Code", "Unknown")
+            fallback_codes = {
+                "ResourceNotFoundException",
+                "ValidationException",
+                "ThrottlingException",
+            }
+            if (
+                active_model_id == model_id
+                and fallback_model_id
+                and fallback_model_id != model_id
+                and error_code in fallback_codes
+            ):
+                logger.warning(
+                    "Bedrock primary model unavailable; retrying with fallback "
+                    "model=%s code=%s",
+                    fallback_model_id,
+                    error_code,
+                )
+                active_model_id = fallback_model_id
+                # Keep the fallback contract model-neutral. Some profiles do
+                # not support Anthropic cachePoint blocks.
+                system = [{"text": ROBOT_ANALYST_SYSTEM_PROMPT}]
+                messages = [{"role": "user", "content": [{"text": user_prompt}]}]
+                continue
+            raise
         usage = response.get("usage", {})
         print(json.dumps({
             "event": "bedrock_converse",
-            "model": model_id,
+            "model": active_model_id,
             "input_tokens": usage.get("inputTokens"),
             "output_tokens": usage.get("outputTokens"),
             "cache_read_input_tokens": usage.get("cacheReadInputTokens", 0),

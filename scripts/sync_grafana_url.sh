@@ -10,7 +10,7 @@
 #   ./scripts/sync_grafana_url.sh --restart-api    # SSM 갱신 + API rollout restart
 #
 # Env (override 가능):
-#   AWS_REGION (default: eu-west-1)
+#   AWS_REGION (default: ap-northeast-2)
 #   PROJECT_NAME (default: robot-telemetry)
 #   GRAFANA_NS (default: monitoring)
 #   GRAFANA_INGRESS (default: grafana-ingress)
@@ -19,7 +19,7 @@
 
 set -euo pipefail
 
-REGION="${AWS_REGION:-eu-west-1}"
+REGION="${AWS_REGION:-ap-northeast-2}"
 PROJECT="${PROJECT_NAME:-robot-telemetry}"
 GRAFANA_NS="${GRAFANA_NS:-monitoring}"
 GRAFANA_INGRESS="${GRAFANA_INGRESS:-grafana-ingress}"

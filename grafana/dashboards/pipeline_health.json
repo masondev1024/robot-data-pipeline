@@ -74,7 +74,7 @@
           "period": "60",
           "queryMode": "Metrics",
           "refId": "A",
-          "region": "eu-west-1",
+          "region": "ap-northeast-2",
           "sqlExpression": "",
           "statistic": "Average"
         }
@@ -137,7 +137,7 @@
           "period": "60",
           "queryMode": "Metrics",
           "refId": "A",
-          "region": "eu-west-1",
+          "region": "ap-northeast-2",
           "sqlExpression": "",
           "statistic": "Sum"
         }
@@ -204,7 +204,7 @@
           "period": "60",
           "queryMode": "Metrics",
           "refId": "A",
-          "region": "eu-west-1",
+          "region": "ap-northeast-2",
           "sqlExpression": "",
           "statistic": "Average"
         }
@@ -267,7 +267,7 @@
           "period": "60",
           "queryMode": "Metrics",
           "refId": "A",
-          "region": "eu-west-1",
+          "region": "ap-northeast-2",
           "sqlExpression": "",
           "statistic": "Average"
         }

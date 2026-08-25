@@ -5,7 +5,10 @@ from typing import Optional, Union
 
 from src.common.aws import get_client
 
-DEFAULT_MODEL_ID = "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
+# The APAC Claude 3.5 Sonnet v2 profile is available from Seoul without
+# relying on an unapproved global Anthropic destination. The foundation-model
+# ID itself does not support on-demand throughput in this region.
+DEFAULT_MODEL_ID = "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
 
 
 def invoke_claude(

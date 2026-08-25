@@ -69,7 +69,7 @@ prism/
 | 키 | 기본값 | 용도 |
 |---|---|---|
 | `PRISM_MODE` | `demo` | `demo` = 결정론적 시연 (`PYTHONHASHSEED=2026` 강제) |
-| `BEDROCK_REGION` | `us-west-2` | Bedrock Claude 호출 region |
+| `BEDROCK_REGION` | `ap-northeast-2` | Bedrock Claude 호출 region |
 | `PRISM_OFFLINE` | `1` | `1` 이면 cache_replay 만 사용 (네트워크 없이도 시연) |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | — | Bedrock 호출 시. offline 모드면 불필요 |
 | `DEMO_PORT` | `8501` | 호스트 포트 (Demo) |

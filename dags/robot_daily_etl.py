@@ -10,14 +10,14 @@ from botocore.exceptions import ClientError
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
-from src.common.athena import fetch_rows, start_query, wait_for_query
+from src.common.athena import fetch_rows, wait_for_query
 from src.common.bedrock import invoke_claude
 
 S3_BUCKET = os.environ.get("S3_BUCKET_NAME", "robot-telemetry-data")
 ATHENA_DATABASE = os.environ.get("ATHENA_DATABASE", "robot_telemetry_db")
 ATHENA_WORKGROUP = os.environ.get("ATHENA_WORKGROUP", "robot-telemetry-workgroup")
 ATHENA_OUTPUT = os.environ.get("ATHENA_OUTPUT_LOCATION", f"s3://{S3_BUCKET}/project-athena-results/")
-AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", "eu-west-1")
+AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", "ap-northeast-2")
 
 DQ_FAILURE_RATIO_THRESHOLD = 0.01
 BEDROCK_REPORT_TOP_N = 20
@@ -317,7 +317,7 @@ LIMIT {BEDROCK_REPORT_TOP_N}
 
     model_id = os.environ.get(
         "BEDROCK_MODEL_ID",
-        "eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        "apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
     )
     # cache_system=False — 본 함수는 daily 1회 호출이라 5분 TTL 캐시 적중 불가.
     # ADR-012 의 caching 패턴은 chat API(고빈도) 에 적용.

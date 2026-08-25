@@ -62,6 +62,13 @@ resource "aws_eks_cluster" "main" {
     support_type = "STANDARD"
   }
 
+  # GitHub Actions EKS Access Entry와 기존 aws-auth 기반 워크로드를
+  # 함께 지원한다. Access Entry API는 CONFIG_MAP 단독 모드에서 거부된다.
+  access_config {
+    authentication_mode                         = "API_AND_CONFIG_MAP"
+    bootstrap_cluster_creator_admin_permissions = true
+  }
+
   vpc_config {
     subnet_ids = concat(aws_subnet.public[*].id, aws_subnet.app_private[*].id)
   }
@@ -91,13 +98,23 @@ resource "aws_eks_node_group" "main" {
   capacity_type  = "SPOT"
 
   scaling_config {
-    desired_size = 1
-    max_size     = 10
-    min_size     = 1
+    desired_size = var.node_group_desired_size
+    max_size     = var.node_group_max_size
+    min_size     = var.node_group_min_size
   }
 
   update_config {
     max_unavailable = 1
+  }
+
+  lifecycle {
+    precondition {
+      condition = (
+        var.node_group_min_size <= var.node_group_desired_size &&
+        var.node_group_desired_size <= var.node_group_max_size
+      )
+      error_message = "node group sizes must satisfy min <= desired <= max."
+    }
   }
 
   depends_on = [

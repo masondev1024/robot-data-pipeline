@@ -7,7 +7,10 @@
 ## 데이터 경로
 
 1. Generator가 `robot_id`를 partition key로 Kinesis Data Streams에 이벤트를 보냅니다.
-2. Firehose가 JSON을 Parquet/Snappy로 변환해 S3 Bronze에 시간 단위로 동적 파티셔닝합니다.
+2. Firehose가 JSON을 Parquet/Snappy로 변환해 S3 Bronze에 시간 prefix로 적재하고,
+   Glue/Athena Partition Projection으로 조회 범위를 계산합니다. robot_id 같은
+   고카디널리티 동적 파티셔닝은 작은 파일·활성 파티션 버퍼 비용을 만들 수 있어
+   의도적으로 끄고, Parquet predicate pushdown을 사용합니다.
 3. Glue/Athena가 Partition Projection으로 파티션 등록 작업 없이 데이터를 조회합니다.
 4. Airflow DAG가 Silver 정제와 Gold 집계를 멱등 실행합니다. Task 간 payload 전달 대신 S3 경로를 계약으로 사용합니다.
 5. SageMaker predictor와 PRISM supervisor가 Gold/Silver 데이터를 읽어 예측과 권고를 생성합니다.

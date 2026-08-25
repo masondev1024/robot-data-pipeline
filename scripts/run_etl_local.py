@@ -47,7 +47,7 @@ def main() -> None:
     ctx = {"execution_date": execution_date}
 
     _load_env_file(REPO_ROOT / ".env")
-    os.environ.setdefault("AWS_DEFAULT_REGION", os.environ.get("AWS_REGION", "eu-west-1"))
+    os.environ.setdefault("AWS_DEFAULT_REGION", os.environ.get("AWS_REGION", "ap-northeast-2"))
 
     # airflow 설치된 환경에서만 import 가능
     from robot_daily_etl import _quality_check, _bronze_to_silver, _silver_to_gold

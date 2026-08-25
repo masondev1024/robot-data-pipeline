@@ -11,10 +11,10 @@
 # 사용:
 #   bash scripts/dlq_alarm_e2e.sh
 #
-# 사전 조건: AWS 자격증명 (eu-west-1), CloudWatch + Lambda IAM 권한.
+# 사전 조건: AWS 자격증명 (ap-northeast-2), CloudWatch + Lambda IAM 권한.
 set -euo pipefail
 
-REGION="${AWS_REGION:-eu-west-1}"
+REGION="${AWS_REGION:-ap-northeast-2}"
 ALARM_NAME="${ALARM_NAME:-robot-telemetry-firehose-delivery-errors}"
 LAMBDA_NAME="${LAMBDA_NAME:-robot-anomaly-alert-lambda}"
 

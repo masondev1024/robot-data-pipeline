@@ -21,11 +21,11 @@ resource "aws_lambda_function" "alert" {
   role             = aws_iam_role.lambda_alert_role.arn
   timeout          = 10
 
-  # 1000 robots 환경: alert KDS 1 shard 라 동시 invoker 1개. reserved=10 = shard 수
-  # +safety margin. 향후 alert KDS 2 shard 시 15 권장. unreserved (-1) 였으면
-  # account 단위 concurrent limit (1000) 안에서 자유 fork 였지만, 명시 reserved 로
-  # KDS reshard 후 (예: 4 → 8) 자동 scale 보장 + 다른 Lambda 와 격리.
-  reserved_concurrent_executions = 10
+  # 예약 동시성은 계정별 Lambda concurrency quota가 10인 신규 계정에서
+  # PutFunctionConcurrency 자체가 거부될 수 있다(계정 최소 unreserved=10).
+  # KDS event-source mapping의 batch/backoff가 소비율을 제한하므로, 별도
+  # 예약값 대신 unreserved concurrency를 사용해 배포 가능성과 계정 portability를
+  # 우선한다. 필요 시 quota 증액 후 환경별 Terraform 변수로 예약값을 추가한다.
 
   environment {
     variables = {

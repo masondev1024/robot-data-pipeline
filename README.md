@@ -8,7 +8,7 @@
 
 | 영역 | 구현 |
 |---|---|
-| Streaming | Kinesis Data Streams → Firehose → S3 Parquet, 동적 파티셔닝 |
+| Streaming | Kinesis Data Streams → Firehose → S3 Parquet, 시간 prefix + Athena partition projection |
 | Lakehouse | Bronze/Silver/Gold, Glue/Athena Partition Projection |
 | Platform | EKS, Karpenter, HPA/PDB, IRSA, ALB, Helm pinning |
 | Batch/ML | Airflow 2.10.5 DAG, SageMaker XGBoost 학습·재배포 |
@@ -82,7 +82,7 @@ Airflow 2.10.5 DAG contract는 별도 CI job에서 검증하고, AWS 의존 E2E�
 cp .env.example .env
 RENDER_ROOT="$(mktemp -d /tmp/robot-deploy.XXXXXX)"
 AWS_ACCOUNT_ID=123456789012 \
-AWS_REGION=eu-west-1 \
+AWS_REGION=ap-northeast-2 \
 EKS_CLUSTER_NAME=robot-telemetry-cluster \
 S3_BUCKET_NAME=globally-unique-bucket \
 IMAGE_TAG="$(git rev-parse HEAD)" \

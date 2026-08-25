@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      AWS_REGION: ${{ vars.AWS_REGION || 'eu-west-1' }}
+      AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-2' }}
       ECR_REPO: robot-telemetry-generator
       EKS_CLUSTER: ${{ vars.EKS_CLUSTER_NAME || 'robot-telemetry-cluster' }}
       K8S_NS: robot-telemetry
