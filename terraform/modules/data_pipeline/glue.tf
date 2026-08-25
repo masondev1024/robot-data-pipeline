@@ -175,7 +175,8 @@ resource "aws_glue_catalog_table" "silver_alerts" {
 # Canonical batch Silver table. The schema matches sql/silver_ddl.sql and the
 # robot_daily_etl Bronze -> Silver INSERT. Terraform owns the catalog contract;
 # the SQL file remains a review/reference artifact and must not drift from this
-# definition.
+# definition. Registering this table and the Gold dependency in the same apply
+# keeps API startup/readiness from depending on a manually executed DDL script.
 resource "aws_glue_catalog_table" "silver_robot_telemetry" {
   name          = "silver_robot_telemetry"
   database_name = aws_glue_catalog_database.main.name
@@ -276,7 +277,6 @@ resource "aws_glue_catalog_table" "gold_robot_daily_stats" {
     ser_de_info {
       name                  = "gold-robot-daily-stats"
       serialization_library = "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
-
       parameters = {
         "serialization.format" = "1"
       }

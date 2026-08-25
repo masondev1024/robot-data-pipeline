@@ -56,17 +56,18 @@ resource "aws_eks_cluster" "main" {
   role_arn = aws_iam_role.eks_cluster.arn
   version  = var.eks_cluster_version
 
+  # Access Entry 리소스를 사용하려면 EKS API 인증 모드가 필요하다.
+  # API_AND_CONFIG_MAP은 기존 aws-auth 호환성을 유지하면서 GitHub Actions와
+  # 운영 역할을 EKS Access Entry로 점진적으로 이전할 수 있는 검증/운영 공통 모드다.
+  access_config {
+    authentication_mode                         = "API_AND_CONFIG_MAP"
+    bootstrap_cluster_creator_admin_permissions = true
+  }
+
   # Standard support 만료 시 자동 EXTENDED 전환을 차단 — Extended Support fee
   # ($0.50/h, 월 $360) 회귀 방지. 만료 시점에 plan 이 fail 하도록 명시.
   upgrade_policy {
     support_type = "STANDARD"
-  }
-
-  # GitHub Actions EKS Access Entry와 기존 aws-auth 기반 워크로드를
-  # 함께 지원한다. Access Entry API는 CONFIG_MAP 단독 모드에서 거부된다.
-  access_config {
-    authentication_mode                         = "API_AND_CONFIG_MAP"
-    bootstrap_cluster_creator_admin_permissions = true
   }
 
   vpc_config {

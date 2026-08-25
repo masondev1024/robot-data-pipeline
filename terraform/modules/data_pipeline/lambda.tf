@@ -26,6 +26,9 @@ resource "aws_lambda_function" "alert" {
   # KDS event-source mapping의 batch/backoff가 소비율을 제한하므로, 별도
   # 예약값 대신 unreserved concurrency를 사용해 배포 가능성과 계정 portability를
   # 우선한다. 필요 시 quota 증액 후 환경별 Terraform 변수로 예약값을 추가한다.
+  # null은 unreserved pool을 보존하며, 운영 계정에서 downstream 보호가
+  # 필요할 때만 명시적인 값을 전달한다.
+  reserved_concurrent_executions = var.lambda_reserved_concurrency
 
   environment {
     variables = {

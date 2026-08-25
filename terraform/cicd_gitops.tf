@@ -2,6 +2,8 @@
 resource "aws_ecr_repository" "generator" {
   name                 = "${var.project_name}-generator"
   image_tag_mutability = "MUTABLE"
+  # 단기 검증 스택은 destroy 시 테스트 이미지를 함께 제거해 잔여 과금을 막는다.
+  force_delete = true
 
   image_scanning_configuration {
     scan_on_push = true
@@ -11,6 +13,8 @@ resource "aws_ecr_repository" "generator" {
 resource "aws_ecr_repository" "api" {
   name                 = "${var.project_name}-api"
   image_tag_mutability = "MUTABLE"
+  # 단기 검증 스택은 destroy 시 테스트 이미지를 함께 제거해 잔여 과금을 막는다.
+  force_delete = true
 
   image_scanning_configuration {
     scan_on_push = true
@@ -22,6 +26,8 @@ resource "aws_ecr_repository" "api" {
 resource "aws_ecr_repository" "airflow" {
   name                 = "${var.project_name}-airflow"
   image_tag_mutability = "MUTABLE"
+  # 단기 검증 스택은 destroy 시 테스트 이미지를 함께 제거해 잔여 과금을 막는다.
+  force_delete = true
 
   image_scanning_configuration {
     scan_on_push = true

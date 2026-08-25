@@ -71,3 +71,37 @@ variable "athena_bytes_scanned_cutoff_per_query" {
   type        = number
   default     = 10737418240
 }
+
+variable "kds_iterator_age_threshold_milliseconds" {
+  description = "Maximum tolerated Kinesis consumer iterator age before the streaming lag alarm fires"
+  type        = number
+  default     = 120000
+
+  validation {
+    condition     = var.kds_iterator_age_threshold_milliseconds > 0
+    error_message = "kds_iterator_age_threshold_milliseconds must be greater than zero."
+  }
+}
+
+variable "firehose_data_freshness_threshold_seconds" {
+  description = "Maximum tolerated Firehose DeliveryToS3.DataFreshness age before the delivery freshness alarm fires"
+  type        = number
+  default     = 600
+
+  validation {
+    condition     = var.firehose_data_freshness_threshold_seconds > 0
+    error_message = "firehose_data_freshness_threshold_seconds must be greater than zero."
+  }
+}
+
+variable "lambda_reserved_concurrency" {
+  description = "Optional Lambda reserved concurrency. Keep null for short-lived validation accounts with a small account concurrency quota."
+  type        = number
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.lambda_reserved_concurrency == null || var.lambda_reserved_concurrency >= 0
+    error_message = "lambda_reserved_concurrency must be null or a non-negative number."
+  }
+}

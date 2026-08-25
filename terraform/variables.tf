@@ -124,6 +124,40 @@ variable "kds_alert_shard_count" {
   default     = 1
 }
 
+variable "kds_iterator_age_threshold_milliseconds" {
+  description = "Kinesis consumer lag SLO threshold. 120 seconds is the default streaming freshness budget."
+  type        = number
+  default     = 120000
+
+  validation {
+    condition     = var.kds_iterator_age_threshold_milliseconds > 0
+    error_message = "kds_iterator_age_threshold_milliseconds must be greater than zero."
+  }
+}
+
+variable "firehose_data_freshness_threshold_seconds" {
+  description = "Firehose S3 delivery freshness SLO threshold."
+  type        = number
+  default     = 600
+
+  validation {
+    condition     = var.firehose_data_freshness_threshold_seconds > 0
+    error_message = "firehose_data_freshness_threshold_seconds must be greater than zero."
+  }
+}
+
+variable "lambda_reserved_concurrency" {
+  description = "Optional alert Lambda reserved concurrency. Null preserves the account unreserved pool during short-lived validation."
+  type        = number
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.lambda_reserved_concurrency == null || var.lambda_reserved_concurrency >= 0
+    error_message = "lambda_reserved_concurrency must be null or a non-negative number."
+  }
+}
+
 variable "generator_replicas" {
   description = "Generator StatefulSet replicas. 1단계 HPA 잠금이라 10 고정. POD_TOTAL_REPLICAS env 와 동기화 필요 — Downward API reconciler 구현 후 동적 변경."
   type        = number
@@ -195,4 +229,10 @@ variable "athena_bytes_scanned_cutoff_per_query" {
     condition     = var.athena_bytes_scanned_cutoff_per_query >= 1048576
     error_message = "athena_bytes_scanned_cutoff_per_query must be at least 1 MiB."
   }
+}
+
+variable "allow_full_stack_apply" {
+  description = "Explicit cost approval gate for the complete EKS/EC2/NAT/ALB/RDS/SageMaker stack."
+  type        = bool
+  default     = false
 }
