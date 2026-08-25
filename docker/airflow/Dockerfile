@@ -12,7 +12,7 @@
 #     SDK(.fit / endpoint deploy) 사용 (313MB SDK)
 #
 # 빌드:
-#   aws ecr get-login-password --region eu-west-1 \
+#   aws ecr get-login-password --region ap-northeast-2 \
 #     | docker login --username AWS --password-stdin <aws-account-id>.dkr.ecr.<aws-region>.amazonaws.com
 #   docker buildx build --platform linux/amd64 \
 #     -t <aws-account-id>.dkr.ecr.<aws-region>.amazonaws.com/robot-telemetry-airflow:<tag> \

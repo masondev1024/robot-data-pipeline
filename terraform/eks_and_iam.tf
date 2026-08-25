@@ -99,13 +99,23 @@ resource "aws_eks_node_group" "main" {
   capacity_type  = "SPOT"
 
   scaling_config {
-    desired_size = 1
-    max_size     = 10
-    min_size     = 1
+    desired_size = var.node_group_desired_size
+    max_size     = var.node_group_max_size
+    min_size     = var.node_group_min_size
   }
 
   update_config {
     max_unavailable = 1
+  }
+
+  lifecycle {
+    precondition {
+      condition = (
+        var.node_group_min_size <= var.node_group_desired_size &&
+        var.node_group_desired_size <= var.node_group_max_size
+      )
+      error_message = "node group sizes must satisfy min <= desired <= max."
+    }
   }
 
   depends_on = [

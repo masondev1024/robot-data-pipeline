@@ -23,7 +23,7 @@ jobs:
   run-eval:
     runs-on: ubuntu-latest
     env:
-      AWS_REGION: ${{ vars.AWS_REGION || 'eu-west-1' }}
+      AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-2' }}
     steps:
       - uses: actions/checkout@v5
 
@@ -44,8 +44,8 @@ jobs:
 
       - name: Run eval
         env:
-          BEDROCK_MODEL_ID: eu.anthropic.claude-sonnet-4-5-20250929-v1:0
-          JUDGE_MODEL_ID: eu.anthropic.claude-opus-4-1-20250805-v1:0
+          BEDROCK_MODEL_ID: apac.anthropic.claude-3-5-sonnet-20241022-v2:0
+          JUDGE_MODEL_ID: global.anthropic.claude-opus-4-5-20251101-v1:0
           EVAL_REPORT_PATH: ${{ github.workspace }}/eval_report.json
         run: |
           ARGS=""

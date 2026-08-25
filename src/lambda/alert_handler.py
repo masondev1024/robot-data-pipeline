@@ -12,7 +12,7 @@ def _get_portal_url() -> str:
     global _portal_url
     if _portal_url is None:
         try:
-            ssm = boto3.client("ssm", region_name=os.environ.get("AWS_REGION", "eu-west-1"))
+            ssm = boto3.client("ssm", region_name=os.environ.get("AWS_REGION", "ap-northeast-2"))
             _portal_url = ssm.get_parameter(Name="/robot-telemetry/portal-url")["Parameter"]["Value"]
         except Exception as e:
             print(f"SSM get_parameter failed: {str(e)}")

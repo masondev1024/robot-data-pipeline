@@ -8,6 +8,11 @@ module "data_pipeline" {
   kds_main_shard_count  = var.kds_main_shard_count
   kds_alert_shard_count = var.kds_alert_shard_count
 
+  firehose_buffering_size_mb                = var.firehose_buffering_size_mb
+  firehose_buffering_interval_seconds       = var.firehose_buffering_interval_seconds
+  alert_firehose_buffering_size_mb          = var.alert_firehose_buffering_size_mb
+  alert_firehose_buffering_interval_seconds = var.alert_firehose_buffering_interval_seconds
+  athena_bytes_scanned_cutoff_per_query     = var.athena_bytes_scanned_cutoff_per_query
   kds_iterator_age_threshold_milliseconds   = var.kds_iterator_age_threshold_milliseconds
   firehose_data_freshness_threshold_seconds = var.firehose_data_freshness_threshold_seconds
   lambda_reserved_concurrency               = var.lambda_reserved_concurrency

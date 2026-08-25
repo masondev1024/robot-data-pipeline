@@ -11,7 +11,7 @@
 
 set -uo pipefail
 
-REGION="${AWS_DEFAULT_REGION:-eu-west-1}"
+REGION="${AWS_DEFAULT_REGION:-ap-northeast-2}"
 BUCKET="${S3_BUCKET_NAME:-robot-telemetry-data}"
 WORKGROUP="${ATHENA_WORKGROUP:-robot-telemetry-workgroup}"
 DATABASE="${ATHENA_DATABASE:-robot_telemetry_db}"

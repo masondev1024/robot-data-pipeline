@@ -13,7 +13,7 @@ Usage:
     ROBOT_COUNT=10000 \\
     KINESIS_STREAM_NAME=robot-telemetry-stream \\
     SEED_CSV_PATH=data/seed_data_sample.csv \\
-    AWS_DEFAULT_REGION=eu-west-1 \\
+    AWS_DEFAULT_REGION=ap-northeast-2 \\
     python -m src.generator.backfill
 
 기본값:
@@ -32,7 +32,6 @@ from typing import Iterable, Iterator
 
 import boto3
 
-from src.common.aws import AWS_REGION
 from src.generator._record import (
     ISO_Z_FMT,
     hour_load_multiplier,
@@ -185,6 +184,10 @@ def main() -> None:
     robot_count  = int(os.environ.get("ROBOT_COUNT", "10000"))
     stream_name  = os.environ["KINESIS_STREAM_NAME"]
     csv_path     = os.environ.get("SEED_CSV_PATH", "data/seed_data_sample.csv")
+    region       = os.environ.get(
+        "AWS_DEFAULT_REGION",
+        os.environ.get("AWS_REGION", "ap-northeast-2"),
+    )
 
     if days <= 0:
         print(f"BACKFILL_DAYS={days} (≤0) — backfill mode disabled, exiting.")
@@ -199,9 +202,9 @@ def main() -> None:
         f"Backfill plan: {len(profiles):,} robots × {len(timestamps):,} timestamps "
         f"({days}d × {interval_min}min) = {total_expected:,} records"
     )
-    print(f"Target stream: {stream_name} ({AWS_REGION})")
+    print(f"Target stream: {stream_name} ({region})")
 
-    kinesis = boto3.client("kinesis", region_name=AWS_REGION)
+    kinesis = boto3.client("kinesis", region_name=region)
     t0 = time.monotonic()
     pushed = push_to_kinesis(
         backfill_records(profiles, timestamps),

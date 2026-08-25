@@ -173,7 +173,7 @@ env:
   - name: ATHENA_OUTPUT_LOCATION
     value: "s3://__S3_BUCKET_NAME__/project-athena-results/"
   - name: BEDROCK_MODEL_ID
-    value: "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
+    value: "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
   - name: DQ_SNS_TOPIC_ARN
     value: "arn:aws:sns:__AWS_REGION__:__AWS_ACCOUNT_ID__:robot-anomaly-alerts"
   - name: SAGEMAKER_ROLE_ARN

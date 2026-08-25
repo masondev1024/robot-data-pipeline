@@ -5,13 +5,14 @@ from copy import deepcopy
 from unittest.mock import MagicMock
 
 import pytest
+from botocore.exceptions import ClientError
 from fastapi.testclient import TestClient
 
 from conftest import TEST_AUTH_HEADERS
 import src.api.main as api
 
 
-MODEL_ID = "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
+MODEL_ID = "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
 
 
 def _client() -> TestClient:
@@ -143,6 +144,33 @@ def test_converse_executes_tool_and_returns_second_turn(monkeypatch):
             },
         ],
     }
+
+
+def test_chat_retries_with_fallback_profile_when_primary_is_unavailable(monkeypatch):
+    monkeypatch.setenv("BEDROCK_FALLBACK_MODEL_ID", "apac.amazon.nova-lite-v1:0")
+    client = MagicMock()
+    client.converse.side_effect = [
+        ClientError(
+            {
+                "Error": {
+                    "Code": "ResourceNotFoundException",
+                    "Message": "profile unavailable",
+                }
+            },
+            "Converse",
+        ),
+        _final_response("fallback 응답"),
+    ]
+    monkeypatch.setattr(api, "_bedrock_runtime", client)
+
+    response = _client().post("/api/chat", json={"question": "문제가 있는 로봇은?"})
+
+    assert response.status_code == 200
+    assert response.json()["answer"] == "fallback 응답"
+    assert client.converse.call_args_list[0].kwargs["modelId"] == MODEL_ID
+    fallback_kwargs = client.converse.call_args_list[1].kwargs
+    assert fallback_kwargs["modelId"] == "apac.amazon.nova-lite-v1:0"
+    assert fallback_kwargs["system"] == [{"text": api.ROBOT_ANALYST_SYSTEM_PROMPT}]
 
 
 def test_chat_returns_503_when_gold_cache_is_empty(monkeypatch):

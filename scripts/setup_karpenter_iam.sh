@@ -16,10 +16,23 @@ set -euo pipefail
 # ---------- 환경변수 (override 가능) ----------
 PROJECT="${PROJECT:-robot-telemetry}"
 CLUSTER="${CLUSTER:-robot-telemetry-cluster}"
-REGION="${REGION:-eu-west-1}"
+REGION="${REGION:-${AWS_REGION:-ap-northeast-2}}"
 ACCOUNT_ID="${ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
-OIDC_ID="${OIDC_ID:-B28CA7C8043A6481B1BB48F7E4FCD121}"
-OIDC_ISSUER="oidc.eks.${REGION}.amazonaws.com/id/${OIDC_ID}"
+OIDC_ID="${OIDC_ID:-}"
+if [[ -n "$OIDC_ID" ]]; then
+  OIDC_ISSUER="oidc.eks.${REGION}.amazonaws.com/id/${OIDC_ID}"
+else
+  OIDC_URL="$(aws eks describe-cluster \
+    --name "$CLUSTER" \
+    --region "$REGION" \
+    --query 'cluster.identity.oidc.issuer' \
+    --output text)"
+  if [[ -z "$OIDC_URL" || "$OIDC_URL" == "None" ]]; then
+    echo "unable to resolve the OIDC issuer for EKS cluster ${CLUSTER}" >&2
+    exit 1
+  fi
+  OIDC_ISSUER="${OIDC_URL#https://}"
+fi
 
 NODE_ROLE="${PROJECT}-karpenter-node-role"
 CONTROLLER_ROLE="${PROJECT}-karpenter-controller-role"

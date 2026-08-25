@@ -8,7 +8,9 @@ CREATE EXTERNAL TABLE IF NOT EXISTS robot_telemetry_db.bronze_robot_telemetry (
     `timestamp`   STRING,
     failure_type  STRING
 )
-PARTITIONED BY (year INT, month INT, day INT, hour INT)
+-- Athena receives Firehose time-prefix partition values as strings. Keep this
+-- contract aligned with Terraform/Glue and the Airflow predicates ('2026', ...).
+PARTITIONED BY (year STRING, month STRING, day STRING, hour STRING)
 STORED AS PARQUET
 LOCATION 's3://__S3_BUCKET_NAME__/bronze/'
 TBLPROPERTIES (

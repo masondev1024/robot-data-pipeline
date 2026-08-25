@@ -21,9 +21,13 @@ resource "aws_lambda_function" "alert" {
   role             = aws_iam_role.lambda_alert_role.arn
   timeout          = 10
 
-  # 검증 계정은 Lambda account concurrency가 10으로 제한될 수 있으므로
-  # 예약 동시성을 기본으로 잡지 않는다. null은 unreserved pool을 보존하며,
-  # 운영 계정에서 downstream 보호가 필요할 때만 명시적인 값을 전달한다.
+  # 예약 동시성은 계정별 Lambda concurrency quota가 10인 신규 계정에서
+  # PutFunctionConcurrency 자체가 거부될 수 있다(계정 최소 unreserved=10).
+  # KDS event-source mapping의 batch/backoff가 소비율을 제한하므로, 별도
+  # 예약값 대신 unreserved concurrency를 사용해 배포 가능성과 계정 portability를
+  # 우선한다. 필요 시 quota 증액 후 환경별 Terraform 변수로 예약값을 추가한다.
+  # null은 unreserved pool을 보존하며, 운영 계정에서 downstream 보호가
+  # 필요할 때만 명시적인 값을 전달한다.
   reserved_concurrent_executions = var.lambda_reserved_concurrency
 
   environment {

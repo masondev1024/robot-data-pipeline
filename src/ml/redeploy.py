@@ -22,14 +22,15 @@ from pathlib import Path
 
 import boto3
 
-REGION = os.environ.get("AWS_REGION", "eu-west-1")
+REGION = os.environ.get("AWS_REGION", "ap-northeast-2")
 S3_BUCKET = os.environ.get("S3_BUCKET_NAME", "robot-telemetry-data")
 ENDPOINT_NAME = "robot-failure-predictor"
 
-# SageMaker XGBoost framework container (region-specific registry).
-# eu-west-1 framework registry = 141502667606 (sagemaker.image_uris.retrieve 검증).
-# 버킷이 eu-west-1 이라 cross-region 시 CreateModel 이 ModelDataUrl access 거부.
-XGBOOST_IMAGE = f"141502667606.dkr.ecr.{REGION}.amazonaws.com/sagemaker-xgboost:1.7-1"
+# SageMaker XGBoost framework container is region-specific. The image URI must
+# be supplied by the deployment environment because the ECR registry account
+# differs by region; falling back to an EU registry would create a cross-region
+# model/data mismatch in the Seoul deployment.
+XGBOOST_IMAGE = os.environ.get("SAGEMAKER_XGBOOST_IMAGE", "")
 
 # 5/7 학습본 (가장 최근 model.tar.gz). 신규 학습 시 weekly_ml_retrain 이 자동 갱신.
 DEFAULT_MODEL_DATA_URI = (
@@ -79,6 +80,11 @@ def _cleanup(sm, name: str):
 
 
 def main():
+    if not XGBOOST_IMAGE:
+        raise RuntimeError(
+            "SAGEMAKER_XGBOOST_IMAGE must be set to the regional SageMaker "
+            "XGBoost image before redeploying an endpoint"
+        )
     role_arn = os.environ["SAGEMAKER_ROLE_ARN"]
     model_data = os.environ.get("SAGEMAKER_MODEL_DATA_URI", DEFAULT_MODEL_DATA_URI)
     source_uri = _package_and_upload_source()
@@ -112,7 +118,7 @@ def main():
         }],
     )
     sm.create_endpoint(EndpointName=ENDPOINT_NAME, EndpointConfigName=ENDPOINT_NAME)
-    print(f"[redeploy] Endpoint 생성 요청 — InService 까지 ~5분")
+    print("[redeploy] Endpoint 생성 요청 — InService 까지 ~5분")
 
     for _ in range(80):  # 80 × 10s = 13min 안전 마진
         state = sm.describe_endpoint(EndpointName=ENDPOINT_NAME)["EndpointStatus"]
@@ -124,7 +130,7 @@ def main():
             reason = sm.describe_endpoint(EndpointName=ENDPOINT_NAME).get("FailureReason", "?")
             raise RuntimeError(f"Endpoint 생성 실패: {reason}")
         time.sleep(10)
-    raise TimeoutError(f"Endpoint InService 대기 timeout (13min)")
+    raise TimeoutError("Endpoint InService 대기 timeout (13min)")
 
 
 if __name__ == "__main__":

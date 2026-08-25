@@ -1,6 +1,6 @@
 """LLM-as-judge for chat eval (ADR-011).
 
-Claude Opus 4 가 candidate 응답을 3개 axis(relevance/accuracy/grounding) 로 1-5점 채점.
+Claude Opus 4.5 inference profile이 candidate 응답을 3개 axis(relevance/accuracy/grounding) 로 1-5점 채점.
 JSON 응답 강제로 파싱 안정성 확보.
 """
 import json
@@ -11,7 +11,7 @@ from src.common.aws import get_client
 
 
 JUDGE_MODEL_ID = os.environ.get(
-    "JUDGE_MODEL_ID", "eu.anthropic.claude-opus-4-1-20250805-v1:0"
+    "JUDGE_MODEL_ID", "global.anthropic.claude-opus-4-5-20251101-v1:0"
 )
 
 

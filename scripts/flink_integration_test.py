@@ -14,7 +14,7 @@ Notebook을 재현하는 배포 코드가 아니라, main KDS에 결정론적 �
 사전 조건:
   - Studio Notebook anomaly paragraph가 RUNNING 상태.
   - Notebook이 main KDS에서 alert KDS로 sink를 구성한 상태.
-  - AWS 자격증명 (기본 eu-west-1)과 Kinesis read/write 권한.
+  - AWS 자격증명 (ap-northeast-2)과 Kinesis read/write 권한.
 
 사용:
   python3 scripts/flink_integration_test.py
@@ -35,7 +35,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from src.streaming.anomaly_contract import DEFAULT_THRESHOLDS  # noqa: E402
 
 
-REGION = os.environ.get("AWS_REGION", "eu-west-1")
+REGION = os.environ.get("AWS_REGION", "ap-northeast-2")
 MAIN_STREAM = os.environ.get("KINESIS_STREAM_NAME", "robot-telemetry-stream")
 ALERT_STREAM = os.environ.get("KINESIS_ALERT_STREAM_NAME", "robot-anomaly-alert-stream")
 

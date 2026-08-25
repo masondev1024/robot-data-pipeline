@@ -31,15 +31,45 @@ variable "environment" {
 # Grafana admin 은 K8s secret `grafana-admin` 에서 직접 read.
 
 variable "kds_main_shard_count" {
-  description = "Telemetry KDS shard count. root variables.tf 가 100 robots × 2s tick 학습 부하 기준 default 1 를 전달 (1 shard 한도 1000 RPS 의 ~5% 사용). 2+ 시 Firehose flush stagger 회귀 위험."
+  description = "Telemetry KDS shard count. Root default is 4 for the production-like 1000-robot baseline; override only after measuring throughput and throttling."
   type        = number
   default     = 1
 }
 
 variable "kds_alert_shard_count" {
-  description = "Anomaly alert KDS shard count. 운영 기본 2, 시연 시 1로 축소"
+  description = "Anomaly alert KDS shard count. Root default is 1 because alert volume is sparse; increase only after measuring throttling."
   type        = number
   default     = 1
+}
+
+variable "firehose_buffering_size_mb" {
+  description = "Main telemetry Firehose buffer size in MB"
+  type        = number
+  default     = 128
+}
+
+variable "firehose_buffering_interval_seconds" {
+  description = "Main telemetry Firehose buffering interval in seconds"
+  type        = number
+  default     = 300
+}
+
+variable "alert_firehose_buffering_size_mb" {
+  description = "Alert archive Firehose buffer size in MB"
+  type        = number
+  default     = 128
+}
+
+variable "alert_firehose_buffering_interval_seconds" {
+  description = "Alert archive Firehose buffering interval in seconds"
+  type        = number
+  default     = 300
+}
+
+variable "athena_bytes_scanned_cutoff_per_query" {
+  description = "Athena per-query bytes scanned cutoff in bytes"
+  type        = number
+  default     = 10737418240
 }
 
 variable "kds_iterator_age_threshold_milliseconds" {

@@ -73,7 +73,7 @@
           "connectionArgs": {
             "catalog": "AwsDataCatalog",
             "database": "robot_telemetry_db",
-            "region": "eu-west-1",
+            "region": "ap-northeast-2",
             "resultReuseEnabled": false,
             "resultReuseMaxAgeInMinutes": 60
           },
@@ -149,7 +149,7 @@
           "connectionArgs": {
             "catalog": "AwsDataCatalog",
             "database": "robot_telemetry_db",
-            "region": "eu-west-1",
+            "region": "ap-northeast-2",
             "resultReuseEnabled": false,
             "resultReuseMaxAgeInMinutes": 60
           },
@@ -229,7 +229,7 @@
           "connectionArgs": {
             "catalog": "AwsDataCatalog",
             "database": "robot_telemetry_db",
-            "region": "eu-west-1",
+            "region": "ap-northeast-2",
             "resultReuseEnabled": false,
             "resultReuseMaxAgeInMinutes": 60
           },
@@ -311,7 +311,7 @@
           "connectionArgs": {
             "catalog": "AwsDataCatalog",
             "database": "robot_telemetry_db",
-            "region": "eu-west-1",
+            "region": "ap-northeast-2",
             "resultReuseEnabled": false,
             "resultReuseMaxAgeInMinutes": 60
           },
@@ -379,7 +379,7 @@
           "connectionArgs": {
             "catalog": "AwsDataCatalog",
             "database": "robot_telemetry_db",
-            "region": "eu-west-1",
+            "region": "ap-northeast-2",
             "resultReuseEnabled": false,
             "resultReuseMaxAgeInMinutes": 60
           },
@@ -446,7 +446,7 @@
           "connectionArgs": {
             "catalog": "AwsDataCatalog",
             "database": "robot_telemetry_db",
-            "region": "eu-west-1",
+            "region": "ap-northeast-2",
             "resultReuseEnabled": false,
             "resultReuseMaxAgeInMinutes": 60
           },
@@ -494,7 +494,7 @@
       "pluginVersion": "11.3.0",
       "targets": [
         {
-          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
+          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "ap-northeast-2", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
           "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
           "format": 1,
           "rawSQL": "-- 이번 주 dominant_failure_type 별 robot 건수 — gold daily 집계 7일\n-- 부품/유지보수 예산 배분 인사이트: 어떤 고장이 우세한가\nSELECT dominant_failure_type AS metric, COUNT(*) AS value\nFROM robot_telemetry_db.gold_robot_daily_stats\nWHERE dt >= CAST(CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE) - INTERVAL '7' DAY AS DATE)\n  AND dt <  CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS DATE)\n  AND dominant_failure_type IS NOT NULL AND dominant_failure_type <> 'NONE'\nGROUP BY dominant_failure_type\nORDER BY value DESC",
@@ -541,7 +541,7 @@
       "pluginVersion": "11.3.0",
       "targets": [
         {
-          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "eu-west-1", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
+          "connectionArgs": { "catalog": "AwsDataCatalog", "database": "robot_telemetry_db", "region": "ap-northeast-2", "resultReuseEnabled": false, "resultReuseMaxAgeInMinutes": 60 },
           "datasource": { "type": "grafana-athena-datasource", "uid": "athena" },
           "format": 1,
           "rawSQL": "-- 24시간 시간대별 alert 건수 — silver_alerts hour 파티션 + 24h sliding\n-- 운영 시간대별 부하 패턴 인사이트: 언제 issue 가 몰리는가\nSELECT DATE_TRUNC('hour', date_parse(window_end, '%Y-%m-%d %H:%i:%s')) AS time, COUNT(*) AS alerts\nFROM robot_telemetry_db.silver_alerts\nWHERE (\n   (year = date_format(current_timestamp, '%Y') AND month = date_format(current_timestamp, '%m') AND day = date_format(current_timestamp, '%d'))\n OR (year = date_format(current_timestamp - INTERVAL '1' DAY, '%Y') AND month = date_format(current_timestamp - INTERVAL '1' DAY, '%m') AND day = date_format(current_timestamp - INTERVAL '1' DAY, '%d'))\n)\n  AND date_parse(window_end, '%Y-%m-%d %H:%i:%s') > current_timestamp - INTERVAL '24' HOUR\nGROUP BY DATE_TRUNC('hour', date_parse(window_end, '%Y-%m-%d %H:%i:%s'))\nORDER BY time ASC",
@@ -598,7 +598,7 @@
           "connectionArgs": {
             "catalog": "AwsDataCatalog",
             "database": "robot_telemetry_db",
-            "region": "eu-west-1",
+            "region": "ap-northeast-2",
             "resultReuseEnabled": false,
             "resultReuseMaxAgeInMinutes": 60
           },
@@ -861,7 +861,7 @@
           "connectionArgs": {
             "catalog": "AwsDataCatalog",
             "database": "robot_telemetry_db",
-            "region": "eu-west-1",
+            "region": "ap-northeast-2",
             "resultReuseEnabled": false,
             "resultReuseMaxAgeInMinutes": 60
           },
@@ -1010,7 +1010,7 @@
           "connectionArgs": {
             "catalog": "AwsDataCatalog",
             "database": "robot_telemetry_db",
-            "region": "eu-west-1",
+            "region": "ap-northeast-2",
             "resultReuseEnabled": false,
             "resultReuseMaxAgeInMinutes": 60
           },
@@ -1161,7 +1161,7 @@
           "connectionArgs": {
             "catalog": "AwsDataCatalog",
             "database": "robot_telemetry_db",
-            "region": "eu-west-1",
+            "region": "ap-northeast-2",
             "resultReuseEnabled": false,
             "resultReuseMaxAgeInMinutes": 60
           },
@@ -1300,7 +1300,7 @@
           "connectionArgs": {
             "catalog": "AwsDataCatalog",
             "database": "robot_telemetry_db",
-            "region": "eu-west-1",
+            "region": "ap-northeast-2",
             "resultReuseEnabled": false,
             "resultReuseMaxAgeInMinutes": 60
           },
@@ -1382,7 +1382,7 @@
           "connectionArgs": {
             "catalog": "AwsDataCatalog",
             "database": "robot_telemetry_db",
-            "region": "eu-west-1",
+            "region": "ap-northeast-2",
             "resultReuseEnabled": false,
             "resultReuseMaxAgeInMinutes": 60
           },
@@ -1522,7 +1522,7 @@
           "connectionArgs": {
             "catalog": "AwsDataCatalog",
             "database": "robot_telemetry_db",
-            "region": "eu-west-1",
+            "region": "ap-northeast-2",
             "resultReuseEnabled": false,
             "resultReuseMaxAgeInMinutes": 60
           },
@@ -1625,7 +1625,7 @@
           "connectionArgs": {
             "catalog": "AwsDataCatalog",
             "database": "robot_telemetry_db",
-            "region": "eu-west-1",
+            "region": "ap-northeast-2",
             "resultReuseEnabled": false,
             "resultReuseMaxAgeInMinutes": 60
           },
@@ -1731,7 +1731,7 @@
           "connectionArgs": {
             "catalog": "AwsDataCatalog",
             "database": "robot_telemetry_db",
-            "region": "eu-west-1",
+            "region": "ap-northeast-2",
             "resultReuseEnabled": false,
             "resultReuseMaxAgeInMinutes": 60
           },

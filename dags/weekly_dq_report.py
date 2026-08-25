@@ -5,7 +5,7 @@ robot_daily_etl 의 quality_check 는 단일 게이트(pass/fail)일 뿐 추세�
 - 일별 row count
 - null 비율
 - failure_type 분포
-를 집계하여 Claude 3.5 Sonnet 으로 markdown 요약 → S3 저장 → Slack 발행 → 회귀 시 SNS 알림.
+를 집계하여 Claude 3.5 Sonnet으로 markdown 요약 → S3 저장 → Slack 발행 → 회귀 시 SNS 알림.
 
 XCom 회피: 각 query 결과는 S3 staging path 에 JSON 으로 떨어지고 다음 task 가 path 만 받음.
 멱등성: staging prefix 는 매 실행마다 사전 삭제 후 write.
@@ -19,7 +19,7 @@ import boto3
 import urllib.request
 from airflow import DAG
 from airflow.exceptions import AirflowException, AirflowSkipException
-from airflow.operators.python import BranchPythonOperator, PythonOperator
+from airflow.operators.python import PythonOperator
 
 from src.common.athena import fetch_rows, start_query, wait_for_query
 from src.common.bedrock import invoke_claude
@@ -28,7 +28,7 @@ S3_BUCKET = os.environ.get("S3_BUCKET_NAME", "robot-telemetry-data")
 ATHENA_DATABASE = os.environ.get("ATHENA_DATABASE", "robot_telemetry_db")
 ATHENA_WORKGROUP = os.environ.get("ATHENA_WORKGROUP", "robot-telemetry-workgroup")
 ATHENA_OUTPUT = os.environ.get("ATHENA_OUTPUT_LOCATION", f"s3://{S3_BUCKET}/project-athena-results/")
-AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", "eu-west-1")
+AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", "ap-northeast-2")
 
 REPORT_PREFIX = "reports/weekly-dq"
 STAGING_PREFIX = "reports/weekly-dq/_staging"  # task 간 path 전달 (멱등 사전 삭제)
@@ -294,7 +294,7 @@ def _generate_report_bedrock(**ctx):
 
     model_id = os.environ.get(
         "BEDROCK_MODEL_ID",
-        "eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        "apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
     )
     report_md = invoke_claude(
         prompt,

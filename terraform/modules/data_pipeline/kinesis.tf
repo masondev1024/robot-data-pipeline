@@ -32,8 +32,8 @@ resource "aws_kinesis_firehose_delivery_stream" "main" {
     error_output_prefix = "bronze-dlq/!{firehose:error-output-type}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
 
     # 학습 환경 비용 최적화 — Bronze 신선도 5분/15분 trade-off (2026-05-04 drift sync)
-    buffering_size     = 128 # MB (Parquet conversion, 비용 최적화)
-    buffering_interval = 300 # 5분 — Firehose 호출 빈도 ↓, S3 PUT 비용 절감
+    buffering_size     = var.firehose_buffering_size_mb
+    buffering_interval = var.firehose_buffering_interval_seconds
     compression_format = "UNCOMPRESSED"
 
     # 시연용: timestamp 네임스페이스만 사용하므로 dynamic partitioning 비활성화.
@@ -93,8 +93,8 @@ resource "aws_kinesis_firehose_delivery_stream" "alert_archive" {
 
     # 학습 환경 비용 최적화 — Bronze 신선도 5분/15분 trade-off (2026-05-04 drift sync)
     # alert 빈도 낮음 → 큰 buffer 로 S3 PUT 비용 ↓ (Parquet 압축 효율 ↑)
-    buffering_size     = 128 # MB (Parquet conversion, 비용 최적화)
-    buffering_interval = 300 # 5분 — main firehose 와 동일 (drift sync)
+    buffering_size     = var.alert_firehose_buffering_size_mb
+    buffering_interval = var.alert_firehose_buffering_interval_seconds
     compression_format = "UNCOMPRESSED"
 
     # bronze Firehose 와 동일: timestamp 네임스페이스만 사용

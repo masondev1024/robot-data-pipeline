@@ -34,8 +34,8 @@ _AGENT_SCHEMA = {
     "production": ProductionAgentOutput,
 }
 
-HAIKU_MODEL = "anthropic.claude-haiku-4-5-20251001-v1:0"
-SONNET_MODEL = "anthropic.claude-sonnet-4-6-20250513-v1:0"
+HAIKU_MODEL = "apac.anthropic.claude-3-haiku-20240307-v1:0"
+SONNET_MODEL = "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
 
 
 def _load_entries() -> list[dict]:

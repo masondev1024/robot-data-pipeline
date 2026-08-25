@@ -54,7 +54,7 @@ class SafetyAgent(BaseAgent):
     def model_id(self) -> str:
         return os.environ.get(
             "PRISM_HAIKU_MODEL",
-            "anthropic.claude-haiku-4-5-20251001-v1:0",
+            "apac.anthropic.claude-3-haiku-20240307-v1:0",
         )
 
     @property

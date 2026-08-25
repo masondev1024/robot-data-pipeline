@@ -29,13 +29,13 @@ from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.operators.python import BranchPythonOperator, PythonOperator
 from airflow.sensors.external_task import ExternalTaskSensor
 
-from src.common.athena import fetch_rows, start_query, wait_for_query
+from src.common.athena import start_query, wait_for_query
 
 S3_BUCKET = os.environ.get("S3_BUCKET_NAME", "robot-telemetry-data")
 ATHENA_DATABASE = os.environ.get("ATHENA_DATABASE", "robot_telemetry_db")
 ATHENA_WORKGROUP = os.environ.get("ATHENA_WORKGROUP", "robot-telemetry-workgroup")
 ATHENA_OUTPUT = os.environ.get("ATHENA_OUTPUT_LOCATION", f"s3://{S3_BUCKET}/project-athena-results/")
-AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", "eu-west-1")
+AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", "ap-northeast-2")
 
 MODEL_PREFIX = "ml-models/robot-failure-predictor"
 ENDPOINT_NAME = "robot-failure-predictor"

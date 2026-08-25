@@ -30,8 +30,8 @@ from src.orchestration.llm_cache import cache_key  # noqa: E402
 OUTPUT_PATH = _ROOT / "assets" / "cache_replay.jsonl"
 
 # ── 모델 ID ─────────────────────────────────────────────────────────────────────
-HAIKU_MODEL = "anthropic.claude-haiku-4-5-20251001-v1:0"
-SONNET_MODEL = "anthropic.claude-sonnet-4-6-20250513-v1:0"
+HAIKU_MODEL = "apac.anthropic.claude-3-haiku-20240307-v1:0"
+SONNET_MODEL = "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
 
 # ── 시나리오 순서 (test_cache_replay.py 와 정합) ──────────────────────────────────
 SCENARIO_ORDER = ["normal", "fault", "recover"]
