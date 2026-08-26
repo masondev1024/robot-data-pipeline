@@ -29,3 +29,8 @@ terraform/lambda_*.zip
 # Seed 데이터 — 전체 Kaggle 데이터셋은 커밋 금지 (sample만 허용)
 data/seed_data.csv
 data/*.zip
+
+# 로컬 AI 도구와 작업 지침
+.codex/
+AGENTS.md
+CLAUDE.md
