@@ -87,6 +87,8 @@ terraform/tfplan
 비용절감플랜/
 # 로컬 AI 도구 / 세션 산출물 (공개 X)
 .claude/
+.codex/
+AGENTS.md
 CLAUDE.md
 # 설계/운영 문서 — 로컬 보존, GitHub에는 검토된 public 문서만 노출
 docs/*
