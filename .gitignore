@@ -30,6 +30,11 @@ terraform/lambda_*.zip
 data/seed_data.csv
 data/*.zip
 
+# 로컬 AI 도구와 작업 지침
+.codex/
+AGENTS.md
+CLAUDE.md
+
 # 로컬 학습 문서 — 원격 저장소에 올리지 않음
 ARCHITECTURE_OVERVIEW.md
 DATA_FLOW_DETAILED.md
