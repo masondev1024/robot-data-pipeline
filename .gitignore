@@ -64,6 +64,9 @@ prism/*.zip
 **/tfplan
 **/*.tfplan
 
+# Keep the disposable media lab provider lock for reproducible reruns.
+!terraform/media_lab/.terraform.lock.hcl
+
 # 본선 자료 PDF — git 추적 X
 *.pdf
 PRISM_마스터가이드.pdf
