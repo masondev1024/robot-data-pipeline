@@ -77,7 +77,26 @@ Airflow 2.10.5 DAG contract는 별도 CI job에서 검증하고, AWS 의존 E2E�
 
 실제 CDN 비용 없이 멀티리전·멀티CDN 장애 전환 정책을 연습하려면 [`docs/public/EDGE-FAILOVER-LAB.md`](docs/public/EDGE-FAILOVER-LAB.md)의 결정론적 lab을 실행합니다. 주 리전 장애 후 2초 failover RTO와 `cdn-a → cdn-b` 전환을 재현하지만, 실제 라이브 미디어/CDN 운영 증거로 확대하지 않습니다.
 
-2026-08-24에는 별도의 short-lived 전체 EKS profile도 실행해 100 records/s 수집 구간, Firehose freshness, Bronze Parquet 적재와 API/Grafana readiness를 실제 AWS에서 확인했습니다. Managed Flink application은 계정에 존재하지 않아 이상치 alert 발화와 Slack 전달은 미검증으로 남겼습니다. 수치와 한계는 [`docs/public/RELIABILITY.md`](docs/public/RELIABILITY.md)와 [`docs/public/FLINK-ANOMALY-CONTRACT.md`](docs/public/FLINK-ANOMALY-CONTRACT.md)에 분리해 기록했습니다.
+실제 HLS·CloudFront·Cloudflare 경로까지 짧게 검증하려면 [`docs/public/MEDIA-LAB.md`](docs/public/MEDIA-LAB.md)를 사용합니다. 두 리전 private S3와 CloudFront OAC, Cloudflare Worker primary/fallback 경로를 만들고 HLS playlist·segment 및 controlled failover를 측정한 뒤 Worker와 AWS 리소스를 모두 teardown합니다.
+
+## 데이터 운영 실습 확장
+
+로봇 텔레메트리 운영에서 자주 필요한 원천 검증·재처리·감사 흐름도 별도 실습
+프로필로 분리했습니다. S3 Bronze Parquet를 AWS Glue Spark에서 데이터 계약으로
+검증하고, 정상 행만 private RDS staging을 거쳐 target으로 승격합니다. 계약 위반
+행은 S3 reject와 감사 장부에 남기며, `event_id`와 DB 제약으로 재실행 중복을
+막습니다. 실제 서울 리전 실행에서 정상 4건은 4건으로 승격됐고 같은 batch replay
+후에도 target 4건을 유지했으며, 잘못된 2건은 1건 reject·0건 승격으로 끝났습니다.
+
+- 이관 설계와 재현 절차: [`docs/public/S3-GLUE-RDS-LAB.md`](docs/public/S3-GLUE-RDS-LAB.md)
+- 실제 실행 증적: [`docs/public/evidence/2026-09-03-migration-success.json`](docs/public/evidence/2026-09-03-migration-success.json), [`docs/public/evidence/2026-09-03-migration-reject.json`](docs/public/evidence/2026-09-03-migration-reject.json)
+- 작업 판단 기록: [`docs/public/data-engineering-log.md`](docs/public/data-engineering-log.md)
+- 트러블슈팅: [`docs/public/troubleshooting.md`](docs/public/troubleshooting.md)
+- 직접 실습 순서: [`docs/public/lessonrun.md`](docs/public/lessonrun.md)
+- 날씨 예보 품질·공간 제품: [`docs/architecture/forecast-quality-spatial-product.md`](docs/architecture/forecast-quality-spatial-product.md)
+- Kafka 이벤트의 날짜별 Parquet 저장: Kafka 저장소의 [`docs/LAKEHOUSE-PARQUET-LAB.md`](https://github.com/masondev1024/KafKa/blob/main/docs/LAKEHOUSE-PARQUET-LAB.md)
+
+2026-08-24에는 별도의 short-lived 전체 EKS profile도 실행해 100 records/s 수집 구간, Firehose freshness, Bronze Parquet 적재와 API/Grafana readiness를 실제 AWS에서 확인했습니다. 이번 실행 직전 계정에 Managed Flink application이 없었기 때문에 anomaly alert 발화와 Slack 전달은 재실행하지 않았으며, 과거 실행에서 확보한 증거와 이번 미디어 Lab 범위는 분리해 기록했습니다. 수치와 한계는 [`docs/public/RELIABILITY.md`](docs/public/RELIABILITY.md)와 [`docs/public/FLINK-ANOMALY-CONTRACT.md`](docs/public/FLINK-ANOMALY-CONTRACT.md)에 분리해 기록했습니다.
 
 루트 `terraform/` 전체 스택은 비용 실수를 막기 위해 `allow_full_stack_apply=false`가 기본입니다. EKS·EC2·NAT·ALB·RDS·SageMaker를 검증해야 할 때만 비용 승인 후 `-var='allow_full_stack_apply=true'`를 명시하고, 일반 스트리밍 검증에는 validation 프로필을 사용합니다. 상세 선택 근거와 비용 비교는 [`docs/public/COST-ESTIMATE.md`](docs/public/COST-ESTIMATE.md)와 [`docs/public/ARCHITECTURE.md`](docs/public/ARCHITECTURE.md)에 기록했습니다.
 

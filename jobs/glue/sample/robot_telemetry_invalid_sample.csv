@@ -1,0 +1,3 @@
+robot_id,pos_x,pos_y,battery_level,current_load,motor_temp,timestamp,failure_type
+ROBOT-00005,12.9,33.6,82.0,40.0,72.1,2026-09-03T00:01:00Z,NONE
+ROBOT-00006,13.0,33.7,120.0,40.0,72.1,2026-09-03T00:01:01Z,NONE

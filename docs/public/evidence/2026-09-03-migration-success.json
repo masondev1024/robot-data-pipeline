@@ -1,0 +1,55 @@
+{
+  "experiment": "s3-to-glue-to-private-rds",
+  "region": "ap-northeast-2",
+  "batch_id": "robot-demo-20260903",
+  "attempt_id": "attempt-02",
+  "execution": {
+    "bootstrap": {
+      "run_id": "jr_de135f38f0f4e844c4f7a2760df8a7e1ab7b7943dbffa7a817f9c6ef9ede0f66",
+      "status": "SUCCEEDED",
+      "started_at": "2026-09-03T10:08:31.633+09:00",
+      "completed_at": "2026-09-03T10:10:02.127+09:00"
+    },
+    "extract": {
+      "run_id": "jr_330d567c5d4497a53d8dd7aeab5e46321193f5896f004cb7949c78c990f47a86",
+      "status": "SUCCEEDED",
+      "started_at": "2026-09-03T10:12:28.298+09:00",
+      "completed_at": "2026-09-03T10:14:48.218+09:00"
+    },
+    "promote": {
+      "run_id": "jr_5ba7f06bec8f0f81b07aebf7a75a0b2f63bed2c549c63c6b0bb02964606d4adb",
+      "status": "SUCCEEDED",
+      "started_at": "2026-09-03T10:15:08.713+09:00",
+      "completed_at": "2026-09-03T10:16:06.155+09:00"
+    },
+    "promote_replay": {
+      "run_id": "jr_8de7749dadb9ee254940150d0e6fea8c6ac9e7ce168913e428edacb4949ed090",
+      "status": "SUCCEEDED",
+      "started_at": "2026-09-03T10:16:44.443+09:00",
+      "completed_at": "2026-09-03T10:17:48.849+09:00"
+    },
+    "verify": {
+      "run_id": "jr_a074738e8ef27d0199e28f818beb26a3e5e3387c3c93c308c720d6e105d9bbc9",
+      "status": "SUCCEEDED",
+      "started_at": "2026-09-03T10:27:41.319+09:00",
+      "completed_at": "2026-09-03T10:30:06.270+09:00"
+    }
+  },
+  "counts": {
+    "source_rows": 4,
+    "accepted_rows": 4,
+    "rejected_rows": 0,
+    "duplicate_rows": 0,
+    "staged_rows": 4,
+    "merged_rows": 4,
+    "target_rows_for_batch": 4,
+    "target_total_rows": 4,
+    "target_distinct_event_ids": 4,
+    "audit_status": "PROMOTED"
+  },
+  "claims": {
+    "replay_kept_target_count": true,
+    "secrets_in_evidence": false,
+    "exactly_once_claimed": false
+  }
+}
