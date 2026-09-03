@@ -161,3 +161,35 @@ Firehose CloudWatch 지표는 같은 시점 query에서 `NO_DATA`였기 때문�
 Raffle 전체 profile은 Terraform 기준 72개 리소스를 `0 added, 0 changed, 72 destroyed`로 정리했다. Robot 전체 profile은 106개 destroy 계획을 실행했고, 이미지가 남은 ECR repository만 별도 강제 삭제한 뒤 최종 Terraform state를 0개 리소스로 확인했다. ECR repository에는 앞으로 `force_delete = true`를 적용해 이미지가 있는 단기 검증 스택도 한 번의 destroy로 닫히도록 했다.
 
 최종 AWS read-only 감사에서 EKS, RDS, ALB, Kinesis, Firehose, ECR, Secrets Manager, S3, 전용 VPC/NAT/EIP가 모두 absent였다. StatefulSet이 남긴 1GiB 고아 EBS volume 1개는 attachment와 테스트 cluster tag를 확인한 뒤 삭제했고 EC2 control plane 재조회에서 absent를 확인했다. Tagging API는 삭제 ARN을 잠시 캐시했으므로 비용 잔여 판정은 직접 서비스 조회를 기준으로 했다. 이 결과는 리소스가 계속 실행 중이라는 가정의 비용을 제거하지만, 당일 Cost Explorer 반영 전이므로 최종 청구액과 동일하다고 보지 않는다.
+
+### 2026-08-24 실제 HLS Media Lab 비용 선택
+
+| 구성 | 선택 | 비용 통제 |
+|---|---|---|
+| Origin | private S3 2개, `eu-west-1` + `us-east-1` | EC2/NAT/VPC 없이 object delivery만 사용 |
+| CDN | CloudFront 2개, `PriceClass_100` | 광범위 edge price class 회피 |
+| Edge proxy | Cloudflare Worker 1개, `workers.dev` | custom zone/certificate/DNS 리소스 미생성 |
+| Media | 12초 VOD HLS, 약 3.2MiB × 2 origin | 상시 live ingest·encoder 미구성 |
+| Cache | playlist 2~5초, segment 최대 24시간 | playlist freshness와 segment 재사용 분리 |
+
+검증 후 Worker와 Terraform media state를 먼저 제거한다. S3 bucket은 `force_destroy=true`, 1일 lifecycle을 보조 가드레일로 두지만, 최종 비용 통제는 직접 API 감사와 즉시 teardown이다.
+
+## 2026-09-03 S3 → Glue → private RDS 실험 비용 기록
+
+이번 데이터 이관 실험은 별도의 `terraform/migration_lab`로 분리했다. 서울
+리전에서 `db.t4g.micro` 단일 AZ RDS, Glue G.1X 2개 작업자, S3 Gateway
+Endpoint와 Secrets Manager·CloudWatch Logs용 인터페이스 Endpoint만 사용했다.
+EKS, NAT Gateway, ALB, Bastion, RDS 읽기 복제본은 생성하지 않았다.
+
+| 확인 항목 | 결과 |
+|---|---|
+| Terraform 생성 프로필 | `s3-glue-rds-minimal`, short-lived validation |
+| 실환경 검증 | 정상 4건 이관·재실행, 잘못된 1건 reject |
+| 리소스 폐기 | 38개 destroy 완료, 전용 태그 기준 VPC/RDS/NAT/Endpoint 0건 |
+| Cost Explorer 즉시 조회 | `Estimated=true`, `UnblendedCost=0 USD`, 서비스 그룹 없음 |
+| 비용 해석 | 당일 비용 반영 전일 수 있으므로 최종 청구액으로 사용하지 않음 |
+
+이 실험에서 비용을 낮춘 핵심은 더 작은 숫자를 고르는 것보다 생성 범위를
+줄이고, Endpoint·RDS 삭제가 끝날 때까지 Terraform을 기다린 뒤, 자원 조회로
+잔여 상태를 확인한 것이다. 실제 청구액이 반영되면 `data-engineering-log.md`
+의 결과와 함께 갱신한다.

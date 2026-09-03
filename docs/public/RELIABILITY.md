@@ -61,7 +61,7 @@
 | Bronze output | Parquet 2개 이상, 각 약 0.34~0.39MB | S3 직접 list 확인 |
 | Athena Bronze | 29,391 rows, 100 robots, 08:16:08Z~08:21:01Z | buffer flush 전 조회는 일부 구간만 포함 |
 
-현재 계정의 Managed Flink application 목록은 비어 있어 anomaly alert KDS 발화 결과는 검증하지 않았다. `scripts/flink_integration_test.py`는 Notebook이 RUNNING이고 alert sink가 연결된 후에만 실행한다. 따라서 이번 AWS 증거는 수집·저장·freshness/lag 경계까지이며, Flink detector의 실제 발화·Lambda/Slack 전달을 성공했다고 말하지 않는다.
+이번 실행 직전 계정의 Managed Flink application 목록은 비어 있었으므로 anomaly alert KDS 발화와 Lambda/Slack 전달은 재실행하지 않았다. `scripts/flink_integration_test.py`는 Notebook이 RUNNING이고 alert sink가 연결된 후에만 실행한다. 따라서 이번 AWS 증거는 수집·저장·freshness/lag 경계까지이며, Flink detector의 이번 실행 성공으로 과장하지 않는다. 과거 Notebook 실행에서 확보한 alert/Slack 증거는 별도 이력으로 관리한다.
 
 ## 2026-08-24 teardown 감사
 
@@ -78,3 +78,9 @@
 추가로 PVC가 남긴 1GiB 고아 EBS volume을 발견했다. 해당 volume은 `available`, attachment 없음, 테스트 cluster tag가 일치하는 것을 확인한 뒤 명시적으로 삭제했고 EC2 `describe-volumes` 재조회에서 `NotFound`가 반환됐다. Resource Groups Tagging API는 잠시 삭제된 ARN을 캐시해 반환했으므로, teardown 판정은 실제 서비스 control plane 조회를 우선한다. Kubernetes Stateful workload를 단기 실행할 때는 cluster 삭제만으로 PVC/EBS가 항상 제거된다고 가정하지 않는다.
 
 따라서 현재 남아 있는 실행 리소스를 전제로 비용을 추정하지 않는다. Cost Explorer의 당일 값은 청구 지연으로 최종 청구액과 다를 수 있으므로 다음 실행에서도 `Estimated` 표기와 teardown 감사 결과를 함께 기록한다.
+
+## 2026-08-24 실제 HLS edge 검증
+
+두 private S3 origin과 두 CloudFront distribution 위에 Cloudflare Worker를 배치했다. Worker 정상 경로는 primary CloudFront를 사용했고, controlled primary failure 주입 시 secondary CloudFront로 전환했다. playlist와 첫 segment 모두 5/5회 `200`이었으며 Worker playlist p95는 정상 238.63ms, failover 241.46ms였다. 이 수치는 짧은 VOD synthetic probe의 결과이며 live ingest/rebuffering SLO가 아니다.
+
+검증기는 처음 `Python-urllib/3.x` User-Agent로 Cloudflare 1010/403을 받았다. curl과 브라우저형 User-Agent를 비교해 bot protection에 의한 probe fingerprint 문제임을 확인하고, 검증기에 브라우저형 User-Agent를 명시했다. 이후 origin 장애와 probe 차단을 구분할 수 있게 되었다.

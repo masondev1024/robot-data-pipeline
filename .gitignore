@@ -64,6 +64,9 @@ prism/*.zip
 **/tfplan
 **/*.tfplan
 
+# Keep the disposable media lab provider lock for reproducible reruns.
+!terraform/media_lab/.terraform.lock.hcl
+
 # 본선 자료 PDF — git 추적 X
 *.pdf
 PRISM_마스터가이드.pdf
@@ -87,6 +90,8 @@ terraform/tfplan
 비용절감플랜/
 # 로컬 AI 도구 / 세션 산출물 (공개 X)
 .claude/
+.codex/
+AGENTS.md
 CLAUDE.md
 # 설계/운영 문서 — 로컬 보존, GitHub에는 검토된 public 문서만 노출
 docs/*

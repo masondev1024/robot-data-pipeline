@@ -1,0 +1,44 @@
+{
+  "experiment": "s3-to-glue-to-private-rds-rejection",
+  "region": "ap-northeast-2",
+  "batch_id": "robot-invalid-20260903",
+  "attempt_id": "attempt-01",
+  "execution": {
+    "extract": {
+      "run_id": "jr_cd484555216b3bb55169f1592419c8abfc3ee324f71b134bc22bcd8fa4e794d3",
+      "status": "FAILED",
+      "started_at": "2026-09-03T10:22:56.716+09:00",
+      "completed_at": "2026-09-03T10:25:01.950+09:00",
+      "expected_failure": true,
+      "reason": "data contract validation failed"
+    },
+    "verify": {
+      "run_id": "jr_299d6bfda55a3fd6a1a549059388cb0c6acad7651fa2472d0ab9747cc296986d",
+      "status": "SUCCEEDED",
+      "started_at": "2026-09-03T10:34:17.417+09:00",
+      "completed_at": "2026-09-03T10:35:48.241+09:00"
+    }
+  },
+  "counts": {
+    "source_rows": 2,
+    "accepted_rows": 1,
+    "rejected_rows": 1,
+    "duplicate_rows": 0,
+    "staged_rows": 0,
+    "merged_rows": 0,
+    "target_rows_for_batch": 0,
+    "target_total_rows_after_test": 4,
+    "target_distinct_event_ids_after_test": 4,
+    "audit_status": "REJECTED"
+  },
+  "reject_sample": {
+    "reason": "INVALID_BATTERY_LEVEL",
+    "field": "battery_level",
+    "observed_value": 120
+  },
+  "claims": {
+    "invalid_row_reached_target": false,
+    "secrets_in_evidence": false,
+    "fail_closed_batch_policy": true
+  }
+}
