@@ -2,7 +2,16 @@
 
 > 스마트 팩토리 로봇 텔레메트리를 수집·처리·운영하고, 예측 결과를 인과 기반 의사결정으로 연결하는 AWS 플랫폼 엔지니어링 프로젝트
 
-이 저장소는 단순 데이터 분석 데모가 아니라 **1,000대 로봇을 가정한 스트리밍·레이크하우스·배치·ML·관측성 플랫폼**과, 같은 데이터 계약을 사용하는 **오프라인 결정론적 PRISM 데모**를 함께 담고 있습니다.
+생성한 로봇 센서 데이터를 수집·저장·검증하는 데이터 플랫폼입니다. Kinesis·S3 수집, Glue 기반 RDS 이관, 재처리와 적재 지연 관측을 구현했습니다. 로봇 1,000대는 설계 시나리오이며 실제 운영 대수가 아닙니다. 같은 데이터 계약을 사용하는 오프라인 PRISM 데모도 별도 경로로 포함합니다.
+
+## 구현 내용과 검증 기록
+
+S3 → Glue → 사설 RDS 이관의 구현과 소량 AWS 실행 기록은 다음 경로에서 확인할 수 있습니다.
+
+- 데이터 계약과 처리 경계: [이관 설계](docs/public/S3-GLUE-RDS-LAB.md), [행 검증·이벤트 키](src/migration/s3_to_rds_contract.py), [Glue 품질 검사](jobs/glue/s3_to_rds.py), [트랜잭션 승격](jobs/glue/promote_batch.py).
+- 정상 배치: [2026-09-03 실행 기록](docs/public/evidence/2026-09-03-migration-success.json)에서 원천·staging·승격 각 4건, 같은 배치 재실행 후 target과 고유 `event_id` 각 4건을 확인했습니다.
+- 불량 배치: [같은 날 거부 기록](docs/public/evidence/2026-09-03-migration-reject.json)의 원천 2건은 정상 판정 1건·계약 위반 1건입니다. 계약 위반이 있으면 배치 전체를 차단하므로 정상 판정 행도 적재하지 않으며, staging·승격은 모두 0건이고 기존 target 4건은 유지됐습니다.
+- 검증 범위: [증거 해석 기준](docs/public/evidence/README.md)과 [계약 테스트](tests/migration/test_s3_to_rds_contract.py)를 함께 읽습니다. 위 수치는 서울 리전의 소량 실행 기록이며, 대규모 처리량·고가용성·장기 SLO·전체 경로의 exactly-once를 입증하지 않습니다.
 
 ## 한눈에 보는 결과
 
