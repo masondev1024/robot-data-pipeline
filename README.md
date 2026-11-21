@@ -1,54 +1,33 @@
-# Robot Data Platform + PRISM
+# Robot Data Platform
 
-> 스마트 팩토리 로봇 텔레메트리를 수집·처리·운영하고, 예측 결과를 인과 기반 의사결정으로 연결하는 AWS 플랫폼 엔지니어링 프로젝트
+합성 센서 기록으로 로봇별 하루 최고 온도와 배터리 사용량, 이상 신호 횟수를 집계하는 개인 프로젝트입니다. Terraform으로 AWS 네트워크와 EKS를 구성하고, 센서 생성기와 조회 API를 Docker 이미지로 만들어 ECR에 올린 뒤 EKS에 배포했습니다. [인프라 구성](docs/public/ARCHITECTURE.md) · [배포 워크플로](.github/workflows/k8s-deploy.yml)
 
-생성한 로봇 센서 데이터를 수집·저장·검증하는 데이터 플랫폼입니다. Kinesis·S3 수집, Glue 기반 RDS 이관, 재처리와 적재 지연 관측을 구현했습니다. 로봇 1,000대는 설계 시나리오이며 실제 운영 대수가 아닙니다. 같은 데이터 계약을 사용하는 오프라인 PRISM 데모도 별도 경로로 포함합니다.
+## AWS에서 확인한 결과
 
-## 구현 내용과 검증 기록
-
-S3 → Glue → 사설 RDS 이관의 구현과 소량 AWS 실행 기록은 다음 경로에서 확인할 수 있습니다.
-
-- 데이터 계약과 처리 경계: [이관 설계](docs/public/S3-GLUE-RDS-LAB.md), [행 검증·이벤트 키](src/migration/s3_to_rds_contract.py), [Glue 품질 검사](jobs/glue/s3_to_rds.py), [트랜잭션 승격](jobs/glue/promote_batch.py).
-- 정상 배치: [2026-09-03 실행 기록](docs/public/evidence/2026-09-03-migration-success.json)에서 원천·staging·승격 각 4건, 같은 배치 재실행 후 target과 고유 `event_id` 각 4건을 확인했습니다.
-- 불량 배치: [같은 날 거부 기록](docs/public/evidence/2026-09-03-migration-reject.json)의 원천 2건은 정상 판정 1건·계약 위반 1건입니다. 계약 위반이 있으면 배치 전체를 차단하므로 정상 판정 행도 적재하지 않으며, staging·승격은 모두 0건이고 기존 target 4건은 유지됐습니다.
-- 검증 범위: [증거 해석 기준](docs/public/evidence/README.md)과 [계약 테스트](tests/migration/test_s3_to_rds_contract.py)를 함께 읽습니다. 위 수치는 서울 리전의 소량 실행 기록이며, 대규모 처리량·고가용성·장기 SLO·전체 경로의 exactly-once를 입증하지 않습니다.
-
-## 한눈에 보는 결과
-
-| 영역 | 구현 |
-|---|---|
-| Streaming | Kinesis Data Streams → Firehose → S3 Parquet, 시간 prefix + Athena partition projection |
-| Lakehouse | Bronze/Silver/Gold, Glue/Athena Partition Projection |
-| Platform | EKS, Karpenter, HPA/PDB, IRSA, ALB, Helm pinning |
-| Batch/ML | Airflow 2.10.5 DAG, SageMaker XGBoost 학습·재배포 |
-| Observability | CloudWatch, ADOT/X-Ray, Grafana 5종 대시보드, Slack alert |
-| IaC/GitOps | Terraform 모듈, GitHub Actions OIDC, 배포 후 검증 |
-| AI decision layer | DoWhy 6-node causal DAG, 4-agent supervisor, Bedrock cache replay |
-| Reproducibility | DuckDB 기반 오프라인 데모, 고정 seed/hash, 회귀 테스트 |
+- **8월 24일 · Kinesis 수신 41,000건.** 초당 약 100건을 보낸 뒤 S3에 Parquet 파일이 생긴 것을 확인했습니다. Firehose 버퍼가 모두 비워지기 전 Athena에서 조회한 구간은 로봇 100대의 29,391행입니다. [수집·저장 지표](docs/public/RELIABILITY.md#2026-08-24-전체-파이프라인-short-lived-aws-증거)
+- **8월 25일 · 센서 원본 2,965행 → 로봇 10대의 일별 통계 10행.** 별도 배치 시험에서 Airflow 일배치와 같은 조건의 SQL을 Athena에서 직접 실행했습니다. 정제 후 2,965행을 확인하고 로봇별로 집계했습니다. [배치 집계 기록](https://jungseongheon.org/portfolio/evidence/robot-batch-20260825.json)
+- **9월 3일 · 사설 RDS 재실행 후 고유 4건 유지.** Glue Spark로 검사한 정상 4건을 다시 반영해도 건수가 같았습니다. 정상 1건에 배터리 값이 120인 행을 섞은 배치는 전체를 차단해 신규 반영 0건이었습니다. [정상 배치·재실행](docs/public/evidence/2026-09-03-migration-success.json) · [오류 배치](docs/public/evidence/2026-09-03-migration-reject.json)
 
 ## 아키텍처
 
+Kinesis에서는 로봇 ID로 이벤트를 나눠 받습니다. S3에는 Firehose가 시간별로 묶어 저장합니다. 로봇마다 작은 파일이 생기는 일을 줄이고, 조회할 시간대만 골라 읽기 위해서입니다. 자정(KST)에 실행하도록 구성한 Airflow 일배치에서 Athena SQL로 원본을 검사하고 로봇 ID·측정 시각이 같은 기록을 정리합니다. [일배치 코드](dags/robot_daily_etl.py) · [포트폴리오 상세](https://jungseongheon.org/portfolio/#robot)
+
 ```mermaid
-flowchart LR
-  R["Robot telemetry"] --> KDS["Kinesis Data Streams"]
-  KDS --> FH["Firehose"] --> S3["S3 Parquet\nBronze / Silver / Gold"]
-  KDS --> FL["Managed Flink"] --> AL["Alert KDS"] --> LA["Lambda → Slack"]
-  S3 --> AT["Glue + Athena"]
-  AT --> AF["Airflow ETL"]
-  AT --> SM["SageMaker XGBoost"]
-  AT --> API["FastAPI portal"]
-  AT --> PR["PRISM causal supervisor"]
-  API --> GF["Grafana / operator UI"]
-  SM --> PR
+flowchart TD
+    Gen["센서 생성기 · EKS"] --> KDS["Kinesis Data Streams"]
+    KDS --> FH["Firehose · JSON → Parquet"] --> Raw["S3 Bronze · 시간별 원본"]
+    AF["Airflow · 일배치"] --> SQL["Athena SQL · 품질 검사와 집계"]
+    Raw --> SQL --> Out["S3 Silver · 정제 / Gold · 로봇별 일별 통계"]
+    Out --> Query["Athena 조회"] --> API["FastAPI · 조회 API"]
 ```
 
-- 설계와 트레이드오프: [`docs/public/ARCHITECTURE.md`](docs/public/ARCHITECTURE.md)
-- 운영 신뢰성 사례: [`docs/public/RELIABILITY.md`](docs/public/RELIABILITY.md)
-- PRISM ↔ production 계약: [`docs/public/INTERFACE.md`](docs/public/INTERFACE.md)
+- **수집과 저장 사이의 지연**은 CloudWatch로 따로 확인합니다. 8월 24일 수집 구간에서 Kinesis 쓰기 제한은 0건이었고 Firehose의 S3 전달 신선도는 306~312초였습니다. [신뢰성 기록](docs/public/RELIABILITY.md)
+- **분석 조회**에는 Glue Data Catalog의 스키마와 Athena Partition Projection을 사용합니다. API는 수집이 늦은 날 최근 데이터가 있는 파티션을 선택해 캐시를 갱신합니다. [조회 설계](docs/public/ARCHITECTURE.md)
+- **사설 RDS 이관**은 별도의 배치 경로입니다. S3 Parquet를 Glue Spark로 검사해 staging에 넣고, 한 트랜잭션으로 최종 테이블에 반영합니다. 입력 오류는 S3와 감사 테이블에 남깁니다. [이관 설계](docs/public/S3-GLUE-RDS-LAB.md) · [행 검사](src/migration/s3_to_rds_contract.py) · [Glue 작업](jobs/glue/s3_to_rds.py) · [최종 반영 코드](jobs/glue/promote_batch.py) · [계약 테스트](tests/migration/test_s3_to_rds_contract.py)
 
-## 5분 오프라인 데모
+## PRISM 오프라인 데모
 
-AWS 비용이나 계정 없이 PRISM 의사결정 흐름을 재현할 수 있습니다.
+같은 저장소의 **PRISM**은 공구 교체나 속도 조정 같은 대응 방안을 비교하는 팀 시제품입니다. DuckDB와 저장된 모델 응답을 사용해 노트북에서 의사결정 화면을 재현할 수 있습니다. [데이터·예측 인터페이스](docs/public/INTERFACE.md)
 
 ```bash
 cd prism
@@ -88,27 +67,6 @@ Airflow 2.10.5 DAG contract는 별도 CI job에서 검증하고, AWS 의존 E2E�
 
 실제 HLS·CloudFront·Cloudflare 경로까지 짧게 검증하려면 [`docs/public/MEDIA-LAB.md`](docs/public/MEDIA-LAB.md)를 사용합니다. 두 리전 private S3와 CloudFront OAC, Cloudflare Worker primary/fallback 경로를 만들고 HLS playlist·segment 및 controlled failover를 측정한 뒤 Worker와 AWS 리소스를 모두 teardown합니다.
 
-## 데이터 운영 실습 확장
-
-로봇 텔레메트리 운영에서 자주 필요한 원천 검증·재처리·감사 흐름도 별도 실습
-프로필로 분리했습니다. S3 Bronze Parquet를 AWS Glue Spark에서 데이터 계약으로
-검증하고, 정상 행만 private RDS staging을 거쳐 target으로 승격합니다. 계약 위반
-행은 S3 reject와 감사 장부에 남기며, `event_id`와 DB 제약으로 재실행 중복을
-막습니다. 실제 서울 리전 실행에서 정상 4건은 4건으로 승격됐고 같은 batch replay
-후에도 target 4건을 유지했으며, 잘못된 2건은 1건 reject·0건 승격으로 끝났습니다.
-
-- 이관 설계와 재현 절차: [`docs/public/S3-GLUE-RDS-LAB.md`](docs/public/S3-GLUE-RDS-LAB.md)
-- 실제 실행 증적: [`docs/public/evidence/2026-09-03-migration-success.json`](docs/public/evidence/2026-09-03-migration-success.json), [`docs/public/evidence/2026-09-03-migration-reject.json`](docs/public/evidence/2026-09-03-migration-reject.json)
-- 작업 판단 기록: [`docs/public/data-engineering-log.md`](docs/public/data-engineering-log.md)
-- 트러블슈팅: [`docs/public/troubleshooting.md`](docs/public/troubleshooting.md)
-- 직접 실습 순서: [`docs/public/lessonrun.md`](docs/public/lessonrun.md)
-- 날씨 예보 품질·공간 제품: [`docs/architecture/forecast-quality-spatial-product.md`](docs/architecture/forecast-quality-spatial-product.md)
-- Kafka 이벤트의 날짜별 Parquet 저장: Kafka 저장소의 [`docs/LAKEHOUSE-PARQUET-LAB.md`](https://github.com/masondev1024/KafKa/blob/main/docs/LAKEHOUSE-PARQUET-LAB.md)
-
-2026-08-24에는 별도의 short-lived 전체 EKS profile도 실행해 100 records/s 수집 구간, Firehose freshness, Bronze Parquet 적재와 API/Grafana readiness를 실제 AWS에서 확인했습니다. 이번 실행 직전 계정에 Managed Flink application이 없었기 때문에 anomaly alert 발화와 Slack 전달은 재실행하지 않았으며, 과거 실행에서 확보한 증거와 이번 미디어 Lab 범위는 분리해 기록했습니다. 수치와 한계는 [`docs/public/RELIABILITY.md`](docs/public/RELIABILITY.md)와 [`docs/public/FLINK-ANOMALY-CONTRACT.md`](docs/public/FLINK-ANOMALY-CONTRACT.md)에 분리해 기록했습니다.
-
-루트 `terraform/` 전체 스택은 비용 실수를 막기 위해 `allow_full_stack_apply=false`가 기본입니다. EKS·EC2·NAT·ALB·RDS·SageMaker를 검증해야 할 때만 비용 승인 후 `-var='allow_full_stack_apply=true'`를 명시하고, 일반 스트리밍 검증에는 validation 프로필을 사용합니다. 상세 선택 근거와 비용 비교는 [`docs/public/COST-ESTIMATE.md`](docs/public/COST-ESTIMATE.md)와 [`docs/public/ARCHITECTURE.md`](docs/public/ARCHITECTURE.md)에 기록했습니다.
-
 ## 계정 이식성과 배포 안전 게이트
 
 - K8s·Helm·Athena 배포 원본에는 AWS 계정 ID, 리전, 버킷, 이미지 태그를 고정하지 않습니다. `scripts/render_deployment.py`가 검증된 비밀 아닌 좌표만 별도 디렉터리에 렌더링하며 원본은 수정하지 않습니다.
@@ -132,13 +90,12 @@ python3 scripts/render_deployment.py --output "$RENDER_ROOT"
 bash scripts/sync_airflow_admin_secret.sh
 ```
 
-## 플랫폼 엔지니어링에서 강조한 문제
+## 운영 기록
 
-- **장애를 코드와 가드레일로 환원:** KDS 재생성 후 Firehose/Lambda 연결 고착, ratio alarm 단위 오류, stale VolumeAttachment 같은 실제 운영 실패를 runbook과 자동화 조건으로 반영했습니다.
-- **비용도 플랫폼 품질로 취급:** HPA·Ingress·ALB·Grafana 잔존으로 생기는 유휴 비용까지 종료 순서에 포함했습니다.
-- **보안 경계:** GitHub Actions OIDC, IRSA, Secrets Manager/SSM을 사용하고 webhook·자격증명 하드코딩을 금지합니다.
-- **데이터 계약과 재현성:** production Athena와 demo DuckDB가 `DataSource`/`Predictor` 계약을 공유하고, demo는 고정 seed와 cache replay로 재현됩니다.
-- **정직한 검증 범위:** 로컬 결정론 테스트와 실제 AWS E2E 상태를 문서에서 분리합니다.
+- 품질 검사와 재처리 기준, Glue 작업을 사설 RDS에 연결하면서 겪은 오류. [판단 기록](docs/public/data-engineering-log.md) · [트러블슈팅](docs/public/troubleshooting.md) · [이관 재현 순서](docs/public/lessonrun.md) · [실행 기록 해석](docs/public/evidence/README.md)
+- Flink의 이상 신호 탐지는 AWS Studio Notebook에서 관리합니다. 8월 24일 시험은 Kinesis 수집과 S3 전달 구간을 대상으로 했습니다. [탐지 규칙과 검증 방법](docs/public/FLINK-ANOMALY-CONTRACT.md)
+- 전체 Terraform 환경은 비용 승인을 거쳐 실행합니다. 기본값은 `allow_full_stack_apply=false`입니다. [비용 추정과 환경 선택 기준](docs/public/COST-ESTIMATE.md)
+- 관련 데이터 프로젝트. [ASK Seoul 예보 품질·공간 데이터](https://github.com/masondev1024/seoul-weather-platform/blob/main/docs/architecture/forecast-quality-spatial-product.md) · [D2C Kafka 이벤트의 Iceberg 적재](https://github.com/masondev1024/d2c-event-data-platform/blob/main/lakehouse/d2c_iceberg_stream.py)
 
 ## 저장소 구조
 
